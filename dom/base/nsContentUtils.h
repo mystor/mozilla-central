@@ -2441,6 +2441,38 @@ public:
 
   static bool PushEnabled(JSContext* aCx, JSObject* aObj);
 
+  // The order of these entries matters, as we use std::min for total ordering
+  // of permissions. Private Browsing is considered to be more limiting
+  // then session scoping
+  enum class StorageAccess {
+    // Don't allow access to the storage
+    eDeny = 0,
+    // Allow access to the storage, but only if it is secure to do so in a
+    // private browsing context.
+    ePrivateBrowsing = 1,
+    // Allow access to the storage, but only persist it for the current session
+    eSessionScoped = 2,
+    // Allow access to the storage
+    eAllow = 3,
+  };
+
+  /*
+   * Checks if storage for the given window is prohibited by the user's
+   * preferences, and the window's third-party status.
+   *
+   * This logic is intended to be shared between the different forms of
+   * persistent storage which are avaliable to web pages. Cookies don't use
+   * this logic, and security logic related to them must be updated seperately.
+   */
+  static StorageAccess StorageAllowedForWindow(nsPIDOMWindow* aWindow);
+
+  /*
+   * Checks if storage for the given principal is prohibited by the user's
+   * preferences. This is the same as StorageAllowedForWindow, except that
+   * aPrincipal must be non-null, and the context is assumed to be first-party.
+   */
+  static StorageAccess StorageAllowedForPrincipal(nsIPrincipal* aPrincipal);
+
 private:
   static bool InitializeEventTable();
 
@@ -2480,6 +2512,18 @@ private:
   static void CallOnAllRemoteChildren(nsIMessageBroadcaster* aManager,
                                       CallOnRemoteChildFunction aCallback,
                                       void* aArg);
+
+  /*
+   * Checks if storage for a given principal is prohibited by the user's
+   * preferences. If aWindow is non-null, its principal must be passed as
+   * aPrincipal, and the third-party and sandboxing status of the window
+   * are also checked.
+   *
+   * Used in the implementation of StorageAllowedForWindow and
+   * StorageAllowedForPrincipal.
+   */
+  static StorageAccess InternalStorageAllowedForPrincipal(nsIPrincipal* aPrincipal,
+                                                                                   nsPIDOMWindow* aWindow);
 
   static nsIXPConnect *sXPConnect;
 
@@ -2544,6 +2588,8 @@ private:
   static bool sEncodeDecodeURLHash;
   static bool sGettersDecodeURLHash;
   static bool sPrivacyResistFingerprinting;
+  static uint32_t sCookiesLifetimePolicy;
+  static uint32_t sCookiesBehavior;
 
   static nsHtml5StringParser* sHTMLFragmentParser;
   static nsIParser* sXMLFragmentParser;
