@@ -108,7 +108,7 @@ public:
    * into multiple ranges to exclude those before adding the resulting ranges
    * to this Selection.
    */
-  nsresult      AddItem(nsRange* aRange, int32_t* aOutIndex);
+  nsresult      AddItem(nsRange* aRange, int32_t* aOutIndex, bool aNoStartSelect = false);
   nsresult      RemoveItem(nsRange* aRange);
   nsresult      RemoveCollapsedRanges();
   nsresult      Clear(nsPresContext* aPresContext);
@@ -229,6 +229,23 @@ public:
     AutoRestore<bool> mSavedValue;
     MOZ_DECL_USE_GUARD_OBJECT_NOTIFIER
   };
+
+  // The nsSelectionEventListener class uses this field to keep track of the ranges
+  // which were present in the selection when the selectionchange event was previously
+  // fired. This allows for the selectionchange event to only be fired
+  // when a selection is actually changed.
+  struct RawRangeData {
+    nsCOMPtr<nsINode> mStartParent;
+    nsCOMPtr<nsINode> mEndParent;
+    // XXX These are int32_ts on nsRange, but uint32_ts in the return value
+    // of GetStart_, so I use uint32_ts here. See bug 1194256.
+    uint32_t mStartOffset;
+    uint32_t mEndOffset;
+
+    explicit RawRangeData(const nsRange* aRange);
+    bool Equals(const nsRange* aRange);
+  };
+  nsTArray<RawRangeData> mOldRanges;
 private:
   friend struct mozilla::AutoPrepareFocusRange;
   class ScrollSelectionIntoViewEvent;
@@ -312,7 +329,8 @@ private:
   SelectionType mType;
   /**
    * True if the current selection operation was initiated by user action.
-   * It determines whether we exclude -moz-user-select:none nodes or not.
+   * It determines whether we exclude -moz-user-select:none nodes or not,
+   * as well as whether selectstart events will be fired.
    */
   bool mApplyUserSelectStyle;
 };

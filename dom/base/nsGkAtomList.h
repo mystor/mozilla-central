@@ -2377,3 +2377,5 @@ GK_ATOM(onboundary, "onboundary")
 #endif
 
 GK_ATOM(vr_state, "vr-state")
+GK_ATOM(onselectstart, "onselectstart")
+GK_ATOM(onselectionchange, "onselectionchange")

@@ -752,6 +752,7 @@ private:
   bool mDesiredPosSet;
 
   int8_t mCaretMovementStyle;
+  bool mSelectionEvents;
 };
 
 #endif /* nsFrameSelection_h___ */

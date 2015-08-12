@@ -136,6 +136,7 @@ using namespace mozilla::system;
 #include "TouchManager.h"
 #include "MediaDecoder.h"
 #include "mozilla/layers/CompositorLRU.h"
+#include "nsSelectionChangeListener.h"
 
 using namespace mozilla;
 using namespace mozilla::net;
@@ -384,6 +385,7 @@ nsLayoutStatics::Shutdown()
   nsListControlFrame::Shutdown();
   nsXBLService::Shutdown();
   nsAutoCopyListener::Shutdown();
+  nsSelectionChangeListener::Shutdown();
   FrameLayerBuilder::Shutdown();
 
 #ifdef MOZ_ANDROID_OMX

@@ -444,6 +444,11 @@
 #define NS_EDITOR_EVENT_START    6100
 #define NS_EDITOR_INPUT          (NS_EDITOR_EVENT_START)
 
+// selection events
+#define NS_SELECT_EVENT_START    6200
+#define NS_SELECT_START          (NS_SELECT_EVENT_START)
+#define NS_SELECTION_CHANGE      (NS_SELECT_EVENT_START+1)
+
 namespace IPC {
 template<typename T>
 struct ParamTraits;
