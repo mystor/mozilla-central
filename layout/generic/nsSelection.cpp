@@ -1749,9 +1749,11 @@ printf(" * TakeFocus - moving into new cell\n");
         if (mDomSelections[index]->GetDirection() == eDirNext && aContentEndOffset > aContentOffset) //didn't go far enough 
         {
           mDomSelections[index]->Extend(aNewFocus, aContentEndOffset);//this will only redraw the diff 
-        }
-        else
+        } else {
           mDomSelections[index]->Extend(aNewFocus, aContentOffset);
+        }
+        // Don't notify selection listeners again!
+        return NS_OK;
       }
     }
   }
