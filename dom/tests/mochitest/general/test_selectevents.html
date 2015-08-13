@@ -1,0 +1,244 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Testing Selection Events</title>
+    <script type="text/javascript" src="/tests/SimpleTest/SimpleTest.js"></script>
+    <script type="text/javascript" src="/tests/SimpleTest/EventUtils.js"></script>
+    <link rel="stylesheet" type="text/css" href="/tests/SimpleTest/test.css" />
+  </head>
+
+  <body>
+    <div id="normal">
+      <span id="span0">This is a random block of text</span>
+      <span id="span1">with a span</span>
+      <span id="span2">and another span</span>
+    </div>
+
+    <div id="ce" contenteditable>
+      This is a random block of text
+    </div>
+
+    <script>
+      // Basic add_task like runner for mochitest-plain
+      function task(fn) {
+        SimpleTest.waitForExplicitFinish();
+
+        var gen = fn();
+        function next_step(val, e) {
+          var it;
+          try {
+            if (typeof e !== "undefined") {
+              it = gen.throw(e);
+            } else {
+              it = gen.next(val);
+            }
+          } catch (e) {
+            ok(false, "An error was thrown while stepping: " + e);
+            ok(false, "Stack: " + e.stack);
+            SimpleTest.finish();
+          }
+
+          if (it.done) {
+            SimpleTest.finish();
+            return;
+          }
+          it.value.then(next_step, (e) => SimpleTest.executeSoon(() =>next_step(null, e)));
+        }
+
+        next_step();
+      }
+
+      function spin() {
+        return new Promise(function(a) {
+          SimpleTest.executeSoon(function() {
+            SimpleTest.executeSoon(a)
+          });
+        });
+      }
+
+      // The main test
+      task(function *() {
+        yield spin();
+
+        var selectstart = 0;
+        var selectionchange = 0;
+        var cancel = false;
+        document.addEventListener('selectstart', function(aEvent) {
+          console.log(selectstart);
+          selectstart++;
+
+          if (cancel) {
+            aEvent.preventDefault();
+          }
+        });
+        document.addEventListener('selectionchange', function() {
+          console.log(selectionchange);
+          selectionchange++;
+        });
+
+        function elt(aId) { return document.getElementById(aId); }
+        function reset() { selectstart = 0; selectionchange = 0; cancel = false; }
+
+        function* mouseAction(aElement, aOffset, aType, aSelStart, aSelChng) {
+          synthesizeMouse(aElement, aOffset, 10, { type: aType });
+          yield spin();
+          is(selectstart, aSelStart,
+             "SelStart Mouse Action (" + aOffset + " - " + aType + ")");
+          is(selectionchange, aSelChng,
+             "SelChng Mouse Action (" + aOffset + " - " + aType + ")");
+          reset();
+        }
+
+        function* keyAction(aKey, aShift, aAccel, aSelStart, aSelChng) {
+          synthesizeKey(aKey, { shiftKey: aShift, accelKey: aAccel });
+          yield spin();
+          is(selectstart, aSelStart,
+             "SelStart Key Action (" + aKey + " - " + aShift + " - " + aAccel + ")");
+          is(selectionchange, aSelChng,
+             "SelChng Key Action (" + aKey + " - " + aShift + " - " + aAccel + ")");
+          reset();
+        }
+
+        var selection = document.getSelection();
+        function isCollapsed() { is(selection.isCollapsed, true, "Selection is collapsed"); }
+        function isNotCollapsed() { is(selection.isCollapsed, false, "Selection is not collapsed"); }
+
+        // Focus the contenteditable text
+        yield* mouseAction(elt("ce"), 100, undefined, 0, 1);
+        isCollapsed();
+
+        // Move the selection to the right, this should only fire selectstart once
+        yield* keyAction("VK_RIGHT", true, false, 1, 1);
+        isNotCollapsed();
+        yield* keyAction("VK_RIGHT", true, false, 0, 1);
+        isNotCollapsed();
+
+        // Move it back so that the selection is empty again
+        yield* keyAction("VK_LEFT", true, false, 0, 1);
+        isNotCollapsed();
+        yield* keyAction("VK_LEFT", true, false, 0, 1);
+        isCollapsed();
+
+        // Going from empty to non-empty should fire selectstart again
+        yield* keyAction("VK_LEFT", true, false, 1, 1);
+        isNotCollapsed();
+
+        function* mouseMoves(aElement) {
+          // Select a region
+          yield* mouseAction(aElement, 50, "mousedown", 0, 1);
+          isCollapsed();
+          yield* mouseAction(aElement, 100, "mousemove", 1, 1);
+          isNotCollapsed();
+
+          // Moving it more shouldn't trigger a start (move back to empty)
+          yield* mouseAction(aElement, 75, "mousemove", 0, 1);
+          isNotCollapsed();
+          yield* mouseAction(aElement, 50, "mousemove", 0, 1);
+          isCollapsed();
+
+          // Wiggling the mouse a little such that it doesn't select any
+          // characters shouldn't trigger a selection
+          yield* mouseAction(aElement, 49, "mousemove", 0, 0);
+          isCollapsed();
+
+          // Moving the mouse again from an empty selection should trigger a
+          // selectstart
+          yield* mouseAction(aElement, 25, "mousemove", 1, 1);
+          isNotCollapsed();
+
+          // Releasing the mouse shouldn't do anything
+          yield* mouseAction(aElement, 25, "mouseup", 0, 0);
+          isNotCollapsed();
+
+          // And neither should moving your mouse around when the mouse
+          // button isn't pressed
+          yield* mouseAction(aElement, 50, "mousemove", 0, 0);
+          isNotCollapsed();
+
+          // Clicking in an random location should move the selection, but not perform a
+          // selectstart
+          yield* mouseAction(aElement, 50, undefined, 0, 1);
+          isCollapsed();
+
+          // Clicking there again should do nothing
+          yield* mouseAction(aElement, 50, undefined, 0, 0);
+          isCollapsed();
+
+          // Selecting a region, and canceling the selectstart should mean that the
+          // selection remains collapsed
+          yield* mouseAction(aElement, 75, "mousedown", 0, 1);
+          isCollapsed();
+          cancel = true;
+          yield* mouseAction(aElement, 100, "mousemove", 1, 1);
+          isCollapsed();
+          yield* mouseAction(aElement, 100, "mouseup", 0, 0);
+          isCollapsed();
+        }
+
+        // Should work both on normal
+        yield* mouseMoves(elt("span1"));
+        // and contenteditable fields
+        yield* mouseMoves(elt("ce"));
+        // and fields with elements in them
+        yield* mouseMoves(elt("normal"));
+
+        yield* mouseAction(elt("span1"), 50, undefined, 0, 1);
+        isCollapsed();
+
+        reset();
+        // Select all should fire both selectstart and change
+        yield* keyAction("A", false, true, 1, 1);
+        isNotCollapsed();
+
+        // Clear the selection
+        yield* mouseAction(elt("span1"), 50, undefined, 0, 1);
+        isCollapsed();
+
+        // Even if we already have a selection
+        yield* mouseAction(elt("span1"), 75, "mousedown", 0, 1);
+        isCollapsed();
+        yield* mouseAction(elt("span1"), 100, "mousemove", 1, 1);
+        isNotCollapsed();
+        yield* mouseAction(elt("span1"), 100, "mouseup", 0, 0);
+        isNotCollapsed();
+
+        yield* keyAction("A", false, true, 1, 1);
+        isNotCollapsed();
+
+        // Clear the selection
+        yield* mouseAction(elt("span1"), 50, undefined, 0, 1);
+        isCollapsed();
+
+        // Make sure that a synthesized selection change doesn't fire selectstart
+        var s = document.getSelection();
+        s.removeAllRanges();
+        yield spin();
+        is(selectstart, 0, "Synthesized range removals shouldn't fire selectstart");
+        is(selectionchange, 1, "Synthesized range removals should change selectionchange");
+        reset();
+        isCollapsed();
+
+        var range = document.createRange();
+        range.selectNode(elt("span1"));
+        s.addRange(range);
+        yield spin();
+        is(selectstart, 0, "Synthesized range additions shouldn't fire selectstart");
+        is(selectionchange, 1, "Synthesized range additions should change selectionchange");
+        reset();
+        isNotCollapsed();
+
+        // Change the range, without replacing
+        range.selectNode(elt("span2"));
+        yield spin();
+        is(selectstart, 0, "Synthesized range mutations shouldn't fire selectstart");
+
+        // XXX: This is todo, because the spec isn't clear on what should happen here,
+        // and we internally don't fire a nsISelectionListener event when the range
+        // object is mutated. (see spec issue #52 for what the behavior should be here)
+        todo_is(selectionchange, 1, "Synthesized range mutations should change selectionchange");
+        reset();
+        isNotCollapsed();
+      });
+    </script>
+  </body>
+</html>
