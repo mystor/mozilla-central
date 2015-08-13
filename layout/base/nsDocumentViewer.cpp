@@ -2612,9 +2612,6 @@ NS_IMETHODIMP nsDocumentViewer::SelectAll()
   }
   if (!bodyNode) return NS_ERROR_FAILURE;
 
-  rv = selection->RemoveAllRanges();
-  if (NS_FAILED(rv)) return rv;
-
   mozilla::dom::Selection::AutoApplyUserSelectStyle userSelection(selection);
   rv = selection->SelectAllChildren(bodyNode);
   return rv;
