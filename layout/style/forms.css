@@ -75,6 +75,12 @@ input {
   overflow-clip-box: content-box;
 }
 
+input[type=password] > .anonymous-div::before {
+  content: 'S';
+  float: right;
+}
+
+
 input > .anonymous-div,
 input::-moz-placeholder {
   word-wrap: normal !important;
