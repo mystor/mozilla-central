@@ -15,13 +15,19 @@
 
   function expectProcessCreated() {
     return new Promise((resolve, reject) => {
-      var topic = "process-priority-manager:TEST-ONLY:process-created";
-      function observer() {
-        SpecialPowers.removeObserver(observer, topic);
-        ok(true, "Expect process created");
-        resolve();
-      }
-      SpecialPowers.addObserver(observer, topic, /* weak = */ false);
+      let chromeScript = SpecialPowers.loadChromeScript(_ => {
+        let Cu = Components.utils;
+        Cu.import("resource://gre/modules/Services.jsm");
+
+        var topic = "process-priority-manager:TEST-ONLY:process-created";
+        function observer() {
+          Services.obs.removeObserver(observer, topic);
+          sendAsyncMessage('finished', null);
+        }
+        Services.obs.addObserver(observer, topic, /* weak = */ false);
+      });
+
+      chromeScript.addMessageListener('finished', resolve);
     });
   }
 
@@ -65,6 +71,7 @@
     { "set": [["dom.ipc.processPriorityManager.testMode", true],
               ["dom.ipc.processPriorityManager.enabled", true],
               ["dom.ipc.tabs.disabled", false],
+              ["dom.ipc.tabs.nested.enabled", true],
               ["dom.ipc.processCount", 3],
               ["dom.mozBrowserFramesEnabled", true]] },
     () => SpecialPowers.pushPermissions([
