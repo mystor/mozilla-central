@@ -133,6 +133,45 @@ typedef FrameMetrics::ViewID ViewID;
 // we'd need to re-institute a fixed version of bug 98158.
 #define MAX_DEPTH_CONTENT_FRAMES 10
 
+namespace {
+
+bool
+// HACK
+SketchyIsOutOfProcessIframe(Element* ownerContent)
+{
+  if (!ownerContent->IsHTMLElement(nsGkAtoms::iframe)) {
+    return false;
+  }
+
+  // nsDocument.cpp does this, so it's probably OK
+  HTMLIFrameElement* iFrame = static_cast<HTMLIFrameElement*>(ownerContent);
+
+  return iFrame->IsLegalOutOfProcessIframe();
+
+  /*
+  // HACK: Check this with iFrame
+  if (!ownerContent->HasAttr(kNameSpaceID_None, nsGkAtoms::mozoutofprocessiframe)) {
+    return false;
+  }
+
+  // We require all flags except for the below whitelisted flags
+  const uint32_t REQUIRED_SANDBOX_FLAGS =
+    SANDBOX_ALL_FLAGS & ~(SANDBOXED_POINTER_LOCK | SANDBOXED_SCRIPTS |
+                          SANDBOXED_AUTOMATIC_FEATURES | SANDBOXED_FULLSCREEN);
+
+  uint32_t sandboxFlags = iFrame->GetSandboxFlags();
+  // HACK: This is kidna sucky
+  if ((sandboxFlags & REQUIRED_SANDBOX_FLAGS) == REQUIRED_SANDBOX_FLAGS) {
+    NS_WARNING("mozoutofprocessiframe property on iframe with incorrect sandbox flags");
+    return false;
+  }
+
+  return true;
+  */
+}
+
+};
+
 NS_IMPL_CYCLE_COLLECTION(nsFrameLoader, mDocShell, mMessageManager, mChildMessageManager)
 NS_IMPL_CYCLE_COLLECTING_ADDREF(nsFrameLoader)
 NS_IMPL_CYCLE_COLLECTING_RELEASE(nsFrameLoader)
@@ -182,9 +221,9 @@ nsFrameLoader::Create(Element* aOwner, bool aNetworkCreated)
 {
   NS_ENSURE_TRUE(aOwner, nullptr);
   nsIDocument* doc = aOwner->OwnerDoc();
-  NS_ENSURE_TRUE(!doc->IsResourceDoc() &&
-                 ((!doc->IsLoadedAsData() && aOwner->GetComposedDoc()) ||
-                   doc->IsStaticDocument()),
+  NS_ENSURE_TRUE(!doc->IsResourceDoc(), nullptr);
+  NS_ENSURE_TRUE((!doc->IsLoadedAsData() && aOwner->GetComposedDoc()) ||
+                 doc->IsStaticDocument(),
                  nullptr);
 
   return new nsFrameLoader(aOwner, aNetworkCreated);
@@ -1874,6 +1913,11 @@ nsFrameLoader::ShouldUseRemoteProcess()
     return false;
   }
 
+  // If we're a <iframe mozoutofprocessiframe> we should be remote.
+  if (SketchyIsOutOfProcessIframe(mOwnerContent)) {
+    return true;
+  }
+
   if (XRE_IsContentProcess() &&
       !(PR_GetEnv("MOZ_NESTED_OOP_TABS") ||
         Preferences::GetBool("dom.ipc.tabs.nested.enabled", false))) {
@@ -2442,7 +2486,7 @@ nsFrameLoader::TryRemoteBrowser()
   }
 
   // <iframe mozbrowser> gets to skip these checks.
-  if (!OwnerIsMozBrowserOrAppFrame()) {
+  if (!OwnerIsMozBrowserOrAppFrame() && !SketchyIsOutOfProcessIframe(mOwnerContent)) {
     if (parentDocShell->ItemType() != nsIDocShellTreeItem::typeChrome) {
       return false;
     }
@@ -3345,7 +3389,8 @@ nsFrameLoader::GetNewTabContext(MutableTabContext* aTabContext,
                                ownApp,
                                containingApp,
                                attrs,
-                               signedPkgOrigin);
+                               signedPkgOrigin,
+                               SketchyIsOutOfProcessIframe(mOwnerContent));
   NS_ENSURE_STATE(tabContextUpdated);
 
   return NS_OK;

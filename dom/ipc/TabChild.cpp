@@ -555,6 +555,8 @@ TabChild::Create(nsIContentChild* aManager,
                  const TabContext &aContext,
                  uint32_t aChromeFlags)
 {
+  NS_WARNING("TabChild::Create CALLED!");
+  printf("IsMozBrowserOrApp() == %d\n", aContext.IsMozBrowserOrApp());
     if (sPreallocatedTab &&
         sPreallocatedTab->mChromeFlags == aChromeFlags &&
         aContext.IsMozBrowserOrApp()) {

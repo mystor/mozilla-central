@@ -1,0 +1,60 @@
+<script src="/tests/SimpleTest/SimpleTest.js"></script>
+<script src="/tests/SimpleTest/SpawnTask.js"></script>
+<link rel="stylesheet" type="text/css" href="/tests/SimpleTest/test.css" />
+
+<script>
+  function startWaitForProcessLaunch() {
+    return new Promise(resolve => {
+      let chromeScript = SpecialPowers.loadChromeScript(_ => {
+        Components.utils.import("resource://gre/modules/Services.jsm");
+        sendAsyncMessage('started', null);
+
+        const topic = "process-priority-manager:TEST-ONLY:process-created";
+        function observer() {
+          Services.obs.removeObserver(observer, topic);
+          sendAsyncMessage('finished', null);
+        }
+        Services.obs.addObserver(observer, topic, /* weak = */ false);
+      });
+
+      chromeScript.addMessageListener('started', () => resolve({
+        finished: new Promise(resolve => chromeScript.addMessageListener('finished', resolve))
+      }));
+    });
+  }
+
+  add_task(function *() {
+    // Enable the outofprocessiframe attribute
+    yield SpecialPowers.pushPrefEnv({
+      "set": [["dom.mozoutofprocessiframe.enabled", true],
+              // Enable the processprioritymanager such that we can receive the process-created event
+              // XXX: This is copied from test_frameLoader_switchProcess.html. There may be a better
+              // mechanism
+              ["dom.ipc.processPriorityManager.testMode", true],
+              ["dom.ipc.processPriorityManager.enabled", true]]
+    });
+
+    let iframe = document.createElement("iframe");
+    iframe.setAttribute("sandbox", "");
+    iframe.setAttribute("mozoutofprocessiframe", "");
+    iframe.setAttribute("src", "http://example.org/tests/dom/base/test/file_oop_iframe.html");
+    iframe.ondragstart = () => dump("THE WORLD IS ENDING!!!!\n");
+
+    let {finished} = yield startWaitForProcessLaunch();
+    document.body.appendChild(iframe);
+    ok(true, "Created the iFrame");
+    yield finished;
+
+    ok(true, "A new process was spawned when the iframe was created");
+
+    yield new Promise(resolve => {
+      let handler = evt => {
+        if (evt.data == 'loaded') {
+          window.removeEventListener('message', handler);
+          resolve();
+        }
+      };
+      window.addEventListener('message', handler);
+    });
+  });
+</script>

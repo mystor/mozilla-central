@@ -1,0 +1,18 @@
+<html>
+  <h1>I'm an out of process iframe!</h1>
+  <h2></h2>
+  <span></span>
+  <div></div>
+  <script>
+    document.querySelector('h2').innerHTML = Object.keys(window.parent);
+
+    let s = "";
+    for (k in window.parent) {
+      s += k + "<br>";
+    }
+    document.querySelector('span').innerHTML = s;
+    document.querySelector('div').innerHTML = window.parent == window;
+
+    window.parent.postMessage('loaded', '*');
+  </script>
+</html>

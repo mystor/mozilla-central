@@ -134,6 +134,15 @@ public:
   static bool PreallocatedProcessReady();
 
   /**
+   * Create a content process for out of process iframes.
+   * These processes are recorded seperately, as they don't count against
+   * dom.ipc.processCount as a maximum process count.
+   */
+  static already_AddRefed<ContentParent>
+  GetNewProcessForOOPIframe(hal::ProcessPriority aPriority,
+                            ContentParent* aOpener);
+
+  /**
    * Get or create a content process for:
    * 1. browser iframe
    * 2. remote xul <browser>
@@ -530,6 +539,7 @@ protected:
 private:
   static nsDataHashtable<nsStringHashKey, ContentParent*> *sAppContentParents;
   static nsTArray<ContentParent*>* sNonAppContentParents;
+  static nsTArray<ContentParent*>* sOOPIframeContentParents;
   static nsTArray<ContentParent*>* sPrivateContent;
   static StaticAutoPtr<LinkedList<ContentParent> > sContentParents;
 

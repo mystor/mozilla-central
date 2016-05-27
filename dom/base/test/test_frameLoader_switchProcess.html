@@ -48,6 +48,7 @@
 
     expectProcessCreated()
     .then(() => new Promise(next => {
+      return;
       iframe.addEventListener("mozbrowserloadend", function loadend(e) {
         iframe.removeEventListener("mozbrowserloadend", loadend);
         ok(true, "Got mozbrowserloadend");

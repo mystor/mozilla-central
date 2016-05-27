@@ -11,6 +11,7 @@
 #include "nsGenericHTMLFrameElement.h"
 #include "nsIDOMHTMLIFrameElement.h"
 #include "nsDOMTokenList.h"
+#include "nsSandboxFlags.h"
 
 namespace mozilla {
 namespace dom {
@@ -182,6 +183,24 @@ public:
   using nsGenericHTMLFrameElement::SetMozbrowser;
   // nsGenericHTMLFrameElement::GetFrameLoader is fine
   // nsGenericHTMLFrameElement::GetAppManifestURL is fine
+
+  bool IsLegalOutOfProcessIframe()
+  {
+    if (!HasAttr(kNameSpaceID_None, nsGkAtoms::mozoutofprocessiframe)) {
+      return false;
+    }
+
+    // XXX: Urgh bitflags suck.
+    const uint32_t REQUIRED_SANDBOX_FLAGS =
+      SANDBOX_ALL_FLAGS & ~(SANDBOXED_POINTER_LOCK | SANDBOXED_SCRIPTS |
+                            SANDBOXED_AUTOMATIC_FEATURES | SANDBOXED_FULLSCREEN);
+    if ((~GetSandboxFlags()) & REQUIRED_SANDBOX_FLAGS) {
+      printf("GetSandboxFlags = %x, REQUIRED_SANDBOX_FLAGS = %x, COMBINED = %x\n", GetSandboxFlags(), REQUIRED_SANDBOX_FLAGS, (~GetSandboxFlags()) & REQUIRED_SANDBOX_FLAGS);
+      NS_WARNING("mozoutofprocessiframe property on iframe with incorrect sandbox flags");
+      return false;
+    }
+    return true;
+  }
 
   // The fullscreen flag is set to true only when requestFullscreen is
   // explicitly called on this <iframe> element. In case this flag is

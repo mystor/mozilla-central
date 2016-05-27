@@ -543,6 +543,7 @@ ContentParentsMemoryReporter::CollectReports(nsIMemoryReporterCallback* cb,
 
 nsDataHashtable<nsStringHashKey, ContentParent*>* ContentParent::sAppContentParents;
 nsTArray<ContentParent*>* ContentParent::sNonAppContentParents;
+nsTArray<ContentParent*>* ContentParent::sOOPIframeContentParents;
 nsTArray<ContentParent*>* ContentParent::sPrivateContent;
 StaticAutoPtr<LinkedList<ContentParent> > ContentParent::sContentParents;
 #if defined(XP_LINUX) && defined(MOZ_CONTENT_SANDBOX)
@@ -816,6 +817,30 @@ ContentParent::JoinAllSubprocesses()
 }
 
 /*static*/ already_AddRefed<ContentParent>
+ContentParent::GetNewProcessForOOPIframe(ProcessPriority aPriority,
+                                         ContentParent* aOpener)
+{
+  if (!sOOPIframeContentParents) {
+    sOOPIframeContentParents = new nsTArray<ContentParent*>();
+  }
+
+  RefPtr<ContentParent> p = new ContentParent(/* app = */ nullptr,
+                                              aOpener,
+                                              /* forBrowserElement = */ false,
+                                              /* isForPreallocated = */ false);
+
+  if (!p->LaunchSubprocess(aPriority)) {
+    return nullptr;
+  }
+
+  p->Init();
+  p->ForwardKnownInfo();
+
+  sOOPIframeContentParents->AppendElement(p);
+  return p.forget();
+}
+
+/*static*/ already_AddRefed<ContentParent>
 ContentParent::GetNewOrUsedBrowserProcess(bool aForBrowserElement,
                                           ProcessPriority aPriority,
                                           ContentParent* aOpener)
@@ -944,13 +969,17 @@ ContentParent::RecvCreateChildProcess(const IPCTabContext& aContext,
     return false;
   }
 
-  nsCOMPtr<mozIApplication> ownApp = tc.GetTabContext().GetOwnApp();
-  if (ownApp) {
-    cp = GetNewOrPreallocatedAppProcess(ownApp, aPriority, this);
-  }
-  else {
-   cp = GetNewOrUsedBrowserProcess(/* isBrowserElement = */ true,
-                                   aPriority, this);
+  if (tc.GetTabContext().IsOutOfProcessIframe()) {
+    cp = GetNewProcessForOOPIframe(aPriority, this);
+  } else {
+    nsCOMPtr<mozIApplication> ownApp = tc.GetTabContext().GetOwnApp();
+    if (ownApp) {
+      cp = GetNewOrPreallocatedAppProcess(ownApp, aPriority, this);
+    }
+    else {
+      cp = GetNewOrUsedBrowserProcess(/* isBrowserElement = */ true,
+                                      aPriority, this);
+    }
   }
 
   if (!cp) {
@@ -1152,7 +1181,7 @@ ContentParent::CreateBrowserOrApp(const TabContext& aContext,
     RefPtr<TabParent> tp;
     RefPtr<nsIContentParent> constructorSender;
     if (isInContentProcess) {
-      MOZ_ASSERT(aContext.IsMozBrowserElement());
+      MOZ_ASSERT(aContext.IsMozBrowserElement() || aContext.IsOutOfProcessIframe());
       constructorSender = CreateContentBridgeParent(aContext, initialPriority,
                                                     openerTabId, &tabId);
     } else {
@@ -1843,11 +1872,20 @@ ContentParent::MarkAsDead()
         sAppContentParents = nullptr;
       }
     }
-  } else if (sNonAppContentParents) {
-    sNonAppContentParents->RemoveElement(this);
-    if (!sNonAppContentParents->Length()) {
-      delete sNonAppContentParents;
-      sNonAppContentParents = nullptr;
+  } else {
+    if (sNonAppContentParents) {
+      sNonAppContentParents->RemoveElement(this);
+      if (!sNonAppContentParents->Length()) {
+        delete sNonAppContentParents;
+        sNonAppContentParents = nullptr;
+      }
+    }
+    if (sOOPIframeContentParents) {
+      sOOPIframeContentParents->RemoveElement(this);
+      if (!sOOPIframeContentParents->Length()) {
+        delete sOOPIframeContentParents;
+        sOOPIframeContentParents = nullptr;
+      }
     }
   }
 
@@ -2495,8 +2533,10 @@ ContentParent::~ContentParent()
   // We should be removed from all these lists in ActorDestroy.
   MOZ_ASSERT(!sPrivateContent || !sPrivateContent->Contains(this));
   if (mAppManifestURL.IsEmpty()) {
-    MOZ_ASSERT(!sNonAppContentParents ||
-               !sNonAppContentParents->Contains(this));
+    MOZ_ASSERT((!sNonAppContentParents ||
+                !sNonAppContentParents->Contains(this)) &&
+               (!sOOPIframeContentParents ||
+                !sOOPIframeContentParents->Contains(this)));
   } else {
     // In general, we expect sAppContentParents->Get(mAppManifestURL) to be
     // nullptr.  But it could be that we created another ContentParent for

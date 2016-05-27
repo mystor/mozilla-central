@@ -130,6 +130,11 @@ public:
    */
   const nsACString& SignedPkgOriginNoSuffix() const;
 
+  /**
+   * Returns true if the TabContext is for an OutOfProcessIframe
+   */
+  bool IsOutOfProcessIframe() const;
+
 protected:
   friend class MaybeInvalidTabContext;
 
@@ -158,7 +163,8 @@ protected:
                      mozIApplication* aOwnApp,
                      mozIApplication* aAppFrameOwnerApp,
                      const DocShellOriginAttributes& aOriginAttributes,
-                     const nsACString& aSignedPkgOriginNoSuffix);
+                     const nsACString& aSignedPkgOriginNoSuffix,
+                     bool aIsOutOfProcessIframe);
 
   /**
    * Modify this TabContext to match the given TabContext.  This is a special
@@ -215,6 +221,11 @@ private:
    * doesn't own a signed package, this value would be empty.
    */
   nsCString mSignedPkgOriginNoSuffix;
+
+  /**
+   * If this is true, then this iframe is an outofprocessiframe
+   */
+  bool mIsOutOfProcessIframe;
 };
 
 /**
@@ -235,13 +246,15 @@ public:
                 mozIApplication* aOwnApp,
                 mozIApplication* aAppFrameOwnerApp,
                 const DocShellOriginAttributes& aOriginAttributes,
-                const nsACString& aSignedPkgOriginNoSuffix = EmptyCString())
+                const nsACString& aSignedPkgOriginNoSuffix = EmptyCString(),
+                bool aIsOutOfProcessIframe = false)
   {
     return TabContext::SetTabContext(aIsMozBrowserElement,
                                      aOwnApp,
                                      aAppFrameOwnerApp,
                                      aOriginAttributes,
-                                     aSignedPkgOriginNoSuffix);
+                                     aSignedPkgOriginNoSuffix,
+                                     aIsOutOfProcessIframe);
   }
 };
 

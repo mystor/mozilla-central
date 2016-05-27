@@ -3368,6 +3368,7 @@ nsFrame::HandlePress(nsPresContext* aPresContext,
     }
   }
 
+  printf("Do we hit this?\n");
   fc->SetDragState(true);
 
   // Do not touch any nsFrame members after this point without adding

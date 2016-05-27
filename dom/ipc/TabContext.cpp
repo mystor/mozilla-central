@@ -25,6 +25,7 @@ TabContext::TabContext()
   , mIsMozBrowserElement(false)
   , mContainingAppId(NO_APP_ID)
   , mOriginAttributes()
+  , mIsOutOfProcessIframe(false)
 {
 }
 
@@ -191,11 +192,18 @@ TabContext::SignedPkgOriginNoSuffix() const
 }
 
 bool
+TabContext::IsOutOfProcessIframe() const
+{
+  return mIsOutOfProcessIframe;
+}
+
+bool
 TabContext::SetTabContext(bool aIsMozBrowserElement,
                           mozIApplication* aOwnApp,
                           mozIApplication* aAppFrameOwnerApp,
                           const DocShellOriginAttributes& aOriginAttributes,
-                          const nsACString& aSignedPkgOriginNoSuffix)
+                          const nsACString& aSignedPkgOriginNoSuffix,
+                          bool aIsOutOfProcessIframe)
 {
   NS_ENSURE_FALSE(mInitialized, false);
 
@@ -227,6 +235,7 @@ TabContext::SetTabContext(bool aIsMozBrowserElement,
   mOwnApp = aOwnApp;
   mContainingApp = aAppFrameOwnerApp;
   mSignedPkgOriginNoSuffix = aSignedPkgOriginNoSuffix;
+  mIsOutOfProcessIframe = aIsOutOfProcessIframe;
   return true;
 }
 
@@ -238,7 +247,8 @@ TabContext::AsIPCTabContext() const
   return IPCTabContext(FrameIPCTabContext(originSuffix,
                                           mContainingAppId,
                                           mSignedPkgOriginNoSuffix,
-                                          mIsMozBrowserElement));
+                                          mIsMozBrowserElement,
+                                          mIsOutOfProcessIframe));
 }
 
 static already_AddRefed<mozIApplication>
@@ -261,6 +271,7 @@ MaybeInvalidTabContext::MaybeInvalidTabContext(const IPCTabContext& aParams)
   DocShellOriginAttributes originAttributes;
   nsAutoCString originSuffix;
   nsAutoCString signedPkgOriginNoSuffix;
+  bool isOutOfProcessIframe = false;
 
   switch(aParams.type()) {
     case IPCTabContext::TPopupIPCTabContext: {
@@ -322,6 +333,7 @@ MaybeInvalidTabContext::MaybeInvalidTabContext(const IPCTabContext& aParams)
       containingAppId = ipcContext.frameOwnerAppId();
       signedPkgOriginNoSuffix = ipcContext.signedPkgOriginNoSuffix();
       originSuffix = ipcContext.originSuffix();
+      isOutOfProcessIframe = ipcContext.isOutOfProcessIframe();
       originAttributes.PopulateFromSuffix(originSuffix);
       break;
     }
@@ -369,7 +381,8 @@ MaybeInvalidTabContext::MaybeInvalidTabContext(const IPCTabContext& aParams)
                                  ownApp,
                                  containingApp,
                                  originAttributes,
-                                 signedPkgOriginNoSuffix);
+                                 signedPkgOriginNoSuffix,
+                                 isOutOfProcessIframe);
   if (!rv) {
     mInvalidReason = "Couldn't initialize TabContext.";
   }
