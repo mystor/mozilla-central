@@ -13,6 +13,7 @@
 #include "nsStyleConsts.h"
 #include "nsContentUtils.h"
 #include "nsSandboxFlags.h"
+#include "mozilla/Preferences.h"
 
 NS_IMPL_NS_NEW_HTML_ELEMENT_CHECK_PARSER(IFrame)
 
@@ -278,6 +279,29 @@ JSObject*
 HTMLIFrameElement::WrapNode(JSContext* aCx, JS::Handle<JSObject*> aGivenProto)
 {
   return HTMLIFrameElementBinding::Wrap(aCx, this, aGivenProto);
+}
+
+bool
+HTMLIFrameElement::IsLegalOutOfProcessIframe()
+{
+  if (!Preferences::GetBool("dom.mozoutofprocessiframe.enabled", false)) {
+    return false;
+  }
+
+  if (!HasAttr(kNameSpaceID_None, nsGkAtoms::mozoutofprocessiframe)) {
+    return false;
+  }
+
+  // XXX: Improve the bitflag fiddling
+  const uint32_t REQUIRED_SANDBOX_FLAGS =
+    SANDBOX_ALL_FLAGS & ~(SANDBOXED_POINTER_LOCK | SANDBOXED_SCRIPTS |
+                          SANDBOXED_AUTOMATIC_FEATURES | SANDBOXED_FULLSCREEN);
+  if ((~GetSandboxFlags()) & REQUIRED_SANDBOX_FLAGS) {
+    NS_WARNING("mozoutofprocessiframe property on iframe with incorrect sandbox flags");
+    return false;
+  }
+
+  return true;
 }
 
 } // namespace dom

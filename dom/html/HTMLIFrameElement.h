@@ -184,23 +184,10 @@ public:
   // nsGenericHTMLFrameElement::GetFrameLoader is fine
   // nsGenericHTMLFrameElement::GetAppManifestURL is fine
 
-  bool IsLegalOutOfProcessIframe()
-  {
-    if (!HasAttr(kNameSpaceID_None, nsGkAtoms::mozoutofprocessiframe)) {
-      return false;
-    }
-
-    // XXX: Urgh bitflags suck.
-    const uint32_t REQUIRED_SANDBOX_FLAGS =
-      SANDBOX_ALL_FLAGS & ~(SANDBOXED_POINTER_LOCK | SANDBOXED_SCRIPTS |
-                            SANDBOXED_AUTOMATIC_FEATURES | SANDBOXED_FULLSCREEN);
-    if ((~GetSandboxFlags()) & REQUIRED_SANDBOX_FLAGS) {
-      printf("GetSandboxFlags = %x, REQUIRED_SANDBOX_FLAGS = %x, COMBINED = %x\n", GetSandboxFlags(), REQUIRED_SANDBOX_FLAGS, (~GetSandboxFlags()) & REQUIRED_SANDBOX_FLAGS);
-      NS_WARNING("mozoutofprocessiframe property on iframe with incorrect sandbox flags");
-      return false;
-    }
-    return true;
-  }
+  // Returns true if this iframe is marked as a <iframe mozoutofprocessiframe>,
+  // the preference is enabled, and the correct sandbox flags are present.
+  // Otherwise returns false.
+  bool IsLegalOutOfProcessIframe();
 
   // The fullscreen flag is set to true only when requestFullscreen is
   // explicitly called on this <iframe> element. In case this flag is

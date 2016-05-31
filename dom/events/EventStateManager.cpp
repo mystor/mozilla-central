@@ -1796,8 +1796,16 @@ EventStateManager::GenerateDragGesture(nsPresContext* aPresContext,
       // elements in an editor, only fire the draggesture event so that the
       // editor code can handle it but content doesn't see a dragstart.
       nsEventStatus status = nsEventStatus_eIgnore;
-      EventDispatcher::Dispatch(targetContent, aPresContext, &startEvent,
-                                nullptr, &status);
+
+      // If we are looking at a out of process iframe, don't dispatch the drag
+      // start event or perform the default action.
+      if (targetContent->IsHTMLElement(nsGkAtoms::iframe) &&
+          static_cast<HTMLIFrameElement*>(targetContent.get())->IsLegalOutOfProcessIframe()) {
+        status = nsEventStatus_eConsumeNoDefault;
+      } else {
+        EventDispatcher::Dispatch(targetContent, aPresContext, &startEvent,
+                                  nullptr, &status);
+      }
 
       WidgetDragEvent* event = &startEvent;
       if (status != nsEventStatus_eConsumeNoDefault) {

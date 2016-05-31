@@ -147,27 +147,6 @@ SketchyIsOutOfProcessIframe(Element* ownerContent)
   HTMLIFrameElement* iFrame = static_cast<HTMLIFrameElement*>(ownerContent);
 
   return iFrame->IsLegalOutOfProcessIframe();
-
-  /*
-  // HACK: Check this with iFrame
-  if (!ownerContent->HasAttr(kNameSpaceID_None, nsGkAtoms::mozoutofprocessiframe)) {
-    return false;
-  }
-
-  // We require all flags except for the below whitelisted flags
-  const uint32_t REQUIRED_SANDBOX_FLAGS =
-    SANDBOX_ALL_FLAGS & ~(SANDBOXED_POINTER_LOCK | SANDBOXED_SCRIPTS |
-                          SANDBOXED_AUTOMATIC_FEATURES | SANDBOXED_FULLSCREEN);
-
-  uint32_t sandboxFlags = iFrame->GetSandboxFlags();
-  // HACK: This is kidna sucky
-  if ((sandboxFlags & REQUIRED_SANDBOX_FLAGS) == REQUIRED_SANDBOX_FLAGS) {
-    NS_WARNING("mozoutofprocessiframe property on iframe with incorrect sandbox flags");
-    return false;
-  }
-
-  return true;
-  */
 }
 
 };
