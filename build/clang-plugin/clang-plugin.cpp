@@ -7,6 +7,7 @@
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/ASTMatchers/ASTMatchFinder.h"
 #include "clang/ASTMatchers/ASTMatchers.h"
+#include "clang/Analysis/CFG.h"
 #include "clang/Basic/Version.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Frontend/FrontendPluginRegistry.h"
@@ -124,6 +125,11 @@ private:
     virtual void run(const MatchFinder::MatchResult &Result);
   };
 
+  class MoveChecker : public MatchFinder::MatchCallback {
+  public:
+    virtual void run(const MatchFinder::MatchResult &Result);
+  };
+
   ScopeChecker scopeChecker;
   ArithmeticArgChecker arithmeticArgChecker;
   TrivialCtorDtorChecker trivialCtorDtorChecker;
@@ -139,6 +145,7 @@ private:
   NoAutoTypeChecker noAutoTypeChecker;
   NoExplicitMoveConstructorChecker noExplicitMoveConstructorChecker;
   RefCountedCopyConstructorChecker refCountedCopyConstructorChecker;
+  MoveChecker moveChecker;
   MatchFinder astMatcher;
 };
 
@@ -232,6 +239,29 @@ bool isIgnoredPathForImplicitConversion(const Decl *decl) {
                                     end = llvm::sys::path::rend(FileName);
   for (; begin != end; ++begin) {
     if (begin->compare_lower(StringRef("graphite2")) == 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool isIgnoredPathForMoveAnalysis(const Decl *decl) {
+  SourceLocation Loc = decl->getLocation();
+  const SourceManager &SM = decl->getASTContext().getSourceManager();
+  SmallString<1024> FileName = SM.getFilename(Loc);
+  llvm::sys::fs::make_absolute(FileName);
+
+  // These tests test the value of objects after they are moved, and thus must
+  // be exempted from the analysis.
+  SmallString<256> paths [] = {
+    StringRef("mfbt/tests/TestSegmentedVector.cpp"),
+    StringRef("mfbt/tests/TestTuple.cpp"),
+    StringRef("mfbt/tests/TestUniquePtr.cpp"),
+  };
+
+  for (uint32_t i = 0; i < sizeof(paths) / sizeof(paths[0]); ++i) {
+    llvm::sys::path::native(paths[i]);
+    if (StringRef(FileName).endswith_lower(StringRef(paths[i]))) {
       return true;
     }
   }
@@ -767,6 +797,10 @@ AST_MATCHER(CXXConstructorDecl, isExplicitMoveConstructor) {
 AST_MATCHER(CXXConstructorDecl, isCompilerProvidedCopyConstructor) {
   return !Node.isUserProvided() && Node.isCopyConstructor();
 }
+
+AST_MATCHER(Decl, anyTemplateDecl) {
+  return isa<TemplateDecl>(&Node);
+}
 }
 }
 
@@ -1075,6 +1109,9 @@ DiagnosticsMatcher::DiagnosticsMatcher() {
                                             ofClass(hasRefCntMember()))))
           .bind("node"),
       &refCountedCopyConstructorChecker);
+
+  astMatcher.addMatcher(functionDecl(unless(hasAncestor(anyTemplateDecl()))).bind("func"),
+                        &moveChecker);
 }
 
 // These enum variants determine whether an allocation has occured in the code.
@@ -1551,6 +1588,403 @@ void DiagnosticsMatcher::RefCountedCopyConstructorChecker::run(
 
   Diag.Report(E->getLocation(), ErrorID);
   Diag.Report(E->getLocation(), NoteID);
+}
+
+struct MoveActionMap {
+  typedef DenseMap<unsigned, DenseSet<const ValueDecl*>> SatMap;
+  typedef DenseMap<const ValueDecl*, const Stmt*> MovMap;
+  typedef DenseSet<const Stmt*> SeenSet;
+
+  DiagnosticsEngine &Diag;
+  MovMap Map;
+  SatMap &Sat;
+  SeenSet *Seen;
+
+  MoveActionMap(DiagnosticsEngine &Diag, SatMap &Sat)
+    : Diag(Diag), Sat(Sat), Seen(nullptr) {}
+
+  void Handle(const CFGBlock &Block) {
+    // Record that the current block has been seen already with the curring move map set.
+    DenseSet<const ValueDecl*>& OurSat = Sat[Block.getBlockID()];
+    for (auto &bucket : Map) {
+      OurSat.insert(bucket.getFirst());
+    }
+
+    SeenSet LocalSeen;
+    Seen = &LocalSeen;
+
+    // Handle each of the CFG nodes in the block, checking for moves and uses
+    for (auto &Elt : Block) {
+      // We can "renew" the entry for this object to remove it from the map,
+      // if its destructor has been run, as it no longer exists.
+      Optional<CFGAutomaticObjDtor> CD = Elt.getAs<CFGAutomaticObjDtor>();
+      if (CD) {
+        Renew(CD->getVarDecl());
+        continue;
+      }
+
+      const Stmt *S = nullptr;
+      if (Optional<CFGInitializer> CI = Elt.getAs<CFGInitializer>()) {
+        S = CI->getInitializer()->getInit();
+      } else if (Optional<CFGNewAllocator> CA = Elt.getAs<CFGNewAllocator>()) {
+        S = CA->getAllocatorExpr();
+      } else if (Optional<CFGStmt> CS = Elt.getAs<CFGStmt>()) {
+        S = CS->getStmt();
+      }
+
+      if (S) {
+        HandleStmt(S);
+        LocalSeen.insert(S);
+      }
+    }
+
+    // Handle executing the successor blocks if there are new moves required.
+    // XXX: Avoid copying if there is only a single successor
+    for (CFGBlock::const_succ_iterator I = Block.succ_begin();
+         I != Block.succ_end(); ++I) {
+      MoveActionMap M(Diag, Sat);
+
+      CFGBlock *Next = I->getReachableBlock();
+      if (!Next) {
+        Next = I->getPossiblyUnreachableBlock();
+        if (!Next) {
+          continue;
+        }
+      }
+
+      // If we haven't handled this block yet, then handle it immediately, no
+      // matter how many moves we have outstanding.
+      if (!Sat.count(Next->getBlockID())) {
+        M.Map = Map; // Copy over all of our moves, and handle it.
+        M.Handle(*Next);
+        continue;
+      }
+
+      // If we have handled this block before, check if we have any moves which
+      // haven't been handled in this block before, if we do, then handle it
+      // again with those new moves. Don't include old moves as they will
+      // produce duplicate error messages.
+      bool DoHandle = false;
+      DenseSet<const ValueDecl*>& NextSat = Sat[Next->getBlockID()];
+      for (auto &bucket : Map) {
+        if (!NextSat.count(bucket.getFirst())) {
+          DoHandle = true;
+          M.Map[bucket.getFirst()] = bucket.getSecond();
+        }
+      }
+
+      if (DoHandle) {
+        M.Handle(*Next);
+      }
+    }
+  }
+
+private:
+  void HandleStmt(const Stmt *S) {
+    if (Seen->count(S)) {
+      return;
+    }
+
+    // Some expressions may have had their arguments already processed in
+    // different blocks. We skip their subcomponents because of this
+    if (isa<AbstractConditionalOperator>(S)) {
+      return;
+    }
+
+    if (const DeclRefExpr *D = dyn_cast<DeclRefExpr>(S)) {
+      Use(D->getDecl(), S);
+      return;
+    }
+
+    // We keep track of the decls to renew in a list because values which are renewed
+    // aren't actually renewed until after the expression is evaluated, which
+    // means that we don't want to renew them before we run the rest of the arguments.
+    SmallVector<const ValueDecl *, 4> RenewList;
+    if (const CXXMemberCallExpr *Call = dyn_cast<CXXMemberCallExpr>(S)) {
+      const CXXMethodDecl *Method = Call->getMethodDecl();
+      const Expr *ObjArg = Call->getImplicitObjectArgument();
+      const ValueDecl *Decl = DeclRefDecl(ObjArg);
+
+      if (Decl && Method && MozChecker::hasCustomAnnotation(Method, "moz_renews_this")) {
+        RenewList.push_back(Decl);
+      } else {
+        HandleStmt(ObjArg);
+      }
+
+      if (Decl && Method && MozChecker::hasCustomAnnotation(Method, "moz_moves_this")) {
+        Move(Decl, Call);
+      }
+    }
+
+    // The non-overloaded assignment operator (=) will renew the LHS argument to
+    // it, so we handle the RHS, and then renew the value on the LHS
+    if (const BinaryOperator *Op = dyn_cast<BinaryOperator>(S)) {
+      if (Op->getOpcode() == BO_Assign) {
+        if (const ValueDecl *Decl = DeclRefDecl(Op->getLHS())) {
+          HandleStmt(Op->getRHS());
+          Renew(Decl);
+          return;
+        }
+      }
+    }
+
+    // OperatorCallExpr is weird because even if the operator is defined
+    // as a method declaration, it's call site doesn't use a subclass of
+    // CXXMemberCallExpr, instead it uses a CXXOperatorCallExpr, and just
+    // passes the implicit this as the first argument.
+    //
+    // As we want consistency, we detect this case, and consider the first
+    // argument in this case to be the `this` argument to the function.
+    bool SkipFirstArgument = false;
+    if (const CXXOperatorCallExpr *Call = dyn_cast<CXXOperatorCallExpr>(S)) {
+      if (Call->getOperator() == OO_Equal) { // operator= is by default renewing
+        SkipFirstArgument = true;
+
+        if (const Expr *ObjArg = Call->getArg(0)) {
+          if (const ValueDecl *Decl = DeclRefDecl(ObjArg)) {
+            RenewList.push_back(Decl);
+          }
+        }
+      } else if (const FunctionDecl *Func = Call->getDirectCallee()) {
+        if (const CXXMethodDecl *Method = dyn_cast<CXXMethodDecl>(Func)) {
+          SkipFirstArgument = true;
+
+          if(const Expr *ObjArg = Call->getArg(0)) {
+            const ValueDecl *Decl = DeclRefDecl(ObjArg);
+
+            if (Decl && MozChecker::hasCustomAnnotation(Method, "moz_renews_this")) {
+              RenewList.push_back(Decl);
+            } else {
+              HandleStmt(ObjArg);
+            }
+
+            if (Decl && MozChecker::hasCustomAnnotation(Method, "moz_moves_this")) {
+              Move(Decl, Call);
+            }
+          }
+        }
+      }
+    }
+
+    if (const CallExpr *Call = dyn_cast<CallExpr>(S)) {
+      const FunctionDecl *Func = Call->getDirectCallee();
+      uint32_t ArgIdx = 0;
+      for (const Expr *Arg : Call->arguments()) {
+        if (Func && IsCastFunction(Func)) {
+          HandleStmt(Arg);
+          ++ArgIdx;
+          continue;
+        }
+
+        if (SkipFirstArgument) {
+          SkipFirstArgument = false;
+          continue;
+        }
+
+        const ValueDecl *Decl = DeclRefDecl(Arg);
+
+        std::string AnnotationName = "moz_renews_arg_";
+        AnnotationName += std::to_string(ArgIdx);
+        if (Decl && Func && MozChecker::hasCustomAnnotation(Func, AnnotationName.c_str())) {
+          RenewList.push_back(Decl);
+        } else {
+          HandleStmt(Arg);
+        }
+
+        AnnotationName = "moz_moves_arg_";
+        AnnotationName += std::to_string(ArgIdx);
+        if (Decl && Func && MozChecker::hasCustomAnnotation(Func, AnnotationName.c_str())) {
+          Move(Decl, Call);
+        }
+
+        // Check if the argument is an rvalue reference, and move it if it is
+        if (Decl && Func && ArgIdx < Func->getNumParams()) {
+          if (const ParmVarDecl *Param = Func->getParamDecl(ArgIdx)) {
+            QualType T = Param->getType();
+            if (!T.isNull() && T->isRValueReferenceType()) {
+              Move(Decl, Call);
+            }
+          }
+        }
+
+        ++ArgIdx;
+      }
+
+      if (const Expr *Callee = Call->getCallee()) {
+        if (!Func) {
+          HandleStmt(Callee);
+        }
+      }
+
+      // We need to renew any declarations which we added to the RenewList.
+      for (const ValueDecl *Decl : RenewList) {
+        Renew(Decl);
+      }
+
+      if (Map.size() > 0 && Func && Func->getIdentifier() && Func->getName() == "longjmp") {
+        unsigned errorID = Diag.getDiagnosticIDs()->getCustomDiagID(
+            DiagnosticIDs::Error,
+            "Cannot reason about state of %0 moved value(s) after call to longjmp");
+        Diag.Report(S->getLocStart(), errorID) << Map.size();
+      }
+      return;
+    }
+
+    // XXX: Handle lambdas (how to generate CFG for lambda body?)
+    /*
+    if (const LambdaExpr *Lambda = dyn_cast<LambdaExpr>(S)) {
+      const CompoundStmt *Body = Lambda->getBody();
+
+      CFG::BuildOptions Opts;
+      Opts.AddImplicitDtors = true;
+      Opts.AddEHEdges = true;
+      unique_ptr<CFG> Cfg = CFG::buildCFG(F, S, &F->getASTContext(), Opts);
+
+      // Fresh MoveActionMap for the Lambda - unrelated function!
+      SatMap NewSat;
+      MoveActionMap(Diag, NewSat).HandleStmt(Cfg->getEntry());
+
+      return;
+    }
+    */
+
+    for (const Stmt *Child : S->children()) {
+      if (Child) {
+        HandleStmt(Child);
+      }
+    }
+  }
+
+  const ValueDecl *DeclRefDecl(const Stmt *S) {
+    // Strip away any casts which we don't care about from the expression We
+    // don't care about these casts as they "keep the identity" of the type
+    // being passed in. We also strip away casting functions like Move.
+    while (true) {
+      if (const CastExpr *C = dyn_cast<CastExpr>(S)) {
+        CastKind Kind = C->getCastKind();
+        if (Kind == CK_NoOp ||
+            Kind == CK_BaseToDerived ||
+            Kind == CK_DerivedToBase ||
+            Kind == CK_UncheckedDerivedToBase ||
+            Kind == CK_Dynamic ||
+            Kind == CK_LValueToRValue) {
+          S = C->getSubExpr();
+          continue;
+        }
+      }
+
+      if (const CallExpr *C = dyn_cast<CallExpr>(S)) {
+        if (const FunctionDecl *Func = C->getDirectCallee()) {
+          if (IsCastFunction(Func)) {
+            if (C->getNumArgs() == 1) {
+              S = C->getArg(0);
+              continue;
+            }
+            // Silently ignore call to cast function with non-1 arg count, as it
+            // is probably the range overload of std::move, which is not a cast
+            // function.
+          }
+        }
+      }
+
+      break;
+    }
+
+    if (const DeclRefExpr *D = dyn_cast<DeclRefExpr>(S)) {
+      return D->getDecl();
+    }
+
+    return nullptr;
+  }
+
+  void Join(const MoveActionMap &Other) {
+    for (const auto &It : Other.Map) {
+      if (!Map.count(It.first)) {
+        Map[It.first] = It.second;
+      }
+    }
+  }
+
+  void Use(const ValueDecl *V, const Stmt *U) {
+    if (Map.count(V)) {
+      unsigned errorID = Diag.getDiagnosticIDs()->getCustomDiagID(
+          DiagnosticIDs::Error, "Use of moved value");
+      unsigned noteID = Diag.getDiagnosticIDs()->getCustomDiagID(
+          DiagnosticIDs::Note, "Value was moved here");
+
+      Diag.Report(U->getLocStart(), errorID);
+      Diag.Report(Map[V]->getLocStart(), noteID);
+    }
+  }
+
+  void Move(const ValueDecl *V, const Stmt *M) {
+    Map[V] = M;
+  }
+
+  void Renew(const ValueDecl *V) {
+    Map.erase(V);
+  }
+
+  bool IsCastFunction(const FunctionDecl *F) {
+    std::string QualName;
+    llvm::raw_string_ostream OS(QualName);
+    F->printQualifiedName(OS, F->getASTContext().getPrintingPolicy());
+    std::string name = OS.str();
+
+    return name == "std::move" ||
+      name == "std::forward" ||
+      name == "mozilla::Move" ||
+      name == "mozilla::Forward";
+  }
+};
+
+void DiagnosticsMatcher::MoveChecker::run(
+    const MatchFinder::MatchResult &Result) {
+  DiagnosticsEngine &Diag = Result.Context->getDiagnostics();
+
+  const FunctionDecl *F = Result.Nodes.getNodeAs<FunctionDecl>("func");
+  if (isa<TemplateDecl>(F)) {
+    return;
+  }
+
+  // We ignore some paths for move analysis
+  if (isIgnoredPathForMoveAnalysis(F)) {
+    return;
+  }
+
+  // XXX: Whitelist move constructors and the assignment(=) operator
+  if (const CXXConstructorDecl *C = dyn_cast<CXXConstructorDecl>(F)) {
+    if (C->isMoveConstructor()) {
+      return;
+    }
+  }
+  if (F->getOverloadedOperator() == OO_Equal) {
+    return;
+  }
+
+  if (const CXXMethodDecl *MD = dyn_cast<CXXMethodDecl>(F)) {
+    if (!MD->isUserProvided()) {
+      return;
+    }
+  }
+
+  if (F->hasBody()) {
+    CFG::BuildOptions Opts;
+    // Opts.AddImplicitDtors = true;
+    // Opts.AddEHEdges = true;
+
+    // F->dump();
+    // XXX: Is this API supported in all versions of clang we support?
+    std::unique_ptr<CFG> Cfg = CFG::buildCFG(F, F->getBody(), &F->getASTContext(), Opts);
+
+    // Cfg->dump(LangOptions(), true);
+
+    // This method will create any diagnostic output for us, so we don't
+    // have to worry about that. We can ignore the output, as the diagnostic
+    // output will have already been created.
+    MoveActionMap::SatMap Sat;
+    MoveActionMap(Diag, Sat).Handle(Cfg->getEntry());
+  }
 }
 
 class MozCheckAction : public PluginASTAction {

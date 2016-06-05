@@ -4,6 +4,7 @@ dnl file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 AC_DEFUN([MOZ_TOOL_VARIABLES],
 [
+echo "CC_TYPE = $CC_TYPE"
 GNU_AS=
 GNU_LD=
 
@@ -22,6 +23,7 @@ if test "`echo | $LD -v 2>&1 | grep -c GNU`" != "0"; then
     GNU_LD=1
 fi
 
+echo "CC_TYPE =====>>>>> $CC_TYPE"
 CLANG_CC=
 CLANG_CXX=
 CLANG_CL=
