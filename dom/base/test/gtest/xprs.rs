@@ -10,6 +10,7 @@ extern crate libc;
 use std::ptr;
 use std::slice;
 use std::ops::Deref;
+use std::str;
 
 pub type NsResult = libc::uint32_t;
 
@@ -40,9 +41,9 @@ pub enum ISupports {}
 
 #[repr(C)]
 pub struct ISupportsVTable {
-    query_interface: unsafe extern "C" fn(*const IID, *mut *const u8) -> NsResult,
-    addref: unsafe extern "C" fn() -> RefCountType,
-    release: unsafe extern "C" fn() -> RefCountType,
+    query_interface: unsafe extern "C" fn(*const ISupports, *const IID, *mut *const u8) -> NsResult,
+    addref: unsafe extern "C" fn(*const ISupports) -> RefCountType,
+    release: unsafe extern "C" fn(*const ISupports) -> RefCountType,
 }
 
 unsafe impl XpCom for ISupports {
@@ -72,16 +73,23 @@ pub unsafe trait XpCom {
         }
     }
 
+    fn get_isupports(&self) -> &ISupports {
+        unsafe {
+            &*(self as *const Self as *const ISupports)
+        }
+    }
+
     fn query_interface<U: XpCom>(&self) -> Option<ComPtr<U>> {
         let mut p = ptr::null();
         let iid = U::iid();
         let result = unsafe {
-            ((*self.get_isupports_vtable()).query_interface)(&iid as *const _,
+            ((*self.get_isupports_vtable()).query_interface)(self.get_isupports(),
+                                                             &iid as *const _,
                                                              &mut p
                                                                as *mut *const U
                                                                as *mut *const u8)
         };
-        if result != 0 && p != ptr::null() {
+        if result == 0 && p != ptr::null() {
             Some(ComPtr {ptr: p})
         } else {
             None
@@ -105,7 +113,7 @@ impl <T: XpCom> Deref for ComPtr<T> {
 impl <T: XpCom> Drop for ComPtr<T> {
     fn drop(&mut self) {
         unsafe {
-            ((*self.get_isupports_vtable()).release)();
+            ((*self.get_isupports_vtable()).release)(self.get_isupports());
         }
     }
 }
@@ -113,7 +121,7 @@ impl <T: XpCom> Drop for ComPtr<T> {
 impl <T: XpCom> Clone for ComPtr<T> {
     fn clone(&self) -> ComPtr<T> {
         let rc = unsafe {
-            ((*self.get_isupports_vtable()).addref)()
+            ((*self.get_isupports_vtable()).addref)(self.get_isupports())
         };
         assert!(rc > 0);
         ComPtr {
@@ -125,7 +133,7 @@ impl <T: XpCom> Clone for ComPtr<T> {
 impl <T: XpCom> ComPtr<T> {
     pub fn new(t: &T) -> ComPtr<T> {
         let rc = unsafe {
-            ((*t.get_isupports_vtable()).addref)()
+            ((*t.get_isupports_vtable()).addref)(t.get_isupports())
         };
         assert!(rc > 0);
         ComPtr {
@@ -137,7 +145,7 @@ impl <T: XpCom> ComPtr<T> {
         if t == ptr::null_mut() {
             return None;
         }
-        let rc = ((*(*t).get_isupports_vtable()).addref)();
+        let rc = ((*(*t).get_isupports_vtable()).addref)((*t).get_isupports());
         assert!(rc > 0);
         Some(ComPtr {
             ptr: t as *const T
@@ -237,7 +245,11 @@ impl Deref for nsCString {
 
 impl Drop for nsCString {
     fn drop(&mut self) {
-        assert!(self.0.flags & ns_str_flags::F_SHARED == 0);
+        if self.0.flags & ns_str_flags::F_SHARED != 0 {
+            unsafe {
+                nsStringBuffer_Release(self.0.data as *mut libc::c_void);
+            }
+        }
         if self.0.flags & ns_str_flags::F_OWNED != 0 {
             unsafe {
                 libc::free(self.0.data as *mut libc::c_void);
@@ -316,13 +328,19 @@ impl Deref for nsString {
 
 impl Drop for nsString {
     fn drop(&mut self) {
-        assert!(self.0.flags & ns_str_flags::F_SHARED == 0);
-        if self.0.flags & ns_str_flags::F_OWNED != 0 {
-            unsafe {
+        unsafe {
+            if self.0.flags & ns_str_flags::F_SHARED != 0 {
+                nsStringBuffer_Release(self.0.data as *mut libc::c_void);
+            }
+            if self.0.flags & ns_str_flags::F_OWNED != 0 {
                 libc::free(self.0.data as *mut libc::c_void);
             }
         }
     }
+}
+
+extern "C" {
+    fn nsStringBuffer_Release(p: *mut libc::c_void);
 }
 
 pub enum IURI {}
@@ -461,27 +479,25 @@ impl IURI {
     }
 }
 
-/*
 #[no_mangle]
-pub extern "C" fn xprs_test(p: *const ISupports) {
+pub extern fn xprs_test(p: *const ISupports) -> u8 {
     if p.is_null() {
         println!("ERROR!!!! null argument pointer!");
-        return;
+        return 0;
     }
     if let Some(uri) = unsafe { &*p }.query_interface::<IURI>() {
         println!("We found a uri!");
         let spec = unsafe { uri.get_spec() };
         if let Ok(s) = spec {
-            println!("We got a spec! Its value is {:?}", &*s);
-            return;
+            println!("We got a spec! Its value is {:?}", str::from_utf8(&s));
+            return 1;
         } else {
             println!("ERROR!!! (error)");
-            return;
+            return 0;
         }
     } else {
-        println!("ERROR!!! (error')");
-        return;
+        println!("ERROR!!! (error' got a none)");
+        return 0;
     }
-}
 
-*/
+}

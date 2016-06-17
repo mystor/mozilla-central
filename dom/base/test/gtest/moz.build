@@ -8,6 +8,10 @@ UNIFIED_SOURCES += [
     'TestParserDialogOptions.cpp',
 ]
 
+if CONFIG['MOZ_RUST']:
+    SOURCES += ['xprs.rs',]
+    UNIFIED_SOURCES += ['TestXprs.cpp',]
+
 LOCAL_INCLUDES += [
     '/dom/base'
 ]
