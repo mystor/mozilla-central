@@ -79,6 +79,7 @@ pub unsafe trait XpCom {
         }
     }
 
+    // XXX: Should query_interface produce a ComPtr<U> or a &U?
     fn query_interface<U: XpCom>(&self) -> Option<ComPtr<U>> {
         let mut p = ptr::null();
         let iid = U::iid();
@@ -269,7 +270,7 @@ impl Deref for nsAString {
     type Target = [u16];
     fn deref(&self) -> &[u16] {
         let data = if self.data.is_null() {
-            0x1 as *const u16 // XXX: arbitrary non-null value
+            0x1 as *const u16 // arbitrary non-null value
         } else {
             self.data
         };
@@ -482,22 +483,14 @@ impl IURI {
 #[no_mangle]
 pub extern fn xprs_test(p: *const ISupports) -> u8 {
     if p.is_null() {
-        println!("ERROR!!!! null argument pointer!");
         return 0;
     }
     if let Some(uri) = unsafe { &*p }.query_interface::<IURI>() {
-        println!("We found a uri!");
-        let spec = unsafe { uri.get_spec() };
-        if let Ok(s) = spec {
+        if let Ok(s) = unsafe { uri.get_spec() } {
             println!("We got a spec! Its value is {:?}", str::from_utf8(&s));
             return 1;
-        } else {
-            println!("ERROR!!! (error)");
-            return 0;
         }
-    } else {
-        println!("ERROR!!! (error' got a none)");
-        return 0;
     }
-
+    0
 }
+

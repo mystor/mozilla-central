@@ -126,6 +126,12 @@ class Builtin(object):
         return "%s%s %s" % (const, self.nativename,
                             calltype != 'in' and '*' or '')
 
+    def rustType(self, calltype, shared=False, const=False):
+        if calltype == 'in':
+            return self.nativename
+        else:
+            return "*const %s" % self.nativename
+
 builtinNames = [
     Builtin('boolean', 'bool'),
     Builtin('void', 'void'),
@@ -355,6 +361,12 @@ class Typedef(object):
         return "%s %s" % (self.name,
                           calltype != 'in' and '*' or '')
 
+    def rustType(self, calltype):
+        if calltype == 'in':
+            return "*const %s" % self.name
+        else:
+            return self.name
+
     def __str__(self):
         return "typedef %s %s\n" % (self.type, self.name)
 
@@ -390,6 +402,12 @@ class Forward(object):
     def nativeType(self, calltype):
         return "%s %s" % (self.name,
                           calltype != 'in' and '* *' or '*')
+
+    def rustType(self, calltype):
+        if calltype == 'in':
+            return "*const *const %s" % self.name
+        else:
+            return "*const %s" % self.name
 
     def __str__(self):
         return "forward-declared %s\n" % self.name
@@ -477,6 +495,21 @@ class Native(object):
             m = calltype != 'in' and '*' or ''
         return "%s%s %s" % (const and 'const ' or '', self.nativename, m)
 
+    def rustType(self, calltype, const=False, shared=False):
+        if self.specialtype == 'jsval':
+            if calltype == 'out' or calltype == 'inout':
+                return "*mut libc::c_void"
+            return "*const libc::c_void"
+
+        if self.isRef(calltype) or self.isPtr(calltype):
+            m = "*const "
+            if self.modifier == 'ptr' and calltype != 'in':
+                m = "*const " + m
+        else:
+            m = calltype != 'in' and '*const ' or ''
+        return "%s %s" % (m, self.nativename)
+
+
     def __str__(self):
         return "native %s(%s)\n" % (self.name, self.nativename)
 
@@ -554,6 +587,10 @@ class Interface(object):
         return "%s%s %s" % (const and 'const ' or '',
                             self.name,
                             calltype != 'in' and '* *' or '*')
+
+    def rustType(self, calltype, const=False):
+        return "%s %s" % (calltype != 'in' and '*const *const' or '*const',
+                          self.name)
 
     def __str__(self):
         l = ["interface %s\n" % self.name]
@@ -1002,6 +1039,21 @@ class Param(object):
         except TypeError, e:
             raise IDLError("Unexpected parameter attribute", self.location)
 
+    def rustType(self):
+        kwargs = {}
+        if self.shared:
+            kwargs['shared'] = True
+        if self.const:
+            kwargs['const'] = True
+
+        try:
+            return self.realtype.rustType(self.paramtype, **kwargs)
+        except IDLError, e:
+            raise IDLError(e.message, self.location)
+        except TypeError, e:
+            print(e)
+            raise IDLError("Unexpected parameter attribute", self.location)
+
     def toIDL(self):
         return "%s%s %s %s" % (paramAttlistToIDL(self.attlist),
                                self.paramtype,
@@ -1019,6 +1071,10 @@ class Array(object):
     def nativeType(self, calltype, const=False):
         return "%s%s*" % (const and 'const ' or '',
                           self.type.nativeType(calltype))
+
+    def rustType(self, calltype, const=False):
+        return "*%s %s" % (const and 'const' or 'mut',
+                           self.type.rustType(calltype))
 
 
 class IDLParser(object):
