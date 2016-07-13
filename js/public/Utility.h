@@ -546,6 +546,36 @@ ScrambleHashCode(HashNumber h)
 
 } /* namespace js */
 
+#include <string>
+
+namespace js {
+
+struct MemReserveReqs
+{
+    enum Kind
+    {
+        KIND_ARRAYBUFFER = 0,
+    };
+
+    struct Request
+    {
+        Kind mKind;
+        int32_t mSize;
+    };
+
+    static const uint32_t MAX_REQS_COUNT = 16;
+
+    bool InitFromString(const char* aString);
+    std::string AsString();
+    bool Add(Request aRequest);
+    bool Reserve();
+
+    uint32_t mCount = 0;
+    Request mReqs[MAX_REQS_COUNT];
+};
+
+}
+
 /* sixgill annotation defines */
 #ifndef HAVE_STATIC_ANNOTATIONS
 # define HAVE_STATIC_ANNOTATIONS

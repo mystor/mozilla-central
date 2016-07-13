@@ -22,6 +22,8 @@
 #include "js/Utility.h"
 #include "js/Value.h"
 
+#include "jslock.h"
+
 #define JS_ALWAYS_TRUE(expr)      MOZ_ALWAYS_TRUE(expr)
 #define JS_ALWAYS_FALSE(expr)     MOZ_ALWAYS_FALSE(expr)
 
@@ -466,5 +468,14 @@ typedef size_t jsbitmap;
         expr;                                                                 \
     JS_END_MACRO
 #endif
+
+namespace js {
+
+struct ReservedMemory {
+    MemReserveReqs::Request mRequest;
+    void* mData;
+};
+
+} // namespace js
 
 #endif /* jsutil_h */

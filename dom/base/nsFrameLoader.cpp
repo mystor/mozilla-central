@@ -167,6 +167,12 @@ nsFrameLoader::nsFrameLoader(Element* aOwner, bool aNetworkCreated)
   , mVisible(true)
 {
   mRemoteFrame = ShouldUseRemoteProcess();
+
+  if (mOwnerContent->GetNameSpaceID() == kNameSpaceID_XUL) {
+    mOwnerContent->GetAttr(kNameSpaceID_None,
+                           nsGkAtoms::memreservations,
+                           mMemReserveReqs);
+  }
 }
 
 nsFrameLoader::~nsFrameLoader()
@@ -2569,7 +2575,25 @@ nsFrameLoader::TryRemoteBrowser()
   NS_ENSURE_SUCCESS(rv, false);
 
   nsCOMPtr<Element> ownerElement = mOwnerContent;
-  mRemoteBrowser = ContentParent::CreateBrowserOrApp(context, ownerElement, openerContentParent);
+  if (mMemReserveReqs.IsEmpty() || openerContentParent) {
+    if (!mMemReserveReqs.IsEmpty()) {
+      // We are trying to reserve memory, but we can't because we have an
+      // openerContentParent. Log an error to the console, explaining why we
+      // were unable to reserve the memory
+
+      // XXX: Implement
+      NS_WARNING("We were unable to reserve the requested memory due "
+                 "to the presence of an opener");
+    }
+
+    mRemoteBrowser = ContentParent::CreateBrowserOrApp(context, ownerElement,
+                                                       openerContentParent);
+  } else {
+    mRemoteBrowser = ContentParent::CreateBrowserWithReservations(context,
+                                                                  ownerElement,
+                                                                  mMemReserveReqs);
+  }
+
   if (!mRemoteBrowser) {
     return false;
   }

@@ -279,3 +279,109 @@ JS_DumpHistogram(JSBasicStats* bs, FILE* fp)
 }
 
 #endif /* JS_BASIC_STATS */
+
+namespace js {
+
+Mutex gReservedMemMutex = Mutex();
+uint32_t gReservedMemCount = 0;
+ReservedMemory gReservedMem[MemReserveReqs::MAX_REQS_COUNT] = {};
+
+bool
+MemReserveReqs::InitFromString(const char* aString)
+{
+    char* s = (char *)malloc(strlen(aString) + 1);
+    memcpy(s, aString, strlen(aString) + 1);
+    char* tok = strtok(s, " ");
+    while (tok) {
+        Request req;
+        if (strcmp(tok, "arraybuffer") == 0) {
+            req.mKind = KIND_ARRAYBUFFER;
+        } else {
+            printf("Found reservation type without matching size in MemReserveReqs string\n");
+            return false;
+        }
+
+        char* endptr;
+        long l = strtol(tok, &endptr, 10);
+        if (l <= 0 || *endptr != '\0') {
+            printf("Invalid integer found in MemReserveReqs string\n");
+            return false;
+        }
+        req.mSize = l;
+
+        if (!Add(req)) {
+            return false;
+        }
+
+        tok = strtok(NULL, " ");
+    }
+    return true;
+}
+
+std::string
+MemReserveReqs::AsString()
+{
+    std::string s;
+    for (uint32_t i = 0; i < mCount; ++i) {
+        if (!s.empty()) {
+            s.push_back(' ');
+        }
+
+        switch (mReqs[i].mKind) {
+        case KIND_ARRAYBUFFER:
+            s.append("arraybuffer ");
+            break;
+        default:
+            MOZ_ASSERT(false && "Invalid mKind property on MemReserveReqs");
+        }
+
+        s.append(std::to_string(mReqs[i].mSize));
+    }
+
+    return s;
+}
+
+bool
+MemReserveReqs::Add(MemReserveReqs::Request aRequest)
+{
+    if (mCount >= MAX_REQS_COUNT) {
+        printf("BAD\n");
+        return false;
+    }
+
+    mReqs[mCount++] = aRequest;
+    return true;
+}
+
+bool
+MemReserveReqs::Reserve()
+{
+    // LockGuard lock(gReservedMemMutex);
+    if (gReservedMemCount != 0) {
+        printf("Cannot reserve multiple sets of MemReserveReqs\n");
+        return false;
+    }
+
+    bool someFailed = false;
+    for (uint32_t i = 0; i < mCount; ++i) {
+        switch (mReqs[i].mKind) {
+        case KIND_ARRAYBUFFER:
+            gReservedMem[gReservedMemCount].mData = js_calloc(mReqs[i].mSize);
+            if (gReservedMem[gReservedMemCount].mData) {
+                gReservedMem[gReservedMemCount].mRequest = mReqs[i];
+                ++gReservedMemCount;
+            } else {
+                printf("Unable to allocate memory reservation\n");
+                someFailed = true;
+            }
+            break;
+        default:
+            MOZ_ASSERT(false, "Invalid type");
+        }
+    }
+
+    return !someFailed;
+}
+
+} // namespace js
+

@@ -377,6 +377,10 @@ private:
   // Holds the last known size of the frame.
   mozilla::ScreenIntSize mLazySize;
 
+  // Memory reservations which will be allocated by the process when this page
+  // is loaded
+  nsString mMemReserveReqs;
+
   bool mIsPrerendered : 1;
   bool mDepthTooGreat : 1;
   bool mIsTopLevelContent : 1;

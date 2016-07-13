@@ -869,6 +869,8 @@ JSContext::JSContext(JSRuntime* rt)
     resolvingList(nullptr),
     generatingError(false),
     cycleDetectorSet(this),
+    pendingArrayBufferData(nullptr),
+    pendingArrayBufferSize(0),
     data(nullptr),
     data2(nullptr),
     outstandingRequests(0),
@@ -880,6 +882,9 @@ JSContext::JSContext(JSRuntime* rt)
 
 JSContext::~JSContext()
 {
+    if (pendingArrayBufferData) {
+        js_free(pendingArrayBufferData);
+    }
     /* Free the stuff hanging off of cx. */
     MOZ_ASSERT(!resolvingList);
 }
@@ -1121,4 +1126,16 @@ AutoEnterOOMUnsafeRegion::crash(size_t size, const char* reason)
             annotateOOMSizeCallback(size);
     }
     crash(reason);
+}
+
+JS_PUBLIC_API(bool)
+JS_SetPendingArrayBuffer(JSContext* cx, void *data, size_t size)
+{
+    if (cx->pendingArrayBufferData) {
+        return false;
+    }
+
+    cx->pendingArrayBufferData = data;
+    cx->pendingArrayBufferSize = size;
+    return true;
 }

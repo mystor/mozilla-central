@@ -541,6 +541,7 @@ ProcessPriorityManagerImpl::GetParticularProcessPriorityManager(
     pppm->Init();
     mParticularManagers.Put(cpId, pppm);
 
+    printf("\n*\n*\n*\n*\n*CREATED PROCESS1111111\n");
     FireTestOnlyObserverNotification("process-created",
       nsPrintfCString("%lld", cpId));
   }

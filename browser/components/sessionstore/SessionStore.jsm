@@ -3335,8 +3335,10 @@ var SessionStoreInternal = {
     let activeIndex = tabData.index - 1;
     let activePageData = tabData.entries[activeIndex] || null;
     let uri = activePageData ? activePageData.url || null : null;
+    let memReserveReqs = null;
     if (aLoadArguments) {
       uri = aLoadArguments.uri;
+      memReserveReqs = aLoadArguments.memReserveReqs;
     }
 
     // We have to mark this tab as restoring first, otherwise
@@ -3345,7 +3347,7 @@ var SessionStoreInternal = {
     // flip the remoteness of any browser that is not being displayed.
     this.markTabAsRestoring(aTab);
 
-    let isRemotenessUpdate = tabbrowser.updateBrowserRemotenessByURL(browser, uri);
+    let isRemotenessUpdate = tabbrowser.updateBrowserRemotenessByURL(browser, uri, memReserveReqs);
     if (isRemotenessUpdate) {
       // We updated the remoteness, so we need to send the history down again.
       //

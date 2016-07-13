@@ -162,6 +162,11 @@ public:
                      Element* aFrameElement,
                      ContentParent* aOpenerContentParent);
 
+  static TabParent*
+  CreateBrowserWithReservations(const TabContext& aContext,
+                                Element* aFrameElement,
+                                const nsAString& aMemReserveReqs);
+
   static void GetAll(nsTArray<ContentParent*>& aArray);
 
   static void GetAllEvenIfDead(nsTArray<ContentParent*>& aArray);
@@ -585,6 +590,7 @@ protected:
 private:
   static nsDataHashtable<nsStringHashKey, ContentParent*> *sAppContentParents;
   static nsTArray<ContentParent*>* sNonAppContentParents;
+  static nsTArray<ContentParent*>* sOneOffContentParents;
   static nsTArray<ContentParent*>* sPrivateContent;
   static StaticAutoPtr<LinkedList<ContentParent> > sContentParents;
 
@@ -641,7 +647,8 @@ private:
 
   // Launch the subprocess and associated initialization.
   // Returns false if the process fails to start.
-  bool LaunchSubprocess(hal::ProcessPriority aInitialPriority = hal::PROCESS_PRIORITY_FOREGROUND);
+  bool LaunchSubprocess(hal::ProcessPriority aInitialPriority = hal::PROCESS_PRIORITY_FOREGROUND,
+                        const nsAString& aMemReserveReqs = EmptyString());
 
   // Common initialization after sub process launch or adoption.
   void InitInternal(ProcessPriority aPriority,

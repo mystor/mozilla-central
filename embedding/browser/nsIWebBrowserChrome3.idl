@@ -43,8 +43,11 @@ interface nsIWebBrowserChrome3 : nsIWebBrowserChrome2
    *        The URI being loaded.
    * @param aReferrer
    *        The referrer of the load.
+   * @param aReservations
+   *        Any memory reservations to be made by the parent process
    */
   bool shouldLoadURI(in nsIDocShell    aDocShell,
                      in nsIURI         aURI,
-                     in nsIURI         aReferrer);
+                     in nsIURI         aReferrer,
+                     in AString        aReservations);
 };

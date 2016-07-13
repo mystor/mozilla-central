@@ -593,9 +593,11 @@ var WebBrowserChrome = {
   },
 
   // Check whether this URI should load in the current process
-  shouldLoadURI: function(aDocShell, aURI, aReferrer) {
-    if (!E10SUtils.shouldLoadURI(aDocShell, aURI, aReferrer)) {
-      E10SUtils.redirectLoad(aDocShell, aURI, aReferrer);
+  shouldLoadURI: function(aDocShell, aURI, aReferrer, aMemReserveReqs) {
+    // If we have any memory reservation requests (which are represented as a
+    // non-empty string) we always need to try to load in a new process.
+    if (aMemReserveReqs || !E10SUtils.shouldLoadURI(aDocShell, aURI, aReferrer)) {
+      E10SUtils.redirectLoad(aDocShell, aURI, aReferrer, aMemReserveReqs);
       return false;
     }
 

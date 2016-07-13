@@ -8,6 +8,7 @@
 #include "mozilla/dom/HTMLMetaElement.h"
 #include "mozilla/dom/HTMLMetaElementBinding.h"
 #include "mozilla/dom/nsCSPService.h"
+#include "mozilla/dom/TabChild.h"
 #include "nsContentUtils.h"
 #include "nsStyleConsts.h"
 #include "nsIContentSecurityPolicy.h"

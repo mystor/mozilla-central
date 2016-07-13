@@ -1,0 +1,11 @@
+<!doctype html>
+<html>
+  <meta name="outofprocess" size="2048">
+
+  <script>
+    dump("The javascript is running in the frame\n");
+    let abo = new ArrayBuffer(2048);
+  </script>
+
+  Hopefully this was loaded out of process!
+</html>

@@ -547,6 +547,7 @@ ContentParentsMemoryReporter::CollectReports(nsIMemoryReporterCallback* cb,
 
 nsDataHashtable<nsStringHashKey, ContentParent*>* ContentParent::sAppContentParents;
 nsTArray<ContentParent*>* ContentParent::sNonAppContentParents;
+nsTArray<ContentParent*>* ContentParent::sOneOffContentParents;
 nsTArray<ContentParent*>* ContentParent::sPrivateContent;
 StaticAutoPtr<LinkedList<ContentParent> > ContentParent::sContentParents;
 #if defined(XP_LINUX) && defined(MOZ_CONTENT_SANDBOX)
@@ -1124,6 +1125,91 @@ ContentParent::RecvFindPlugins(const uint32_t& aPluginEpoch,
 {
   *aRv = mozilla::plugins::FindPluginsForContent(aPluginEpoch, aPlugins, aNewPluginEpoch);
   return true;
+}
+
+/*static*/ TabParent*
+ContentParent::CreateBrowserWithReservations(const TabContext& aContext,
+                                             Element* aFrameElement,
+                                             const nsAString& aMemReserveReqs)
+{
+  PROFILER_LABEL_FUNC(js::ProfileEntry::Category::OTHER);
+
+  if (!sCanLaunchSubprocesses) {
+    return nullptr;
+  }
+
+  ProcessPriority initialPriority = GetInitialProcessPriority(aFrameElement);
+  MOZ_ASSERT(XRE_IsParentProcess());
+
+
+  // Launch a new content process
+  RefPtr<ContentParent> cp = new ContentParent(/* app = */ nullptr,
+                                               /* opener = */ nullptr,
+                                               /* forBrowserElement = */ false,
+                                               /* isForPreallocated = */ false);
+  if (!cp->LaunchSubprocess(initialPriority, aMemReserveReqs)) {
+    return nullptr;
+  }
+  cp->Init();
+  cp->ForwardKnownInfo();
+  if (!sOneOffContentParents) {
+    sOneOffContentParents = new nsTArray<ContentParent*>();
+  }
+  sOneOffContentParents->AppendElement(cp);
+
+
+  nsIDocShell* docShell = GetOpenerDocShellHelper(aFrameElement);
+  TabId openerTabId;
+  if (docShell) {
+    openerTabId = TabParent::GetTabIdFrom(docShell);
+  }
+  TabId tabId = AllocateTabId(openerTabId,
+                              aContext.AsIPCTabContext(),
+                              cp->ChildID());
+
+
+  nsCOMPtr<nsIDocShellTreeOwner> treeOwner;
+  docShell->GetTreeOwner(getter_AddRefs(treeOwner));
+  if (!treeOwner) {
+    return nullptr;
+  }
+
+  nsCOMPtr<nsIWebBrowserChrome> wbc = do_GetInterface(treeOwner);
+  if (!wbc) {
+    return nullptr;
+  }
+  uint32_t chromeFlags = 0;
+  wbc->GetChromeFlags(&chromeFlags);
+
+  nsCOMPtr<nsILoadContext> loadContext = do_QueryInterface(docShell);
+  if (loadContext && loadContext->UsePrivateBrowsing()) {
+    chromeFlags |= nsIWebBrowserChrome::CHROME_PRIVATE_WINDOW;
+  }
+  bool affectLifetime;
+  docShell->GetAffectPrivateSessionLifetime(&affectLifetime);
+  if (affectLifetime) {
+    chromeFlags |= nsIWebBrowserChrome::CHROME_PRIVATE_LIFETIME;
+  }
+
+  if (tabId == 0) {
+    return nullptr;
+  }
+  RefPtr<TabParent> tp(new TabParent(cp, tabId, aContext, chromeFlags));
+  tp->SetInitedByParent();
+
+  PBrowserParent* browser =
+  cp->SendPBrowserConstructor(
+    // DeallocPBrowserParent() releases this ref.
+    tp.forget().take(), tabId, aContext.AsIPCTabContext(),
+    chromeFlags, cp->ChildID(), cp->IsForApp(), cp->IsForBrowser());
+
+  if (browser) {
+    RefPtr<TabParent> constructedTabParent = TabParent::GetFrom(browser);
+    constructedTabParent->SetOwnerElement(aFrameElement);
+    return constructedTabParent;
+  }
+
+  return nullptr;
 }
 
 /*static*/ TabParent*
@@ -1826,11 +1912,20 @@ ContentParent::MarkAsDead()
         sAppContentParents = nullptr;
       }
     }
-  } else if (sNonAppContentParents) {
-    sNonAppContentParents->RemoveElement(this);
-    if (!sNonAppContentParents->Length()) {
-      delete sNonAppContentParents;
-      sNonAppContentParents = nullptr;
+  } else {
+    if (sNonAppContentParents) {
+      sNonAppContentParents->RemoveElement(this);
+      if (!sNonAppContentParents->Length()) {
+        delete sNonAppContentParents;
+        sNonAppContentParents = nullptr;
+      }
+    }
+    if (sOneOffContentParents) {
+      sOneOffContentParents->RemoveElement(this);
+      if (!sOneOffContentParents->Length()) {
+        delete sOneOffContentParents;
+        sOneOffContentParents = nullptr;
+      }
     }
   }
 
@@ -2306,13 +2401,20 @@ ContentParent::InitializeMembers()
 }
 
 bool
-ContentParent::LaunchSubprocess(ProcessPriority aInitialPriority /* = PROCESS_PRIORITY_FOREGROUND */)
+ContentParent::LaunchSubprocess(ProcessPriority aInitialPriority /* = PROCESS_PRIORITY_FOREGROUND */,
+                                const nsAString& aMemReserveReqs /* = EmptyString() */)
 {
   PROFILER_LABEL_FUNC(js::ProfileEntry::Category::OTHER);
 
   std::vector<std::string> extraArgs;
   if (mIsNuwaProcess) {
     extraArgs.push_back("-nuwa");
+  }
+
+  if (!aMemReserveReqs.IsEmpty()) {
+    std::string arg = "-memreserve=";
+    arg.append(NS_ConvertUTF16toUTF8(aMemReserveReqs).get());
+    extraArgs.push_back(arg);
   }
 
   if (!mSubprocess->LaunchAndWaitForProcessHandle(extraArgs)) {
@@ -2480,6 +2582,8 @@ ContentParent::~ContentParent()
   if (mAppManifestURL.IsEmpty()) {
     MOZ_ASSERT(!sNonAppContentParents ||
                !sNonAppContentParents->Contains(this));
+    MOZ_ASSERT(!sOneOffContentParents ||
+               !sOneOffContentParents->Contains(this));
   } else {
     // In general, we expect sAppContentParents->Get(mAppManifestURL) to be
     // nullptr.  But it could be that we created another ContentParent for

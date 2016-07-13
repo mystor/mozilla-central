@@ -343,6 +343,10 @@ struct JSContext : public js::ExclusiveContext
     /* State for object and array toSource conversion. */
     js::AutoCycleDetector::Set cycleDetectorSet;
 
+    /* A buffer which was pre-allocated for an array buffer to be created by this page */
+    void*               pendingArrayBufferData;
+    size_t              pendingArrayBufferSize;
+
     /* Client opaque pointers. */
     void*               data;
     void*               data2;

@@ -242,9 +242,19 @@ ArrayBufferObject::class_constructor(JSContext* cx, unsigned argc, Value* vp)
 static ArrayBufferObject::BufferContents
 AllocateArrayBufferContents(JSContext* cx, uint32_t nbytes)
 {
-    uint8_t* p = cx->runtime()->pod_callocCanGC<uint8_t>(nbytes);
-    if (!p)
+    uint8_t* p;
+    // XXX: Hack get the pending array buffer data from the context!
+    if (cx->pendingArrayBufferData && cx->pendingArrayBufferSize == nbytes) {
+        p = static_cast<uint8_t*>(cx->pendingArrayBufferData);
+        cx->pendingArrayBufferData = nullptr;
+        cx->pendingArrayBufferSize = 0;
+    } else {
+        p = cx->runtime()->pod_callocCanGC<uint8_t>(nbytes);
+    }
+
+    if (!p) {
         ReportOutOfMemory(cx);
+    }
 
     return ArrayBufferObject::BufferContents::create<ArrayBufferObject::PLAIN>(p);
 }

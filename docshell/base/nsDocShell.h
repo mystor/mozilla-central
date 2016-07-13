@@ -1044,6 +1044,68 @@ private:
   void MaybeNotifyKeywordSearchLoading(const nsString& aProvider,
                                        const nsString& aKeyword);
 
+  /**
+   * Loads the given URI.  This method is identical to loadURI(...) except
+   * that its parameter list is broken out instead of being packaged inside
+   * of an nsIDocShellLoadInfo object...
+   *
+   * @param aURI            - The URI to load.
+   * @param aOriginalURI    - If aOriginalURI is present and this function ends
+   *                          up actually loading data from network or cache,
+   *                          but not from bfcache, (e.g. in case of a reload)
+   *                          aOriginalURI will be loaded instead of aURI.
+   *                          Thereby we will load all redirects again.
+   * @param aReferrer       - Referring URI
+   * @param aReferrerPolicy - Referrer policy
+   * @param aOwner          - Owner (security principal)
+   * @param aInheritOwner   - Flag indicating whether the owner of the current
+   *                          document should be inherited if aOwner is null.
+   * @param aStopActiveDoc  - Flag indicating whether loading the current
+   *                          document should be stopped.
+   * @param aWindowTarget   - Window target for the load.
+   * @param aTypeHint       - A hint as to the content-type of the resulting
+   *                          data.  May be null or empty if no hint.
+   * @param aFileName       - Non-null when the link should be downloaded as
+                              the given filename.
+   * @param aPostDataStream - Post data stream (if POSTing)
+   * @param aHeadersStream  - Stream containing "extra" request headers...
+   * @param aLoadFlags      - Flags to modify load behaviour. Flags are defined
+   *                          in nsIWebNavigation.
+   * @param aSHEntry        - Active Session History entry (if loading from SH)
+   * @param aSrcdoc           When INTERNAL_LOAD_FLAGS_IS_SRCDOC is set, the
+   *                          contents of this parameter will be loaded instead
+   *                          of aURI.
+   * @param aSourceDocShell - The source browsing context for the navigation.
+   * @param aBaseURI        - The base URI to be used for the load.  Set in
+   *                          srcdoc loads as it cannot otherwise be inferred
+   *                          in certain situations such as view-source.
+   * @param aMemReserveReqs - Any memory reservations which should be made before
+   *                          loading this URI. If this parameter is non-empty,
+   *                          the browser will spawn a new process to handle
+   *                          this navigation.
+   */
+  nsresult InternalLoad(nsIURI* aURI,
+                        nsIURI* aOriginalURI,
+                        nsIURI* aReferrer,
+                        uint32_t aReferrerPolicy,
+                        nsISupports* aOwner,
+                        uint32_t aFlags,
+                        const char16_t* aWindowTarget,
+                        const char* aTypeHint,
+                        const nsAString& aFileName,
+                        nsIInputStream* aPostData,
+                        nsIInputStream* aHeadersData,
+                        uint32_t aLoadType,
+                        nsISHEntry* aSHEntry,
+                        bool aFirstParty,
+                        const nsAString& aSrcdoc,
+                        nsIDocShell* aSourceDocShell,
+                        nsIURI* aBaseURI,
+                        mozilla::UniquePtr<js::MemReserveReqs> aMemReserveReqs,
+                        nsIDocShell** aDocShell,
+                        nsIRequest** aRequest);
+  friend class InternalLoadEvent;
+
 #ifdef DEBUG
   // We're counting the number of |nsDocShells| to help find leaks
   static unsigned long gNumberOfDocShells;
