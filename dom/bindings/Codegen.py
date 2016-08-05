@@ -4233,19 +4233,21 @@ def getHandleDefault(defaultValue):
     return toStringBool(defaultValue.value)
 
 
-def handleDefaultStringValue(defaultValue, method):
+def handleDefaultStringValue(defaultValue, method, char_t="char16_t"):
     """
-    Returns a string which ends up calling 'method' with a (char16_t*, length)
+    Returns a string which ends up calling 'method' with a (char_t*, length)
     pair that sets this string default value.  This string is suitable for
     passing as the second argument of handleDefault; in particular it does not
     end with a ';'
     """
     assert defaultValue.type.isDOMString()
-    return ("static const char16_t data[] = { %s };\n"
-            "%s(data, ArrayLength(data) - 1)" %
-            (", ".join(["'" + char + "'" for char in
-                        defaultValue.value] + ["0"]),
-             method))
+    return ("static const %(char_t)s data[] = { %(data)s };\n"
+            "%(method)s(data, ArrayLength(data) - 1)") % {
+                'char_t': char_t,
+                'method': method,
+                'data': ", ".join(["'" + char + "'" for char in
+                                   defaultValue.value] + ["0"])
+            }
 
 
 # If this function is modified, modify CGNativeMember.getArg and
@@ -5462,8 +5464,11 @@ def getJSToNativeConversionInfo(type, descriptorProvider, failureCode=None,
             nullable=nullable,
             exceptionCode=exceptionCode)
 
-        # ByteString arguments cannot have a default value.
-        assert defaultValue is None
+        if defaultValue is not None:
+            defaultCode = handleDefaultStringValue(defaultValue,
+                                                   "${declName}.Rebind",
+                                                   "char")
+            conversionCode = handleDefault(conversionCode, defaultCode + ";\n")
 
         return JSToNativeConversionInfo(
             conversionCode,

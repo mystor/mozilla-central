@@ -1009,6 +1009,9 @@ dictionary Dict : ParentDict {
   DOMString otherStr = "def";
   DOMString? yetAnotherStr = null;
   DOMString template;
+  ByteString byteStr;
+  ByteString emptyByteStr = "";
+  ByteString otherByteStr = "def";
   object someObj;
   boolean prototype;
   object? anotherObj = null;

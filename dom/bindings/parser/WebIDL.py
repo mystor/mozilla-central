@@ -9,6 +9,7 @@ import re
 import os
 import traceback
 import math
+import string
 from collections import defaultdict
 
 # Machinery
@@ -3382,6 +3383,18 @@ class IDLValue(IDLObject):
             # DOMString.  No coercion is required in this case as Codegen.py
             # treats USVString just like DOMString, but with an
             # extra normalization step.
+            assert self.type.isDOMString()
+            return self
+        elif self.type.isString() and type.isByteString():
+            # Allow ByteStrings to use a default value like DOMString.
+            # No coercion is required as Codegen.py will handle the
+            # extra steps. We want to make sure that our string contains
+            # only valid characters, so we check that here.
+            valid_ascii_lit = " " + string.ascii_letters + string.digits + string.punctuation
+            for c in self.value:
+                if c not in valid_ascii_lit:
+                    raise WebIDLError("Trying to coerce non-ascii string literal %s to ByteString"
+                                      % self.value.__repr__(), [location])
             assert self.type.isDOMString()
             return self
         raise WebIDLError("Cannot coerce type %s to type %s." %
