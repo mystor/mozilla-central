@@ -4240,7 +4240,7 @@ def handleDefaultStringValue(defaultValue, method, char_t="char16_t"):
     passing as the second argument of handleDefault; in particular it does not
     end with a ';'
     """
-    assert defaultValue.type.isDOMString()
+    assert defaultValue.type.isDOMString() or defaultValue.type.isByteString()
     return ("static const %(char_t)s data[] = { %(data)s };\n"
             "%(method)s(data, ArrayLength(data) - 1)") % {
                 'char_t': char_t,
@@ -5465,9 +5465,13 @@ def getJSToNativeConversionInfo(type, descriptorProvider, failureCode=None,
             exceptionCode=exceptionCode)
 
         if defaultValue is not None:
-            defaultCode = handleDefaultStringValue(defaultValue,
-                                                   "${declName}.Rebind",
-                                                   "char")
+            if isinstance(defaultValue, IDLNullValue):
+                assert(type.nullable())
+                defaultCode = "${declName}.SetIsVoid(true)"
+            else:
+                defaultCode = handleDefaultStringValue(defaultValue,
+                                                       "${declName}.Rebind",
+                                                       "char")
             conversionCode = handleDefault(conversionCode, defaultCode + ";\n")
 
         return JSToNativeConversionInfo(

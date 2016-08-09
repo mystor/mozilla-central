@@ -354,9 +354,13 @@ interface TestJSImplInterface {
   void passByteString(ByteString arg);
   void passNullableByteString(ByteString? arg);
   void passOptionalByteString(optional ByteString arg);
+  void passOptionalByteStringWithDefaultValue(optional ByteString arg = "abc");
   void passOptionalNullableByteString(optional ByteString? arg);
+  void passOptionalNullableByteStringWithDefaultValue(optional ByteString? arg = null);
   void passVariadicByteString(ByteString... arg);
   void PassUnionByteString((ByteString or long) arg);
+  void PassOptionalUnionByteString(optional (ByteString or long) arg);
+  void PassOptionalUnionByteStringWithDefaultValue(optional (ByteString or long) arg = "abc");
 
   // USVString types
   void passSVS(USVString arg);

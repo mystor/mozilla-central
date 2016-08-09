@@ -3391,10 +3391,14 @@ class IDLValue(IDLObject):
             # extra steps. We want to make sure that our string contains
             # only valid characters, so we check that here.
             valid_ascii_lit = " " + string.ascii_letters + string.digits + string.punctuation
-            for c in self.value:
+            for idx, c in enumerate(self.value):
                 if c not in valid_ascii_lit:
-                    raise WebIDLError("Trying to coerce non-ascii string literal %s to ByteString"
-                                      % self.value.__repr__(), [location])
+                    raise WebIDLError("Coercing this string literal %s to a ByteString is not supported yet. "
+                                      "Coercion failed due to an unsupported byte %d at index %d."
+                                      % (self.value.__repr__(), ord(c), idx), [location])
+            if not self.type.isDOMString():
+                raise WebIDLError("type is %s" % str(self.type), [location])
+
             assert self.type.isDOMString()
             return self
         raise WebIDLError("Cannot coerce type %s to type %s." %
