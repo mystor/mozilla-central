@@ -283,10 +283,10 @@ DataTransfer::GetMozUserCancelled(bool* aUserCancelled)
   return NS_OK;
 }
 
-FileList*
+already_AddRefed<FileList>
 DataTransfer::GetFiles(ErrorResult& aRv)
 {
-  return mItems->Files();
+  return mItems->Files(nsContentUtils::SubjectPrincipal());
 }
 
 NS_IMETHODIMP
@@ -296,11 +296,13 @@ DataTransfer::GetFiles(nsIDOMFileList** aFileList)
     return NS_ERROR_FAILURE;
   }
 
-  ErrorResult rv;
-  RefPtr<FileList> files = GetFiles(rv);
-  if (NS_WARN_IF(rv.Failed())) {
-    return rv.StealNSResult();
-  }
+  // The XPCOM interface is only avaliable to system code, and thus we can
+  // assume the system principal. This is consistent with the previous behavour
+  // of this function, which also assumed the system principal.
+  //
+  // This code is also called from C++ code, which expects it to have a System
+  // Principal, and thus the SubjectPrincipal cannot be used.
+  RefPtr<FileList> files = mItems->Files(nsContentUtils::GetSystemPrincipal());
 
   files.forget(aFileList);
   return NS_OK;
@@ -836,7 +838,7 @@ DataTransfer::GetFilesAndDirectories(ErrorResult& aRv)
     return nullptr;
   }
 
-  RefPtr<FileList> files = mItems->Files();
+  RefPtr<FileList> files = mItems->Files(nsContentUtils::SubjectPrincipal());
   if (NS_WARN_IF(!files)) {
     return nullptr;
   }

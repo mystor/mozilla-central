@@ -200,15 +200,31 @@ DataTransferItemList::Add(File& aData, ErrorResult& aRv)
   return item;
 }
 
-FileList*
-DataTransferItemList::Files()
+already_AddRefed<FileList>
+DataTransferItemList::Files(nsIPrincipal* aPrincipal)
 {
+  RefPtr<FileList> files;
+  if (nsContentUtils::IsSystemPrincipal(aPrincipal)) {
+    NS_WARNING("Accessing files from System Principal");
+    files = new FileList(static_cast<nsIDOMDataTransfer*>(mDataTransfer));
+    GenerateFiles(files, aPrincipal);
+    return files.forget();
+  }
+
   if (!mFiles) {
     mFiles = new FileList(static_cast<nsIDOMDataTransfer*>(mDataTransfer));
+    mFilesPrincipal = aPrincipal;
     RegenerateFiles();
   }
 
-  return mFiles;
+  if (!aPrincipal->Subsumes(mFilesPrincipal)) {
+    MOZ_ASSERT(false, "This DataTransfer should only be accessed by the system "
+               "and a single principal");
+    return nullptr;
+  }
+
+  files = mFiles;
+  return files.forget();
 }
 
 void
@@ -491,22 +507,31 @@ DataTransferItemList::RegenerateFiles()
     // infrequently used.
     mFiles->Clear();
 
-    uint32_t count = Length();
-    for (uint32_t i = 0; i < count; i++) {
-      ErrorResult rv;
-      bool found;
-      RefPtr<DataTransferItem> item = IndexedGetter(i, found, rv);
-      if (NS_WARN_IF(!found || rv.Failed())) {
+    DataTransferItemList::GenerateFiles(mFiles, mFilesPrincipal);
+  }
+}
+
+void
+DataTransferItemList::GenerateFiles(FileList* aFiles,
+                                    nsIPrincipal* aFilesPrincipal)
+{
+  MOZ_ASSERT(aFiles);
+  MOZ_ASSERT(aFilesPrincipal);
+  uint32_t count = Length();
+  for (uint32_t i = 0; i < count; i++) {
+    ErrorResult rv;
+    bool found;
+    RefPtr<DataTransferItem> item = IndexedGetter(i, found, rv);
+    if (NS_WARN_IF(!found || rv.Failed())) {
+      continue;
+    }
+
+    if (item->Kind() == DataTransferItem::KIND_FILE) {
+      RefPtr<File> file = item->GetAsFileWithPrincipal(aFilesPrincipal, rv);
+      if (NS_WARN_IF(rv.Failed() || !file)) {
         continue;
       }
-
-      if (item->Kind() == DataTransferItem::KIND_FILE) {
-        RefPtr<File> file = item->GetAsFile(rv);
-        if (NS_WARN_IF(rv.Failed() || !file)) {
-          continue;
-        }
-        mFiles->Append(file);
-      }
+      aFiles->Append(file);
     }
   }
 }
