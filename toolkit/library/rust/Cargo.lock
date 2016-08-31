@@ -2,6 +2,7 @@
 name = "gkrust"
 version = "0.1.0"
 dependencies = [
+ "gkrust-gtest 0.1.0",
  "mp4parse 0.4.0",
  "nsstring 0.1.0",
 ]
@@ -11,6 +12,14 @@ name = "byteorder"
 version = "0.5.3"
 
 [[package]]
+name = "gkrust-gtest"
+version = "0.1.0"
+dependencies = [
+ "mp4parse-gtest 0.1.0",
+ "nsstring-gtest 0.1.0",
+]
+
+[[package]]
 name = "mp4parse"
 version = "0.4.0"
 dependencies = [
@@ -18,6 +27,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "mp4parse-gtest"
+version = "0.1.0"
+
+[[package]]
 name = "nsstring"
 version = "0.1.0"
+
+[[package]]
+name = "nsstring-gtest"
+version = "0.1.0"
+dependencies = [
+ "nsstring 0.1.0",
+]
 

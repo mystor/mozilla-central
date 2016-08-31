@@ -5,8 +5,8 @@
 extern "C" {
   // This function is called by the rust code in test.rs if a non-fatal test
   // failure occurs.
-  void GTest_ExpectFailure(const char* aMessage) {
-    EXPECT_STREQ(aMessage, "");
+  MOZ_EXPORT void GTest_ExpectFailure(const char* aMessage) {
+    EXPECT_TRUE(false) << aMessage;
   }
 }
 
@@ -187,7 +187,7 @@ TEST(RustNsString, AssignFromRust) {
 }
 
 extern "C" {
-  void Cpp_AssignFromCpp(nsACString* aCStr, nsAString* aStr) {
+  MOZ_EXPORT void Cpp_AssignFromCpp(nsACString* aCStr, nsAString* aStr) {
     aCStr->AssignASCII("Hello, World!");
     aStr->AssignASCII("Hello, World!");
   }

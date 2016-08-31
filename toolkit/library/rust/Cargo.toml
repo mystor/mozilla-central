@@ -9,6 +9,13 @@ description = "Rust code for libxul"
 mp4parse = { path = "../../../media/libstagefright/binding/mp4parse" }
 nsstring = { path = "../../../xpcom/rust/nsstring" }
 
+# We include all gtest code alongside our non-gtest code. The linker should
+# throw out these unused symbols when linking libxul normally, and this means
+# that we always have exactly 1 rust library in tree, which avoids a ton of
+# problems related to linking multiple rust-created staticlibs into a single
+# library.
+gkrust-gtest = { path = "../gtest/rust" }
+
 [lib]
 path = "lib.rs"
 crate-type = ["staticlib"]

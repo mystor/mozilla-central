@@ -145,7 +145,6 @@ if CONFIG['MOZ_GIO_COMPONENT']:
 
 if CONFIG['MOZ_RUST']:
     DIRS += [
-        '/toolkit/library/gtest/rust',
         '/toolkit/library/rust',
     ]
 

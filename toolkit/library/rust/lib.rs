@@ -4,3 +4,4 @@
 
 extern crate mp4parse;
 extern crate nsstring;
+extern crate gkrust_gtest;
