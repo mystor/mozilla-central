@@ -31,6 +31,7 @@
 #include "nsISupportsImpl.h"
 #include "nsRegionFwd.h"
 #include <new>
+#include <iterator>
 
 namespace JS {
 template<class T>
@@ -352,6 +353,111 @@ struct nsTArray_SafeElementAtHelper<mozilla::OwningNonNull<E>, Derived>
       return static_cast<const Derived*>(this)->ElementAt(aIndex);
     }
     return nullptr;
+  }
+};
+
+template<class Element>
+class nsTArrayIterator
+{
+public:
+  typedef nsTArray<typename mozilla::RemoveConst<Element>::Type> array_type;
+  typedef nsTArrayIterator<Element>       iterator_type;
+  typedef typename array_type::index_type index_type;
+  typedef Element                         value_type;
+  typedef ptrdiff_t                       difference_type;
+  typedef value_type*                     pointer;
+  typedef value_type&                     reference;
+  typedef std::random_access_iterator_tag iterator_category;
+
+private:
+  const array_type* mArray;
+  index_type mIndex;
+
+public:
+  nsTArrayIterator() : mArray(nullptr), mIndex(0) {}
+  nsTArrayIterator(const iterator_type& aOther)
+    : mArray(aOther.mArray), mIndex(aOther.mIndex) {}
+  nsTArrayIterator(const array_type& aArray, index_type aIndex)
+    : mArray(&aArray), mIndex(aIndex) {}
+
+  iterator_type& operator=(const iterator_type& aOther) {
+    mArray = aOther.mArray;
+    mIndex = aOther.mIndex;
+    return *this;
+  }
+
+  bool operator==(const iterator_type& aRhs) const {
+    return mIndex == aRhs.mIndex;
+  }
+  bool operator!=(const iterator_type& aRhs) const {
+    return !(*this == aRhs);
+  }
+  bool operator<(const iterator_type& aRhs) const {
+    return mIndex < aRhs.mIndex;
+  }
+  bool operator>(const iterator_type& aRhs) const {
+    return mIndex > aRhs.mIndex;
+  }
+  bool operator<=(const iterator_type& aRhs) const {
+    return mIndex <= aRhs.mIndex;
+  }
+  bool operator>=(const iterator_type& aRhs) const {
+    return mIndex >= aRhs.mIndex;
+  }
+
+  value_type* operator->() const {
+    return const_cast<value_type*>(&(*mArray)[mIndex]);
+  }
+  value_type& operator*() const {
+    return const_cast<value_type&>((*mArray)[mIndex]);
+  }
+
+  iterator_type& operator++() {
+    ++mIndex;
+    return *this;
+  }
+  iterator_type operator++(int) {
+    iterator_type it = *this;
+    ++*this;
+    return it;
+  }
+  iterator_type& operator--() {
+    --mIndex;
+    return *this;
+  }
+  iterator_type operator--(int) {
+    iterator_type it = *this;
+    --*this;
+    return it;
+  }
+
+  iterator_type& operator+=(difference_type aDiff) {
+    mIndex += aDiff;
+    return *this;
+  }
+  iterator_type& operator-=(difference_type aDiff) {
+    mIndex -= aDiff;
+    return *this;
+  }
+
+  iterator_type operator+(difference_type aDiff) const {
+    iterator_type it = *this;
+    it += aDiff;
+    return it;
+  }
+  iterator_type operator-(difference_type aDiff) const {
+    iterator_type it = *this;
+    it -= aDiff;
+    return it;
+  }
+
+  difference_type operator-(const iterator_type& aOther) const {
+    return static_cast<difference_type>(mIndex) -
+      static_cast<difference_type>(aOther.mIndex);
+  }
+
+  value_type& operator[](difference_type aIndex) const {
+    return *this->operator+(aIndex);
   }
 };
 
@@ -851,10 +957,10 @@ public:
   typedef nsTArray_Impl<E, Alloc>                    self_type;
   typedef nsTArrayElementTraits<E>                   elem_traits;
   typedef nsTArray_SafeElementAtHelper<E, self_type> safeelementat_helper_type;
-  typedef elem_type*                                 iterator;
-  typedef const elem_type*                           const_iterator;
-  typedef mozilla::ReverseIterator<elem_type*>       reverse_iterator;
-  typedef mozilla::ReverseIterator<const elem_type*> const_reverse_iterator;
+  typedef nsTArrayIterator<elem_type>                iterator;
+  typedef nsTArrayIterator<const elem_type>          const_iterator;
+  typedef mozilla::ReverseIterator<iterator>         reverse_iterator;
+  typedef mozilla::ReverseIterator<const_iterator>   const_reverse_iterator;
 
   using safeelementat_helper_type::SafeElementAt;
   using base_type::EmptyHdr;
@@ -1092,11 +1198,11 @@ public:
   }
 
   // Methods for range-based for loops.
-  iterator begin() { return Elements(); }
-  const_iterator begin() const { return Elements(); }
+  iterator begin() { return iterator(*this, 0); }
+  const_iterator begin() const { return const_iterator(*this, 0); }
   const_iterator cbegin() const { return begin(); }
-  iterator end() { return Elements() + Length(); }
-  const_iterator end() const { return Elements() + Length(); }
+  iterator end() { return iterator(*this, Length()); }
+  const_iterator end() const { return const_iterator(*this, Length()); }
   const_iterator cend() const { return end(); }
 
   // Methods for reverse iterating.
