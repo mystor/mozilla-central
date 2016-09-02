@@ -6,7 +6,7 @@ authors = [
 ]
 
 [lib]
-crate-type = ["staticlib"]
+crate-type = ["rlib"]
 
 [dependencies]
 bogus = { version = "0.1.0" }

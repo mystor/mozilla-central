@@ -8,7 +8,7 @@ authors = [
 build = "build.rs"
 
 [lib]
-crate-type = ["staticlib"]
+crate-type = ["rlib"]
 
 [build-dependencies]
 bogus = { version = "0.1.0", path = "../bogus" }

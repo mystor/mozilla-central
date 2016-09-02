@@ -245,6 +245,121 @@ class ExpandArgsMore(ExpandArgs):
         self.tmp.append(tmp)
         self.append(option % tmp)
 
+    # Discover what the output file from the underlying call will be by looking
+    # for `-o`, `-out:$PATH` or `-Fo$PATH` in the argument list.
+    def getOutArgument(self):
+        path = None
+        for i, arg in enumerate(self):
+            if arg == '-o':
+                path = self[i+1]
+            elif arg.lower().startswith('-out:'):
+                path = arg[5:]
+            elif arg.lower().startswith('-Fo'):
+                path = arg[3:]
+        return path
+
+    def prelinkRust(self, verbose):
+        # Split the arguments into the rlibs, other arguments which came before
+        # the first rlib, and other arguments which came after the first rlib.
+        # We do this so that we put the unified rust library item in the same
+        # location in the arguments list as the first rlib.
+        before_first = []
+        after_first = []
+        rlibs = []
+        other = before_first
+        for s in self:
+            if s.endswith(".rlib"):
+                rlibs.append(s)
+                other = after_first
+            else:
+                other.append(s)
+        if len(rlibs) == 0:
+            return None
+
+        # We need to know where to put our intermediate results, so let's discover the output argument
+        out_arg = self.getOutArgument()
+        if out_arg is None:
+            print >>sys.stderr, "error: no out argument passed. Skipping rust prelink"
+            sys.stderr.flush()
+            return 1
+
+        # generate the path names
+        out_arg_noext = os.path.splitext(out_arg)[0]
+        output_file = out_arg_noext + "-rust" + conf.LIB_SUFFIX
+        input_file = out_arg_noext + "-rust.rs"
+
+        # Overwrite the arguments with the computed ones
+        self[:] = before_first + [output_file] + after_first
+
+        # Check if any of our rlibs are newer than our existing output_file
+        try:
+            out_mtime = os.path.getmtime(output_file)
+        except OSError:
+            out_mtime = 0
+
+        must_relink = False
+        for rlib in rlibs:
+            if os.path.getmtime(rlib) > out_mtime:
+                must_relink = True
+                break
+        if not must_relink:
+            print >>sys.stderr, "note: Skipping relinking up-to-date rlibs"
+            return None
+
+        # Build up the arguments to rustc
+        rustc_args = [conf.RUSTC]
+        rustc_args += [
+            input_file,
+            "-o", output_file,
+            "--crate-type", "staticlib",
+            "--target", conf.RUST_TARGET,
+            "-C", "panic=abort",
+            "-g",
+        ]
+        if conf.MOZ_DEBUG:
+            rustc_args += [
+                "-C", "opt-level=1",
+                "-C", "debug-assertions",
+            ]
+        else:
+            rustc_args += [
+                "-C", "opt-level=2",
+                "-C", "lto"
+            ]
+
+        # List each of the rlibs with --extern, and their dependency search directory with -L
+        with open(input_file, "w") as f:
+            f.write("/* THIS IS A GENERATED FILE. DO NOT EDIT */\n")
+            for rlib in rlibs:
+                # We need the name of the crate, and the "deps" folder for the crate
+                dirname, basename = os.path.split(rlib)
+                crate_name = os.path.splitext(basename)[0]
+                crate_deps = os.path.join(dirname, "deps")
+
+                rustc_args += [
+                    "--extern", "%s=%s" % (crate_name, rlib),
+                    "-L", crate_deps,
+                ]
+                f.write("extern crate %s;\n" % crate_name)
+
+        # Execute the rustc command, and return its returncode.
+        print >>sys.stderr, "note: Prelinking rust: `" + " ".join(rustc_args) + "`"
+        sys.stderr.flush()
+        try:
+            proc = subprocess.Popen(rustc_args, stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
+        except Exception, e:
+            print >>sys.stderr, 'error: Launching', args, ':', e
+            raise e
+        (stdout, stderr) = proc.communicate()
+        if proc.returncode or verbose:
+            sys.stderr.write(stdout)
+        if not proc.returncode:
+            print >>sys.stderr, "note: rust prelink successful"
+        sys.stderr.flush()
+
+        return proc.returncode
+
+
 class SectionFinder(object):
     '''Instances of this class allow to map symbol names to sections in
     object files.'''
@@ -321,10 +436,16 @@ def main(args, proc_callback=None):
         help="display executed command and temporary files content")
     parser.add_option("--symbol-order", dest="symbol_order", metavar="FILE",
         help="use the given list of symbols to order symbols in the resulting binary when using with a linker")
+    parser.add_option("--prelink-rust", action="store_true", dest="prelink_rust",
+        help="prelink rust rlib files into a staticlib before passing to program")
 
     (options, args) = parser.parse_args(args)
 
     with ExpandArgsMore(args) as args:
+        if options.prelink_rust:
+            rust_returncode = args.prelinkRust(options.verbose)
+            if rust_returncode:
+                return rust_returncode
         if options.extract:
             args.extract()
         if options.symbol_order:

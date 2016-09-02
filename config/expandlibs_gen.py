@@ -25,6 +25,12 @@ def generate(args):
                 desc['LIBS'].append(os.path.abspath(arg))
             else:
                 raise Exception("File not found: %s" % arg)
+        elif os.path.splitext(arg)[1] == ".rlib":
+            if os.path.exists(arg):
+                desc['LIBS'].append(os.path.abspath(arg))
+            else:
+                raise Exception("File not found: %s" % arg)
+
     return desc
 
 if __name__ == '__main__':

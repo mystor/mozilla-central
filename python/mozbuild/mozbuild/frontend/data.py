@@ -474,12 +474,8 @@ class RustLibrary(StaticLibrary):
         # package names defined in Cargo.toml with underscores in actual
         # filenames. But we need to keep the basename consistent because
         # many other things in the build system depend on that.
-        assert self.crate_type == 'staticlib'
-        self.lib_name = '%s%s%s' % (
-            context.config.lib_prefix,
-            basename.replace('-', '_'),
-            context.config.lib_suffix
-        )
+        assert self.crate_type == 'rlib'
+        self.lib_name = 'lib%s.rlib' % basename.replace('-', '_')
         # cargo creates several directories and places its build artifacts
         # in those directories.  The directory structure depends not only
         # on the target, but also what sort of build we are doing.

@@ -6,7 +6,7 @@ authors = [
 ]
 
 [lib]
-crate-type = ["staticlib"]
+crate-type = ["rlib"]
 
 [dependencies]
 ok = { version = "0.1.0", path = "ok" }
