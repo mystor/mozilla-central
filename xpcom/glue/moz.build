@@ -92,6 +92,8 @@ UNIFIED_SOURCES += [
     'nsStringAPI.cpp',
 ]
 
+SOURCES += ['Testing.cpp']
+
 Library('xpcomglue_s')
 
 SDK_LIBRARY = True
