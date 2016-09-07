@@ -460,6 +460,7 @@ class TreeMetadataEmitter(LoggingMixin):
     def _rust_library(self, context, libname, static_args):
         # We need to note any Rust library for linking purposes.
         cargo_file = mozpath.join(context.srcdir, 'Cargo.toml')
+        lock_file = mozpath.join(context.srcdir, 'Cargo.wrap.lock')
         if not os.path.exists(cargo_file):
             raise SandboxValidationError(
                 'No Cargo.toml file found in %s' % cargo_file, context)
@@ -472,27 +473,9 @@ class TreeMetadataEmitter(LoggingMixin):
                 'library %s does not match Cargo.toml-defined package %s' % (libname, crate_name),
                 context)
 
-        lib_section = config.get('lib', None)
-        if not lib_section:
-            raise SandboxValidationError(
-                'Cargo.toml for %s has no [lib] section' % libname,
-                context)
-
-        crate_type = lib_section.get('crate-type', None)
-        if not crate_type:
-            raise SandboxValidationError(
-                'Can\'t determine a crate-type for %s from Cargo.toml' % libname,
-                context)
-
-        crate_type = crate_type[0]
-        if crate_type != 'rlib':
-            raise SandboxValidationError(
-                'crate-type %s is not permitted for %s' % (crate_type, libname),
-                context)
-
         self._verify_local_paths(context, context.relsrcdir, config)
 
-        return RustLibrary(context, libname, cargo_file, crate_type, **static_args)
+        return RustLibrary(context, libname, cargo_file, lock_file, **static_args)
 
     def _handle_linkables(self, context, passthru, generated_files):
         has_linkables = False

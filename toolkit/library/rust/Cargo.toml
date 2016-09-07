@@ -11,28 +11,9 @@ nsstring = { path = "../../../xpcom/rust/nsstring" }
 
 [lib]
 path = "lib.rs"
-crate-type = ["rlib"]
 test = false
 doctest = false
 bench = false
 doc = false
 plugin = false
 harness = false
-
-# Explicitly specify what our profiles use.
-[profile.dev]
-opt-level = 1
-debug = true
-rpath = false
-lto = false
-debug-assertions = true
-codegen-units = 1
-panic = "abort"
-
-[profile.release]
-opt-level = 2
-debug = true
-rpath = false
-lto = true
-debug-assertions = false
-panic = "abort"

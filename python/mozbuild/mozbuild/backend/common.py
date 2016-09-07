@@ -7,6 +7,9 @@ from __future__ import absolute_import, unicode_literals
 import itertools
 import json
 import os
+import pytoml
+import re
+import shutil
 
 import mozpack.path as mozpath
 
@@ -30,6 +33,7 @@ from mozbuild.frontend.data import (
     GeneratedWebIDLFile,
     PreprocessedTestWebIDLFile,
     PreprocessedWebIDLFile,
+    RustLibrary,
     SharedLibrary,
     TestManifest,
     TestWebIDLFile,
@@ -228,6 +232,7 @@ class CommonBackend(BuildBackend):
         self._test_manager = TestManager(self.environment)
         self._webidls = WebIDLCollection()
         self._binaries = BinariesCollection()
+        self._crates = []
         self._configs = set()
         self._ipdl_sources = set()
 
@@ -326,6 +331,17 @@ class CommonBackend(BuildBackend):
             if hasattr(self, '_process_unified_sources'):
                 self._process_unified_sources(obj)
 
+        elif isinstance(obj, RustLibrary):
+            if self.environment.is_artifact_build:
+                return True
+
+            self._crates.append(obj)
+
+            self.backend_input_files.add(obj.lock_file)
+            self.backend_input_files.add(obj.cargo_file)
+            self._write_wrap_crate(obj)
+            return False
+
         elif isinstance(obj, BaseProgram):
             self._binaries.programs.append(obj)
             return False
@@ -394,6 +410,11 @@ class CommonBackend(BuildBackend):
                 'programs': [p.to_dict() for p in self._binaries.programs],
             }
             json.dump(d, fh, sort_keys=True, indent=4)
+
+        # Write out a machine-readable file describing the in-tree crates.
+        with self._write_file(mozpath.join(topobjdir, 'crates.json')) as fh:
+            json.dump([c.to_dict() for c in self._crates],
+                      fh, sort_keys=True, indent=4)
 
     def _handle_webidl_collection(self, webidls):
         if not webidls.all_stems():
@@ -568,3 +589,41 @@ class CommonBackend(BuildBackend):
                     m.replace('%', mozpath.basename(jarinfo.name) + '/'))
                 self.consume_object(ChromeManifestEntry(
                     jar_context, '%s.manifest' % jarinfo.name, entry))
+
+    def _write_wrap_crate(self, obj):
+        """
+        Create a wrapping crate in the objdir which has a path dependency on
+        the input crate, and imports it with `extern crate`.
+        """
+
+        cargo_toml = os.path.join(obj.objdir, "Cargo.toml")
+        cargo_lock = os.path.join(obj.objdir, "Cargo.lock")
+        wrap_rs = os.path.join(obj.objdir, "wrap.rs")
+
+        from rust_build_profile import RUST_BUILD_PROFILE
+        toml = {
+            'package': {
+                'name': "wrap_%s" % obj.basename,
+                # Provide a dummy version and author to make cargo happy
+                'version': "0.1.0",
+                'authors': ["nobody@mozilla.org"],
+                # Prevent publishing this generated wrapper crate to crates.io
+                'publish': False,
+            },
+            'lib': {
+                'path': wrap_rs,
+                'crate-type': ["rlib"],
+            },
+            # Declare a path dependency on the actual crate which we are trying
+            # to build
+            'dependencies': { obj.basename: { 'path': obj.srcdir } },
+            'profile': { 'dev': RUST_BUILD_PROFILE },
+        }
+
+        with self._write_file(cargo_toml) as fh:
+            fh.write("# THIS FILE IS GENERATED. DO NOT EDIT\n")
+            pytoml.dump(fh, toml)
+        shutil.copyfile(obj.lock_file, cargo_lock)
+        with self._write_file(wrap_rs) as fh:
+            fh.write("/* THIS FILE IS GENERATED. DO NOT EDIT */\n")
+            fh.write("extern crate %s;\n" % obj.basename.replace('-', '_'));

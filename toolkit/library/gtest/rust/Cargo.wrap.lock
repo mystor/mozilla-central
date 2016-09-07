@@ -1,4 +1,11 @@
 [root]
+name = "wrap_gkrust-gtest"
+version = "0.1.0"
+dependencies = [
+ "gkrust-gtest 0.1.0",
+]
+
+[[package]]
 name = "gkrust-gtest"
 version = "0.1.0"
 dependencies = [

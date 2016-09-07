@@ -916,11 +916,6 @@ endif
 ifdef MOZ_RUST
 ifdef CARGO_FILE
 
-ifdef MOZ_DEBUG
-cargo_build_flags =
-else
-cargo_build_flags = --release
-endif
 ifdef MOZ_CARGO_SUPPORTS_FROZEN
 cargo_build_flags += --frozen
 endif
@@ -934,7 +929,7 @@ cargo_build_flags += --verbose
 # We need to run cargo unconditionally, because cargo is the only thing that
 # has full visibility into how changes in Rust sources might affect the final
 # build.
-force-cargo-build:
+force-cargo-build: $(CARGO_FILE)
 	$(REPORT_BUILD)
 	env CARGO_TARGET_DIR=. RUSTC=$(RUSTC) $(CARGO) build $(cargo_build_flags) --
 

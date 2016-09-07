@@ -1075,20 +1075,6 @@ class TestEmitterBasic(unittest.TestCase):
              'library.*does not match Cargo.toml-defined package'):
             self.read_topsrcdir(reader)
 
-    def test_rust_library_no_lib_section(self):
-        '''Test that a RustLibrary Cargo.toml with no [lib] section fails.'''
-        reader = self.reader('rust-library-no-lib-section')
-        with self.assertRaisesRegexp(SandboxValidationError,
-             'Cargo.toml for.* has no \\[lib\\] section'):
-            self.read_topsrcdir(reader)
-
-    def test_rust_library_invalid_crate_type(self):
-        '''Test that a RustLibrary Cargo.toml has a permitted crate-type.'''
-        reader = self.reader('rust-library-invalid-crate-type')
-        with self.assertRaisesRegexp(SandboxValidationError,
-             'crate-type.* is not permitted'):
-            self.read_topsrcdir(reader)
-
     def test_rust_library_dash_folding(self):
         '''Test that on-disk names of RustLibrary objects convert dashes to underscores.'''
         reader = self.reader('rust-library-dash-folding',

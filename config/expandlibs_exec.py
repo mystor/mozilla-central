@@ -30,6 +30,7 @@ from expandlibs import (
     isObject,
 )
 import expandlibs_config as conf
+from rust_build_profile import RUST_BUILD_PROFILE
 from optparse import OptionParser
 import subprocess
 import tempfile
@@ -313,19 +314,19 @@ class ExpandArgsMore(ExpandArgs):
             "-o", output_file,
             "--crate-type", "staticlib",
             "--target", conf.RUST_TARGET,
-            "-C", "panic=abort",
-            "-g",
+            "-C", "panic=%s" % RUST_BUILD_PROFILE['panic'],
+            "-C", "opt-level=%s" % RUST_BUILD_PROFILE['opt-level'],
+            "-C", "codegen-units=%s" % RUST_BUILD_PROFILE['codegen-units'],
         ]
-        if conf.MOZ_DEBUG:
-            rustc_args += [
-                "-C", "opt-level=1",
-                "-C", "debug-assertions",
-            ]
-        else:
-            rustc_args += [
-                "-C", "opt-level=2",
-                "-C", "lto"
-            ]
+
+        if RUST_BUILD_PROFILE['debug']:
+            rustc_args += ["-g"]
+        if RUST_BUILD_PROFILE['debug-assertions']:
+            rustc_args += ["-C", "debug-assertions"]
+        if RUST_BUILD_PROFILE['lto']:
+            rustc_args += ["-C", "lto"]
+        if RUST_BUILD_PROFILE['rpath']:
+            rustc_args += ["-C", "rpath"]
 
         # List each of the rlibs with --extern, and their dependency search directory with -L
         with open(input_file, "w") as f:

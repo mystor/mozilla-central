@@ -463,28 +463,33 @@ class RustLibrary(StaticLibrary):
     """Context derived container object for a static library"""
     __slots__ = (
         'cargo_file',
-        'crate_type',
+        'lock_file',
     )
 
-    def __init__(self, context, basename, cargo_file, crate_type, **args):
+    DICT_ATTRS = {
+        'basename',
+        'import_name',
+        'lib_name',
+        'objdir',
+        'cargo_file',
+        'lock_file',
+    }
+
+    def __init__(self, context, basename, cargo_file, lock_file, **args):
         StaticLibrary.__init__(self, context, basename, **args)
         self.cargo_file = cargo_file
-        self.crate_type = crate_type
+        self.lock_file = lock_file
         # We need to adjust our naming here because cargo replaces '-' in
         # package names defined in Cargo.toml with underscores in actual
         # filenames. But we need to keep the basename consistent because
         # many other things in the build system depend on that.
-        assert self.crate_type == 'rlib'
-        self.lib_name = 'lib%s.rlib' % basename.replace('-', '_')
-        # cargo creates several directories and places its build artifacts
-        # in those directories.  The directory structure depends not only
-        # on the target, but also what sort of build we are doing.
-        rust_build_kind = 'release'
-        if context.config.substs.get('MOZ_DEBUG'):
-            rust_build_kind = 'debug'
+        self.lib_name = 'libwrap_%s.rlib' % basename.replace('-', '_')
+        # By generating Cargo.toml depending on the build configuration,
+        # we set the build options. This means that we always build into
+        # debug/, despite sometimes building release builds.
         self.import_name = '%s/%s/%s' % (
             context.config.substs['RUST_TARGET'],
-            rust_build_kind,
+            'debug',
             self.lib_name,
         )
 
