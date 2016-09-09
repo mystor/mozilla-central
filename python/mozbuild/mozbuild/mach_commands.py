@@ -1413,29 +1413,6 @@ class ArtifactSubCommand(SubCommand):
             after = arg(after)
         return after
 
-@CommandProvider
-class CargoLockfiles(MachCommandBase):
-    @Command('generate-lockfiles', category='misc',
-             description='Generate Cargo.lock files for all crates in tree.')
-    def generate_lockfiles(self):
-        import subprocess
-        import json
-        import shutil
-
-        # We must have a build environment for this to work
-        cargo = self.substs['CARGO']
-        with open(mozpath.join(self.topobjdir, 'crates.json'), 'r') as fh:
-            crates = json.load(fh)
-
-        for obj in crates:
-            print("Generating Cargo.lock file for", obj['lib_name'])
-            lockfile = mozpath.join(obj['objdir'], 'Cargo.lock')
-            os.remove(lockfile)
-            self._run_command_in_objdir(args=[
-                cargo, 'generate-lockfile',
-                '--manifest-path', mozpath.join(obj['objdir'], 'Cargo.toml'),
-            ])
-            shutil.copyfile(lockfile, obj['lock_file'])
 
 @CommandProvider
 class PackageFrontend(MachCommandBase):

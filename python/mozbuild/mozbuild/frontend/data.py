@@ -463,22 +463,11 @@ class RustLibrary(StaticLibrary):
     """Context derived container object for a static library"""
     __slots__ = (
         'cargo_file',
-        'lock_file',
     )
 
-    DICT_ATTRS = {
-        'basename',
-        'import_name',
-        'lib_name',
-        'objdir',
-        'cargo_file',
-        'lock_file',
-    }
-
-    def __init__(self, context, basename, cargo_file, lock_file, **args):
+    def __init__(self, context, basename, cargo_file, **args):
         StaticLibrary.__init__(self, context, basename, **args)
         self.cargo_file = cargo_file
-        self.lock_file = lock_file
         # We need to adjust our naming here because cargo replaces '-' in
         # package names defined in Cargo.toml with underscores in actual
         # filenames. But we need to keep the basename consistent because

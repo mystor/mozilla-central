@@ -232,7 +232,6 @@ class CommonBackend(BuildBackend):
         self._test_manager = TestManager(self.environment)
         self._webidls = WebIDLCollection()
         self._binaries = BinariesCollection()
-        self._crates = []
         self._configs = set()
         self._ipdl_sources = set()
 
@@ -335,9 +334,6 @@ class CommonBackend(BuildBackend):
             if self.environment.is_artifact_build:
                 return True
 
-            self._crates.append(obj)
-
-            self.backend_input_files.add(obj.lock_file)
             self.backend_input_files.add(obj.cargo_file)
             self._write_wrap_crate(obj)
             return False
@@ -410,11 +406,6 @@ class CommonBackend(BuildBackend):
                 'programs': [p.to_dict() for p in self._binaries.programs],
             }
             json.dump(d, fh, sort_keys=True, indent=4)
-
-        # Write out a machine-readable file describing the in-tree crates.
-        with self._write_file(mozpath.join(topobjdir, 'crates.json')) as fh:
-            json.dump([c.to_dict() for c in self._crates],
-                      fh, sort_keys=True, indent=4)
 
     def _handle_webidl_collection(self, webidls):
         if not webidls.all_stems():
@@ -597,7 +588,6 @@ class CommonBackend(BuildBackend):
         """
 
         cargo_toml = os.path.join(obj.objdir, "Cargo.toml")
-        cargo_lock = os.path.join(obj.objdir, "Cargo.lock")
         wrap_rs = os.path.join(obj.objdir, "wrap.rs")
 
         from rust_build_profile import RUST_BUILD_PROFILE
@@ -623,7 +613,6 @@ class CommonBackend(BuildBackend):
         with self._write_file(cargo_toml) as fh:
             fh.write("# THIS FILE IS GENERATED. DO NOT EDIT\n")
             pytoml.dump(fh, toml)
-        shutil.copyfile(obj.lock_file, cargo_lock)
         with self._write_file(wrap_rs) as fh:
             fh.write("/* THIS FILE IS GENERATED. DO NOT EDIT */\n")
             fh.write("extern crate %s;\n" % obj.basename.replace('-', '_'));

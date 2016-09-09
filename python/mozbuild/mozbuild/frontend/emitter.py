@@ -460,7 +460,6 @@ class TreeMetadataEmitter(LoggingMixin):
     def _rust_library(self, context, libname, static_args):
         # We need to note any Rust library for linking purposes.
         cargo_file = mozpath.join(context.srcdir, 'Cargo.toml')
-        lock_file = mozpath.join(context.srcdir, 'Cargo.wrap.lock')
         if not os.path.exists(cargo_file):
             raise SandboxValidationError(
                 'No Cargo.toml file found in %s' % cargo_file, context)
@@ -475,7 +474,7 @@ class TreeMetadataEmitter(LoggingMixin):
 
         self._verify_local_paths(context, context.relsrcdir, config)
 
-        return RustLibrary(context, libname, cargo_file, lock_file, **static_args)
+        return RustLibrary(context, libname, cargo_file, **static_args)
 
     def _handle_linkables(self, context, passthru, generated_files):
         has_linkables = False
