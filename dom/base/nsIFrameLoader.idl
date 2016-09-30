@@ -18,6 +18,7 @@ interface nsITabParent;
 interface nsILoadContext;
 interface nsIPrintSettings;
 interface nsIWebProgressListener;
+interface mozIDOMWindowProxy;
 
 [scriptable, builtinclass, uuid(1645af04-1bc7-4363-8f2c-eb9679220ab1)]
 interface nsIFrameLoader : nsISupports
@@ -256,6 +257,13 @@ interface nsIFrameLoaderOwner : nsISupports
    * iframes.
    */
   readonly attribute mozIApplication parentApplication;
+
+  /**
+   * Set the opener attribute which should be used for the window loaded within
+   * the frame loader when it is loaded into the dom. This is only respected on
+   * non-remote frame loader owners.
+   */
+  void presetOpenerWindow(in mozIDOMWindowProxy openerWindow);
 
   /**
    * Puts the FrameLoaderOwner in prerendering mode.

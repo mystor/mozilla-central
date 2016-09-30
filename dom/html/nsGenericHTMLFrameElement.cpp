@@ -212,6 +212,12 @@ nsGenericHTMLFrameElement::GetParentApplication(mozIApplication** aApplication)
   return NS_OK;
 }
 
+NS_IMETHODIMP
+nsGenericHTMLFrameElement::PresetOpenerWindow(mozIDOMWindowProxy* aWindow)
+{
+  return NS_ERROR_FAILURE;
+}
+
 void
 nsGenericHTMLFrameElement::SwapFrameLoaders(HTMLIFrameElement& aOtherLoaderOwner,
                                             ErrorResult& rv)

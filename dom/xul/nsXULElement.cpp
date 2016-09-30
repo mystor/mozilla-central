@@ -190,6 +190,8 @@ nsXULElement::nsXULSlots::Traverse(nsCycleCollectionTraversalCallback &cb)
 {
     NS_CYCLE_COLLECTION_NOTE_EDGE_NAME(cb, "mSlots->mFrameLoader");
     cb.NoteXPCOMChild(NS_ISUPPORTS_CAST(nsIFrameLoader*, mFrameLoader));
+    NS_CYCLE_COLLECTION_NOTE_EDGE_NAME(cb, "mSlots->mOpener");
+    cb.NoteXPCOMChild(NS_ISUPPORTS_CAST(mozIDOMWindowProxy*, mOpener));
 }
 
 nsINode::nsSlots*
@@ -1582,6 +1584,15 @@ nsXULElement::LoadSrc()
         slots->mFrameLoader = nsFrameLoader::Create(this, false);
         NS_ENSURE_TRUE(slots->mFrameLoader, NS_OK);
 
+        if (slots->mOpener) {
+            nsCOMPtr<nsIDocShell> docShell;
+            nsresult rv = slots->mFrameLoader->GetDocShell(getter_AddRefs(docShell));
+            NS_ENSURE_SUCCESS(rv, rv);
+            nsCOMPtr<nsPIDOMWindowOuter> outerWindow = docShell->GetWindow();
+            outerWindow->SetOpenerWindow(nsPIDOMWindowOuter::From(slots->mOpener), true);
+            slots->mOpener = nullptr;
+        }
+
         (new AsyncEventDispatcher(this,
                                   NS_LITERAL_STRING("XULFrameLoaderCreated"),
                                   /* aBubbles */ true))->RunDOMEventWhenSafe();
@@ -1622,6 +1633,20 @@ nsXULElement::GetParentApplication(mozIApplication** aApplication)
     }
 
     *aApplication = nullptr;
+    return NS_OK;
+}
+
+nsresult
+nsXULElement::PresetOpenerWindow(mozIDOMWindowProxy* aWindow)
+{
+    nsXULSlots* slots = static_cast<nsXULSlots*>(Slots());
+
+    // Cannot SetOpenerWindow when a frame loader is present
+    if (NS_WARN_IF(slots->mFrameLoader)) {
+        return NS_ERROR_FAILURE;
+    }
+
+    slots->mOpener = aWindow;
     return NS_OK;
 }
 

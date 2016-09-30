@@ -121,6 +121,7 @@ class BoxObject;
 class CDATASection;
 class Comment;
 struct CustomElementDefinition;
+class DocGroup;
 class DocumentFragment;
 class DocumentTimeline;
 class DocumentType;
@@ -2804,6 +2805,8 @@ public:
     return mHasScrollLinkedEffect;
   }
 
+  mozilla::dom::DocGroup* DocGroup();
+
 protected:
   bool GetUseCounter(mozilla::UseCounter aUseCounter)
   {
@@ -3255,6 +3258,8 @@ protected:
 
   // Whether the user has interacted with the document or not:
   bool mUserHasInteracted;
+
+  RefPtr<mozilla::dom::DocGroup> mDocGroup;
 };
 
 NS_DEFINE_STATIC_IID_ACCESSOR(nsIDocument, NS_IDOCUMENT_IID)

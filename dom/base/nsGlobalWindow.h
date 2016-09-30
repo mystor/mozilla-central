@@ -106,6 +106,7 @@ struct ChannelPixelLayout;
 class Console;
 class Crypto;
 class CustomElementsRegistry;
+class DocGroup;
 class External;
 class Function;
 class Gamepad;
@@ -121,6 +122,7 @@ struct RequestInit;
 class RequestOrUSVString;
 class Selection;
 class SpeechSynthesis;
+class TabGroup;
 class U2F;
 class VRDisplay;
 class VREventObserver;
@@ -1711,7 +1713,8 @@ private:
 
 public:
 
-  void GetConstellation(nsACString& aConstellation);
+  mozilla::dom::TabGroup* TabGroup();
+  mozilla::dom::DocGroup* DocGroup();
 
 protected:
   // This member is also used on both inner and outer windows, but
@@ -1930,8 +1933,8 @@ protected:
 
   nsAutoPtr<mozilla::dom::VREventObserver> mVREventObserver;
 
-  uint64_t mStaticConstellation; // Only used on outer windows
-  nsCString mConstellation; // Only used on inner windows
+  RefPtr<mozilla::dom::TabGroup> mTabGroup; // Outer window only
+  bool mTabGroupCanChange; // Outer window only.
 
   friend class nsDOMScriptableHelper;
   friend class nsDOMWindowUtils;

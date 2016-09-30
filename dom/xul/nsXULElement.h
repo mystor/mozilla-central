@@ -413,6 +413,7 @@ public:
 
     nsresult GetFrameLoaderXPCOM(nsIFrameLoader** aFrameLoader);
     nsresult GetParentApplication(mozIApplication** aApplication);
+    nsresult PresetOpenerWindow(mozIDOMWindowProxy* aWindow);
     nsresult SetIsPrerendered();
 
     virtual void RecompileScriptEventListeners() override;
@@ -617,6 +618,7 @@ protected:
         void Traverse(nsCycleCollectionTraversalCallback &cb);
 
         RefPtr<nsFrameLoader> mFrameLoader;
+        nsCOMPtr<mozIDOMWindowProxy> mOpener;
     };
 
     virtual nsINode::nsSlots* CreateSlots() override;

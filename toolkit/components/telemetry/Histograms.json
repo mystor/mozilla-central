@@ -10490,5 +10490,21 @@
     "kind": "enumerated",
     "n_values": 4,
     "description": "Counts the number of asm.js vs WebAssembly modules instanciations, at the time modules are getting instanciated."
+  },
+  "MAX_DOC_GROUP_SIZE": {
+    "alert_emails": ["mlayzell@mozilla.com"],
+    "bug_numbers": [1305154],
+    "expires_in_version": "56",
+    "kind": "enumerated",
+    "n_values": 50,
+    "description": "Counts the maximum size of a DocGroup when it is being destroyed."
+  },
+  "MAX_TAB_GROUP_SIZE": {
+    "alert_emails": ["mlayzell@mozilla.com"],
+    "bug_numbers": [1305154],
+    "expires_in_version": "56",
+    "kind": "enumerated",
+    "n_values": 50,
+    "description": "Counts the maximum size of a TabGroup when it is being destroyed."
   }
 }

@@ -80,6 +80,7 @@
 #include "nsAboutProtocolUtils.h"
 #include "nsCharTraits.h" // NS_IS_HIGH/LOW_SURROGATE
 #include "PostMessageEvent.h"
+#include "DocGroup.h"
 
 // Interfaces Needed
 #include "nsIFrame.h"
@@ -1225,9 +1226,7 @@ nsGlobalWindow::nsGlobalWindow(nsGlobalWindow *aOuterWindow)
     mCleanedUp(false),
     mDialogAbuseCount(0),
     mAreDialogsEnabled(true),
-    mCanSkipCCGeneration(0),
-    mStaticConstellation(0),
-    mConstellation(NullCString())
+    mCanSkipCCGeneration(0)
 {
   AssertIsOnMainThread();
 
@@ -1262,11 +1261,6 @@ nsGlobalWindow::nsGlobalWindow(nsGlobalWindow *aOuterWindow)
     // remain frozen until they get an inner window, so freeze this
     // outer window here.
     Freeze();
-
-    // As an outer window, we may be the root of a constellation. This initial
-    // static constellation may be overridden as this window is given a parent
-    // window or an opener.
-    mStaticConstellation = WindowID();
   }
 
   // We could have failed the first time through trying
@@ -1428,6 +1422,11 @@ nsGlobalWindow::~nsGlobalWindow()
     if (outer) {
       outer->MaybeClearInnerWindow(this);
     }
+  }
+
+  if (mTabGroup) {
+    MOZ_RELEASE_ASSERT(IsOuterWindow());
+    mTabGroup->Leave(AsOuter());
   }
 
   // Outer windows are always supposed to call CleanUp before letting themselves
@@ -3037,11 +3036,8 @@ nsGlobalWindow::SetDocShell(nsIDocShell* aDocShell)
 
   mDocShell = aDocShell; // Weak Reference
 
-  // Copy over the static constellation from our new parent.
-  nsCOMPtr<nsPIDOMWindowOuter> parentWindow = GetParent();
-  if (parentWindow) {
-    mStaticConstellation = Cast(parentWindow)->mStaticConstellation;
-  }
+  nsCOMPtr<nsPIDOMWindowOuter> parentWindow = GetScriptableParentOrNull();
+  MOZ_RELEASE_ASSERT(!parentWindow || !mTabGroup || mTabGroup == Cast(parentWindow)->mTabGroup);
 
   NS_ASSERTION(!mNavigator, "Non-null mNavigator in outer window!");
 
@@ -3154,10 +3150,7 @@ nsGlobalWindow::SetOpenerWindow(nsPIDOMWindowOuter* aOpener,
   mOpener = do_GetWeakReference(aOpener);
   NS_ASSERTION(mOpener || !aOpener, "Opener must support weak references!");
 
-  // Copy over the static constellation from our new opener
-  if (aOpener) {
-    mStaticConstellation = Cast(aOpener)->mStaticConstellation;
-  }
+  MOZ_RELEASE_ASSERT(!aOpener || !mTabGroup || mTabGroup == Cast(aOpener)->mTabGroup);
 
   if (aOriginalOpener) {
     MOZ_ASSERT(!mHadOriginalOpener,
@@ -4765,11 +4758,9 @@ nsGlobalWindow::GetOpener(JSContext* aCx, JS::MutableHandle<JS::Value> aRetval,
 already_AddRefed<nsPIDOMWindowOuter>
 nsGlobalWindow::GetOpener()
 {
-  FORWARD_TO_INNER(GetOpener, (), nullptr);
+  FORWARD_TO_OUTER(GetOpener, (), nullptr);
 
-  ErrorResult dummy;
-  nsCOMPtr<nsPIDOMWindowOuter> opener = GetOpenerWindow(dummy);
-  dummy.SuppressException();
+  nsCOMPtr<nsPIDOMWindowOuter> opener = GetOpenerWindowOuter();
   return opener.forget();
 }
 
@@ -14411,44 +14402,50 @@ nsGlobalWindow::CheckForDPIChange()
   }
 }
 
-void
-nsGlobalWindow::GetConstellation(nsACString& aConstellation)
+mozilla::dom::TabGroup*
+nsGlobalWindow::TabGroup()
 {
-  FORWARD_TO_INNER_VOID(GetConstellation, (aConstellation));
+  FORWARD_TO_OUTER(TabGroup, (), nullptr);
+
+  // Outer windows lazily join TabGroups when requested. This is usually done
+  // because a document is getting its NodePrincipal, and asking for the
+  // TabGroup to determine its DocGroup.
+  if (!mTabGroup) {
+    nsGlobalWindow* opener = Cast(GetOpenerWindowOuter());
+    nsGlobalWindow* parent = Cast(GetScriptableParentOrNull());
+    MOZ_ASSERT(!parent || !opener, "Only one of parent and opener may be provided");
+
+    mozilla::dom::TabGroup* toJoin = nullptr;
+    if (GetDocShell()->ItemType() == nsIDocShellTreeItem::typeChrome) {
+      toJoin = TabGroup::GetChromeTabGroup();
+    } else if (opener) {
+      toJoin = opener->TabGroup();
+    } else if (parent) {
+      toJoin = parent->TabGroup();
+    }
+    mTabGroup = mozilla::dom::TabGroup::Join(AsOuter(), toJoin);
+  }
+  MOZ_ASSERT(mTabGroup);
 
 #ifdef DEBUG
-  RefPtr<nsGlobalWindow> outer = GetOuterWindowInternal();
-  MOZ_ASSERT(outer, "We should have an outer window");
-  RefPtr<nsGlobalWindow> top = outer->GetTopInternal();
-  RefPtr<nsPIDOMWindowOuter> opener = outer->GetOpener();
-  MOZ_ASSERT(!top || (top->mStaticConstellation ==
-                      outer->mStaticConstellation));
-  MOZ_ASSERT(!opener || (Cast(opener)->mStaticConstellation ==
-                         outer->mStaticConstellation));
+  // Sanity check that our tabgroup matches our opener or parent.
+  RefPtr<nsPIDOMWindowOuter> parent = GetScriptableParentOrNull();
+  MOZ_ASSERT_IF(parent, Cast(parent)->TabGroup() == mTabGroup);
+  RefPtr<nsPIDOMWindowOuter> opener = GetOpener();
+  MOZ_ASSERT_IF(opener, Cast(opener)->mTabGroup == mTabGroup);
 #endif
 
-  if (mConstellation.IsVoid()) {
-    mConstellation.Truncate();
-    // The dynamic constellation part comes from the eTLD+1 for the principal's URI.
-    nsCOMPtr<nsIPrincipal> principal = GetPrincipal();
-    nsCOMPtr<nsIURI> uri;
-    nsresult rv = principal->GetURI(getter_AddRefs(uri));
-    if (NS_SUCCEEDED(rv)) {
-      nsCOMPtr<nsIEffectiveTLDService> tldService =
-        do_GetService(NS_EFFECTIVETLDSERVICE_CONTRACTID);
-      if (tldService) {
-        rv = tldService->GetBaseDomain(uri, 0, mConstellation);
-        if (NS_FAILED(rv)) {
-          mConstellation.Truncate();
-        }
-      }
-    }
+  return mTabGroup;
+}
 
-    // Get the static constellation from the outer window object.
-    mConstellation.AppendPrintf("^%llu", GetOuterWindowInternal()->mStaticConstellation);
+mozilla::dom::DocGroup*
+nsGlobalWindow::DocGroup()
+{
+  nsIDocument* doc = GetExtantDoc();
+  if (doc) {
+    return doc->DocGroup();
   }
-
-  aConstellation.Assign(mConstellation);
+  return nullptr;
 }
 
 nsGlobalWindow::TemporarilyDisableDialogs::TemporarilyDisableDialogs(

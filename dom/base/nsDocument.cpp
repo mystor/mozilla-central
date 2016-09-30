@@ -252,6 +252,7 @@
 #include "mozilla/StyleSetHandleInlines.h"
 #include "mozilla/StyleSheet.h"
 #include "mozilla/StyleSheetInlines.h"
+#include "mozilla/dom/DocGroup.h"
 
 #include "mozilla/DocLoadingTimelineMarker.h"
 
@@ -1371,6 +1372,10 @@ nsIDocument::~nsIDocument()
 
   if (mNodeInfoManager) {
     mNodeInfoManager->DropDocumentReference();
+  }
+
+  if (mDocGroup) {
+    mDocGroup->Remove(this);
   }
 
   UnlinkOriginalDocumentIfStatic();
@@ -2931,6 +2936,23 @@ nsDocument::SetPrincipal(nsIPrincipal *aNewPrincipal)
     }
   }
   mNodeInfoManager->SetDocumentPrincipal(aNewPrincipal);
+
+}
+
+mozilla::dom::DocGroup*
+nsIDocument::DocGroup()
+{
+#ifdef DEBUG
+  // Sanity check that we have an up-to-date and accurate docgroup
+  if (mDocGroup) {
+    nsAutoCString docGroupKey;
+    mozilla::dom::DocGroup::GetKey(NodePrincipal(), docGroupKey);
+    MOZ_ASSERT(mDocGroup->MatchesKey(docGroupKey));
+    // XXX: Check that the TabGroup is correct as well!
+  }
+#endif
+
+  return mDocGroup;
 }
 
 NS_IMETHODIMP
@@ -4573,6 +4595,20 @@ nsDocument::SetScriptGlobalObject(nsIScriptGlobalObject *aScriptGlobalObject)
   // having to QI every time it's asked for.
   nsCOMPtr<nsPIDOMWindowInner> window = do_QueryInterface(mScriptGlobalObject);
   mWindow = window;
+
+  if (window) {
+    // We should already have the principal, and now that we have been added to a
+    // document, we should be able to join a docGroup!
+    nsAutoCString docGroupKey;
+    mozilla::dom::DocGroup::GetKey(NodePrincipal(), docGroupKey);
+    if (mDocGroup) {
+      MOZ_RELEASE_ASSERT(mDocGroup->MatchesKey(docGroupKey));
+    } else {
+      mozilla::dom::TabGroup* tabgroup = nsGlobalWindow::Cast(window)->TabGroup();
+      mDocGroup = tabgroup->JoinDocGroup(docGroupKey, this);
+    }
+  }
+
 
   // Now that we know what our window is, we can flush the CSP errors to the
   // Web Console. We are flushing all messages that occured and were stored

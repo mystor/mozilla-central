@@ -67,6 +67,7 @@
 #include "mozilla/dom/TabParent.h"
 #include "nsIXULWindow.h"
 #include "nsIXULBrowserWindow.h"
+#include "nsGlobalWindow.h"
 
 #ifdef USEWEAKREFS
 #include "nsIWeakReference.h"
@@ -1025,7 +1026,7 @@ nsWindowWatcher::OpenWindowInternal(mozIDOMWindowProxy* aParent,
           nsCOMPtr<nsIXULBrowserWindow> xulBrowserWin;
           xulWin->GetXULBrowserWindow(getter_AddRefs(xulBrowserWin));
           if (xulBrowserWin) {
-            xulBrowserWin->ForceInitialBrowserNonRemote();
+            xulBrowserWin->ForceInitialBrowserNonRemote(parentWindow);
           }
         }
         /* It might be a chrome nsXULWindow, in which case it won't have
@@ -2173,7 +2174,13 @@ nsWindowWatcher::ReadyOpenedDocShellItem(nsIDocShellTreeItem* aOpenedItem,
   *aOpenedWindow = 0;
   nsCOMPtr<nsPIDOMWindowOuter> piOpenedWindow = aOpenedItem->GetWindow();
   if (piOpenedWindow) {
-    if (aParent) {
+    nsCOMPtr<nsPIDOMWindowOuter> opener = nsGlobalWindow::Cast(piOpenedWindow)->GetOpener();
+    if (aParent && aParent != opener) {
+      // Check if the opener is the same as the current opener before trying to
+      // change it because the window creation code may have already set this.
+      // We need to check the ErrorResult which will throw if our window is an
+      // inner window with no outer window, which is not the case, so we can
+      // just assert that the error will not be raised.
       piOpenedWindow->SetOpenerWindow(aParent, aWindowIsNew); // damnit
 
       if (aWindowIsNew) {

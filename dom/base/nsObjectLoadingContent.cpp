@@ -1267,6 +1267,12 @@ nsObjectLoadingContent::GetParentApplication(mozIApplication** aApplication)
 }
 
 NS_IMETHODIMP
+nsObjectLoadingContent::PresetOpenerWindow(mozIDOMWindowProxy* aWindow)
+{
+  return NS_ERROR_FAILURE;
+}
+
+NS_IMETHODIMP
 nsObjectLoadingContent::SetIsPrerendered()
 {
   return NS_ERROR_NOT_IMPLEMENTED;

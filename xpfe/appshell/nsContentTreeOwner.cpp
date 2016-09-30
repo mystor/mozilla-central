@@ -989,6 +989,11 @@ nsContentTreeOwner::ProvideWindow(mozIDOMWindowProxy* aParent,
 
   *aWindowIsNew = (openLocation != nsIBrowserDOMWindow::OPEN_CURRENTWINDOW);
 
+  nsPIDOMWindowOuter* outerWindow = nsPIDOMWindowOuter::From(domWin);
+  if (outerWindow && aParent) {
+    outerWindow->SetOpenerWindow(nsPIDOMWindowOuter::From(aParent), *aWindowIsNew);
+  }
+
   {
     dom::AutoNoJSAPI nojsapi;
 

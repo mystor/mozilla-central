@@ -1653,8 +1653,13 @@
       <method name="updateBrowserRemoteness">
         <parameter name="aBrowser"/>
         <parameter name="aShouldBeRemote"/>
+        <parameter name="aOpener"/>
         <body>
           <![CDATA[
+            if (aShouldBeRemote && aOpener) {
+              throw new Exception("aOpener is only supported for non-remote browsers");
+            }
+
             let isRemote = aBrowser.getAttribute("remote") == "true";
             if (isRemote == aShouldBeRemote)
               return false;
@@ -1693,6 +1698,10 @@
             // NB: This works with the hack in the browser constructor that
             // turns this normal property into a field.
             aBrowser.relatedBrowser = relatedBrowser;
+
+            // Set the opener window on the browser, such that when the frame
+            // loader is created the opener is set correctly.
+            aBrowser.presetOpenerWindow(aOpener ? aOpener : null);
 
             parent.appendChild(aBrowser);
 

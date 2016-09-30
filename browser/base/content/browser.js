@@ -4249,10 +4249,10 @@ var XULBrowserWindow = {
     return initBrowser.frameLoader.tabParent;
   },
 
-  forceInitialBrowserNonRemote: function() {
+  forceInitialBrowserNonRemote: function(aOpener) {
     let initBrowser =
       document.getAnonymousElementByAttribute(gBrowser, "anonid", "initialBrowser");
-    gBrowser.updateBrowserRemoteness(initBrowser, false);
+    gBrowser.updateBrowserRemoteness(initBrowser, false, aOpener);
   },
 
   setDefaultStatus: function (status) {
