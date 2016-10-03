@@ -31,6 +31,7 @@
 #include "mozilla/Unused.h"
 #include "Navigator.h"
 #include "URIUtils.h"
+#include "mozilla/dom/DocGroup.h"
 
 #include "nsIContent.h"
 #include "nsIContentInlines.h"
@@ -3679,7 +3680,11 @@ nsDocShell::FindItemWithName(const char16_t* aName,
 
     nsCOMPtr<nsIDocShellTreeItem> foundItem;
     nsDependentString name(aName);
-    if (name.LowerCaseEqualsLiteral("_self")) {
+    // _main is an IE target which should be case-insensitive but isn't
+    // see bug 217886 for details
+    if (name.LowerCaseEqualsLiteral("_self") ||
+        name.LowerCaseEqualsLiteral("_content") ||
+        name.EqualsLiteral("_main")) {
       foundItem = this;
     } else if (name.LowerCaseEqualsLiteral("_blank")) {
       // Just return null.  Caller must handle creating a new window with
@@ -3693,33 +3698,6 @@ nsDocShell::FindItemWithName(const char16_t* aName,
     } else if (name.LowerCaseEqualsLiteral("_top")) {
       GetSameTypeRootTreeItem(getter_AddRefs(foundItem));
       NS_ASSERTION(foundItem, "Must have this; worst case it's us!");
-    }
-    // _main is an IE target which should be case-insensitive but isn't
-    // see bug 217886 for details
-    else if (name.LowerCaseEqualsLiteral("_content") ||
-             name.EqualsLiteral("_main")) {
-      // Must pass our same type root as requestor to the
-      // treeowner to make sure things work right.
-      nsCOMPtr<nsIDocShellTreeItem> root;
-      GetSameTypeRootTreeItem(getter_AddRefs(root));
-      if (mTreeOwner) {
-        NS_ASSERTION(root, "Must have this; worst case it's us!");
-        mTreeOwner->FindItemWithName(aName, root, aOriginalRequestor,
-                                     getter_AddRefs(foundItem));
-      }
-#ifdef DEBUG
-      else {
-        NS_ERROR("Someone isn't setting up the tree owner.  "
-                 "You might like to try that.  "
-                 "Things will.....you know, work.");
-        // Note: _content should always exist.  If we don't have one
-        // hanging off the treeowner, just create a named window....
-        // so don't return here, in case we did that and can now find
-        // it.
-        // XXXbz should we be using |root| instead of creating
-        // a new window?
-      }
-#endif
     } else {
       // Do the search for item by an actual name.
       DoFindItemWithName(aName, aRequestor, aOriginalRequestor,
@@ -3802,14 +3780,17 @@ nsDocShell::DoFindItemWithName(const char16_t* aName,
     }
   }
 
-  // If the parent is null or not of the same type fall through and ask tree
-  // owner.
-
-  // This may fail, but comparing against null serves the same purpose
-  nsCOMPtr<nsIDocShellTreeOwner> reqAsTreeOwner(do_QueryInterface(aRequestor));
-  if (mTreeOwner && mTreeOwner != reqAsTreeOwner) {
-    return mTreeOwner->FindItemWithName(aName, this, aOriginalRequestor,
-                                        aResult);
+  // If we have a null parent or the parent is of the same type, we need to
+  // give up on finding it in our tree, and start looking in our TabGroup.
+  nsCOMPtr<nsPIDOMWindowOuter> window = GetWindow();
+  if (window) {
+    RefPtr<mozilla::dom::TabGroup> tabGroup =
+      nsGlobalWindow::Cast(window)->TabGroup();
+    // We don't want to make the request to our TabGroup if they are the ones
+    // which made a request to us.
+    if (tabGroup && tabGroup != aRequestor) {
+      tabGroup->FindItemWithName(aName, this, aOriginalRequestor, aResult);
+    }
   }
 
   return NS_OK;

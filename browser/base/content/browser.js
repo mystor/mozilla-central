@@ -4900,7 +4900,8 @@ nsBrowserAccess.prototype = {
 
   _openURIInNewTab: function(aURI, aReferrer, aReferrerPolicy, aIsPrivate,
                              aIsExternal, aForceNotRemote=false,
-                             aUserContextId=Ci.nsIScriptSecurityManager.DEFAULT_USER_CONTEXT_ID) {
+                             aUserContextId=Ci.nsIScriptSecurityManager.DEFAULT_USER_CONTEXT_ID,
+                             aOpener=null) {
     let win, needToFocusWin;
 
     // try the current window.  if we're in a popup, fall back on the most recent browser window
@@ -4930,7 +4931,9 @@ nsBrowserAccess.prototype = {
                                       userContextId: aUserContextId,
                                       fromExternal: aIsExternal,
                                       inBackground: loadInBackground,
-                                      forceNotRemote: aForceNotRemote});
+                                      forceNotRemote: aForceNotRemote,
+                                      opener: aOpener,
+                                      });
     let browser = win.gBrowser.getBrowserForTab(tab);
 
     if (needToFocusWin || (!loadInBackground && aIsExternal))
@@ -5005,7 +5008,8 @@ nsBrowserAccess.prototype = {
                               : Ci.nsIScriptSecurityManager.DEFAULT_USER_CONTEXT_ID;
         let browser = this._openURIInNewTab(aURI, referrer, referrerPolicy,
                                             isPrivate, isExternal,
-                                            forceNotRemote, userContextId);
+                                            forceNotRemote, userContextId,
+                                            aOpener);
         if (browser)
           newWindow = browser.contentWindow;
         break;

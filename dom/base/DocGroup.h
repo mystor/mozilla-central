@@ -37,12 +37,13 @@ namespace dom {
 
 class TabGroup;
 
-class DocGroup final
+class DocGroup final : public nsISupports
 {
 public:
   typedef nsTArray<nsIDocument*>::iterator Iterator;
   friend class TabGroup;
-  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(DocGroup)
+
+  NS_DECL_THREADSAFE_ISUPPORTS
 
   static void GetKey(nsIPrincipal* aPrincipal, nsACString& aString);
   bool MatchesKey(const nsACString& aKey)
@@ -75,7 +76,7 @@ private:
 };
 
 
-class TabGroup final
+class TabGroup final : public nsISupports
 {
 private:
   class HashEntry : public nsCStringHashKey
@@ -92,7 +93,8 @@ public:
   typedef DocGroupMap::Iterator Iterator;
 
   friend class DocGroup;
-  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(TabGroup)
+
+  NS_DECL_THREADSAFE_ISUPPORTS
 
   static TabGroup*
   GetChromeTabGroup();
@@ -112,13 +114,18 @@ public:
   static already_AddRefed<TabGroup>
   Join(nsPIDOMWindowOuter* aWindow, TabGroup* aTabGroup);
 
-  void
-  Leave(nsPIDOMWindowOuter* aWindow);
+  void Leave(nsPIDOMWindowOuter* aWindow);
 
   Iterator Iter()
   {
     return mDocGroups.Iter();
   }
+
+  nsresult
+  FindItemWithName(const char16_t* aName,
+                   nsIDocShellTreeItem* aRequestor,
+                   nsIDocShellTreeItem* aOriginalRequestor,
+                   nsIDocShellTreeItem** aFoundItem);
 
 private:
   ~TabGroup();

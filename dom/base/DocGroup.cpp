@@ -4,6 +4,7 @@
 #include "nsIEffectiveTLDService.h"
 #include "mozilla/StaticPtr.h"
 #include "mozilla/ClearOnShutdown.h"
+#include "nsIDocShell.h"
 
 namespace mozilla {
 namespace dom {
@@ -44,6 +45,8 @@ DocGroup::~DocGroup()
   MOZ_ASSERT(mDocuments.IsEmpty());
   mTabGroup->mDocGroups.RemoveEntry(mKey);
 }
+
+NS_IMPL_ISUPPORTS(DocGroup, nsISupports)
 
 TabGroup::TabGroup()
 {}
@@ -115,6 +118,52 @@ TabGroup::Leave(nsPIDOMWindowOuter* aWindow)
   MOZ_ASSERT(mWindows.Contains(aWindow));
   mWindows.RemoveElement(aWindow);
 }
+
+nsresult
+TabGroup::FindItemWithName(const char16_t* aName,
+                           nsIDocShellTreeItem* aRequestor,
+                           nsIDocShellTreeItem* aOriginalRequestor,
+                           nsIDocShellTreeItem** aFoundItem)
+{
+  NS_ENSURE_ARG_POINTER(aFoundItem);
+  *aFoundItem = nullptr;
+
+
+  // The names "_blank", "_content", and "_main" mean that we should simply open
+  // in a new window, so return nothing.
+  nsDependentString name(aName);
+  if (name.LowerCaseEqualsLiteral("_blank") ||
+      name.LowerCaseEqualsLiteral("_content") ||
+      name.EqualsLiteral("_main")) {
+    return NS_OK;
+  }
+
+  for (nsPIDOMWindowOuter* outerWindow : mWindows) {
+    // Ignore non-toplevel windows
+    if (outerWindow->GetScriptableParentOrNull()) {
+      continue;
+    }
+
+    nsCOMPtr<nsIDocShellTreeItem> docshell = outerWindow->GetDocShell();
+    if (!docshell) {
+      continue;
+    }
+
+    nsCOMPtr<nsIDocShellTreeItem> root;
+    docshell->GetSameTypeRootTreeItem(getter_AddRefs(root));
+    MOZ_RELEASE_ASSERT(docshell == root);
+    if (root && aRequestor != root) {
+      root->FindItemWithName(aName, this, aOriginalRequestor, aFoundItem);
+      if (*aFoundItem) {
+        break;
+      }
+    }
+  }
+
+  return NS_OK;
+}
+
+NS_IMPL_ISUPPORTS(TabGroup, nsISupports)
 
 TabGroup::HashEntry::HashEntry(const nsACString* aKey)
   : nsCStringHashKey(aKey), mDocGroup(nullptr)
