@@ -461,6 +461,8 @@ public:
   // Outer windows only.
   void DispatchDOMWindowCreated();
 
+  void MaybeSetOpenerWindow(nsPIDOMWindowOuter* aOpener,
+                            bool aOriginalOpener);
   virtual void SetOpenerWindow(nsPIDOMWindowOuter* aOpener,
                                bool aOriginalOpener) override;
 
@@ -923,6 +925,9 @@ protected:
   // Initializes the mWasOffline member variable
   void InitWasOffline();
 public:
+  nsPIDOMWindowOuter*
+  SanitizeOpener(nsPIDOMWindowOuter* aOpener, bool aCallerIsChrome);
+
   nsPIDOMWindowOuter* GetOpenerWindow(mozilla::ErrorResult& aError);
   void GetOpener(JSContext* aCx, JS::MutableHandle<JS::Value> aRetval,
                  mozilla::ErrorResult& aError);

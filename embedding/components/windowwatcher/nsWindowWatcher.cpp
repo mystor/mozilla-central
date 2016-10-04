@@ -2127,32 +2127,27 @@ nsWindowWatcher::ReadyOpenedDocShellItem(nsIDocShellTreeItem* aOpenedItem,
   *aOpenedWindow = 0;
   nsCOMPtr<nsPIDOMWindowOuter> piOpenedWindow = aOpenedItem->GetWindow();
   if (piOpenedWindow) {
-    nsCOMPtr<nsPIDOMWindowOuter> opener = nsGlobalWindow::Cast(piOpenedWindow)->GetOpener();
-    if (aParent && aParent != opener) {
-      // Check if the opener is the same as the current opener before trying to
-      // change it because the window creation code may have already set this.
-      // We need to check the ErrorResult which will throw if our window is an
-      // inner window with no outer window, which is not the case, so we can
-      // just assert that the error will not be raised.
-      piOpenedWindow->SetOpenerWindow(aParent, aWindowIsNew); // damnit
+    // The window creation logic may have already set the opener for us. If this
+    // is the case, we don't want to set it again. MaybeSetOpenerWindow handles
+    // that for us.
+    nsGlobalWindow::Cast(piOpenedWindow)->MaybeSetOpenerWindow(aParent, aWindowIsNew); // damnit
 
-      if (aWindowIsNew) {
+    if (aWindowIsNew) {
 #ifdef DEBUG
-        // Assert that we're not loading things right now.  If we are, when
-        // that load completes it will clobber whatever principals we set up
-        // on this new window!
-        nsCOMPtr<nsIDocumentLoader> docloader = do_QueryInterface(aOpenedItem);
-        NS_ASSERTION(docloader, "How can we not have a docloader here?");
+      // Assert that we're not loading things right now.  If we are, when
+      // that load completes it will clobber whatever principals we set up
+      // on this new window!
+      nsCOMPtr<nsIDocumentLoader> docloader = do_QueryInterface(aOpenedItem);
+      NS_ASSERTION(docloader, "How can we not have a docloader here?");
 
-        nsCOMPtr<nsIChannel> chan;
-        docloader->GetDocumentChannel(getter_AddRefs(chan));
-        NS_ASSERTION(!chan, "Why is there a document channel?");
+      nsCOMPtr<nsIChannel> chan;
+      docloader->GetDocumentChannel(getter_AddRefs(chan));
+      NS_ASSERTION(!chan, "Why is there a document channel?");
 #endif
 
-        nsCOMPtr<nsIDocument> doc = piOpenedWindow->GetExtantDoc();
-        if (doc) {
-          doc->SetIsInitialDocument(true);
-        }
+      nsCOMPtr<nsIDocument> doc = piOpenedWindow->GetExtantDoc();
+      if (doc) {
+        doc->SetIsInitialDocument(true);
       }
     }
     rv = CallQueryInterface(piOpenedWindow, aOpenedWindow);

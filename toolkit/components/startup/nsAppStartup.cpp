@@ -672,7 +672,7 @@ nsAppStartup::CreateChromeWindow2(nsIWebBrowserChrome *aParent,
     appShell->CreateTopLevelWindow(0, 0, aChromeFlags,
                                    nsIAppShellService::SIZE_TO_CONTENT,
                                    nsIAppShellService::SIZE_TO_CONTENT,
-                                   aOpeningTab,
+                                   aOpeningTab, aOpener,
                                    getter_AddRefs(newWindow));
   }
 

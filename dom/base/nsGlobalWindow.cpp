@@ -3136,6 +3136,20 @@ nsGlobalWindow::DetachFromDocShell()
 }
 
 void
+nsGlobalWindow::MaybeSetOpenerWindow(nsPIDOMWindowOuter* aOpener,
+                                     bool aOriginalOpener)
+{
+  FORWARD_TO_OUTER_VOID(MaybeSetOpenerWindow, (aOpener, aOriginalOpener));
+
+  nsWeakPtr opener = do_GetWeakReference(aOpener);
+  if (opener == mOpener) {
+    return;
+  }
+
+  SetOpenerWindow(aOpener, aOriginalOpener);
+}
+
+void
 nsGlobalWindow::SetOpenerWindow(nsPIDOMWindowOuter* aOpener,
                                 bool aOriginalOpener)
 {
@@ -3150,7 +3164,10 @@ nsGlobalWindow::SetOpenerWindow(nsPIDOMWindowOuter* aOpener,
   mOpener = do_GetWeakReference(aOpener);
   NS_ASSERTION(mOpener || !aOpener, "Opener must support weak references!");
 
-  MOZ_RELEASE_ASSERT(!aOpener || !mTabGroup || mTabGroup == Cast(aOpener)->mTabGroup);
+  // Check that the content visible opener matches!
+  nsPIDOMWindowOuter* contentOpener = SanitizeOpener(aOpener, false);
+  MOZ_RELEASE_ASSERT(!contentOpener || !mTabGroup ||
+    mTabGroup == Cast(contentOpener)->mTabGroup);
 
   if (aOriginalOpener) {
     MOZ_ASSERT(!mHadOriginalOpener,
@@ -4687,25 +4704,22 @@ nsGlobalWindow::GetControllers(nsIControllers** aResult)
 }
 
 nsPIDOMWindowOuter*
-nsGlobalWindow::GetOpenerWindowOuter()
+nsGlobalWindow::SanitizeOpener(nsPIDOMWindowOuter* aOpener, bool aCallerIsChrome)
 {
-  MOZ_RELEASE_ASSERT(IsOuterWindow());
-
-  nsCOMPtr<nsPIDOMWindowOuter> opener = do_QueryReferent(mOpener);
-  if (!opener) {
+  if (!aOpener) {
     return nullptr;
   }
 
-  nsGlobalWindow* win = nsGlobalWindow::Cast(opener);
+  nsGlobalWindow* win = nsGlobalWindow::Cast(aOpener);
 
   // First, check if we were called from a privileged chrome script
-  if (nsContentUtils::LegacyIsCallerChromeOrNativeCode()) {
+  if (aCallerIsChrome) {
     // Catch the case where we're chrome but the opener is not...
     if (GetPrincipal() == nsContentUtils::GetSystemPrincipal() &&
         win->GetPrincipal() != nsContentUtils::GetSystemPrincipal()) {
       return nullptr;
     }
-    return opener;
+    return aOpener;
   }
 
   // First, ensure that we're not handing back a chrome window to content:
@@ -4716,7 +4730,7 @@ nsGlobalWindow::GetOpenerWindowOuter()
   // We don't want to reveal the opener if the opener is a mail window,
   // because opener can be used to spoof the contents of a message (bug 105050).
   // So, we look in the opener's root docshell to see if it's a mail window.
-  nsCOMPtr<nsIDocShell> openerDocShell = opener->GetDocShell();
+  nsCOMPtr<nsIDocShell> openerDocShell = aOpener->GetDocShell();
 
   if (openerDocShell) {
     nsCOMPtr<nsIDocShellTreeItem> openerRootItem;
@@ -4726,12 +4740,21 @@ nsGlobalWindow::GetOpenerWindowOuter()
       uint32_t appType;
       nsresult rv = openerRootDocShell->GetAppType(&appType);
       if (NS_SUCCEEDED(rv) && appType != nsIDocShell::APP_TYPE_MAIL) {
-        return opener;
+        return aOpener;
       }
     }
   }
 
   return nullptr;
+}
+
+nsPIDOMWindowOuter*
+nsGlobalWindow::GetOpenerWindowOuter()
+{
+  MOZ_RELEASE_ASSERT(IsOuterWindow());
+
+  nsCOMPtr<nsPIDOMWindowOuter> opener = do_QueryReferent(mOpener);
+  return SanitizeOpener(opener, nsContentUtils::LegacyIsCallerChromeOrNativeCode());
 }
 
 nsPIDOMWindowOuter*
@@ -14411,7 +14434,11 @@ nsGlobalWindow::TabGroup()
   // because a document is getting its NodePrincipal, and asking for the
   // TabGroup to determine its DocGroup.
   if (!mTabGroup) {
-    nsGlobalWindow* opener = Cast(GetOpenerWindowOuter());
+    // Get mOpener ourselves, instead of relying on GetOpenerWindowOuter,
+    // because that way we dodge the LegacyIsCallerChromeOrNativeCode() call
+    // which we want to return false.
+    nsCOMPtr<nsPIDOMWindowOuter> piOpener = do_QueryReferent(mOpener);
+    nsGlobalWindow* opener = Cast(SanitizeOpener(piOpener, false));
     nsGlobalWindow* parent = Cast(GetScriptableParentOrNull());
     MOZ_ASSERT(!parent || !opener, "Only one of parent and opener may be provided");
 
