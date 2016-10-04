@@ -79,10 +79,6 @@ TabGroup::GetDocGroup(const nsACString& aKey)
 already_AddRefed<DocGroup>
 TabGroup::JoinDocGroup(const nsACString& aKey, nsIDocument* aDocument)
 {
-  // If we are the chrome tab group, we should only have one key, the empty
-  // string key.
-  MOZ_RELEASE_ASSERT(this != sChromeTabGroup || aKey.IsEmpty());
-
   HashEntry* entry = mDocGroups.PutEntry(aKey);
   RefPtr<DocGroup> docGroup;
   if (entry->mDocGroup) {

@@ -197,12 +197,11 @@ nsAppShellService::CreateTopLevelWindow(nsIXULWindow *aParent,
 
   StartupTimeline::RecordOnce(StartupTimeline::CREATE_TOP_LEVEL_WINDOW);
 
-  nsWebShellWindow *newWindow = nullptr;
+  RefPtr<nsWebShellWindow> newWindow;
   rv = JustCreateTopWindow(aParent, aUrl,
                            aChromeMask, aInitialWidth, aInitialHeight,
-                           false, aOpeningTab, &newWindow);  // addrefs
-
-  *aResult = newWindow; // transfer ref
+                           false, aOpeningTab, getter_AddRefs(newWindow));
+  newWindow.forget(aResult);
 
   if (NS_SUCCEEDED(rv)) {
     // the addref resulting from this is the owning addref for this window

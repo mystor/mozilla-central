@@ -1920,13 +1920,17 @@ NS_IMETHODIMP nsXULWindow::ExitModalLoop(nsresult aStatus)
 // top-level function to create a new window
 NS_IMETHODIMP nsXULWindow::CreateNewWindow(int32_t aChromeFlags,
                                            nsITabParent *aOpeningTab,
+                                           mozIDOMWindowProxy *aOpener,
                                            nsIXULWindow **_retval)
 {
   NS_ENSURE_ARG_POINTER(_retval);
 
+  // If we are creating a chrome window, we don't have to worry about the opener
+  // value, as all chrome windows are loaded inside the same tab group, and thus
+  // can have their opener set later.
   if (aChromeFlags & nsIWebBrowserChrome::CHROME_OPENAS_CHROME)
     return CreateNewChromeWindow(aChromeFlags, aOpeningTab, _retval);
-  return CreateNewContentWindow(aChromeFlags, aOpeningTab, _retval);
+  return CreateNewContentWindow(aChromeFlags, aOpeningTab, aOpener, _retval);
 }
 
 NS_IMETHODIMP nsXULWindow::CreateNewChromeWindow(int32_t aChromeFlags,
@@ -1937,7 +1941,6 @@ NS_IMETHODIMP nsXULWindow::CreateNewChromeWindow(int32_t aChromeFlags,
   NS_ENSURE_TRUE(appShell, NS_ERROR_FAILURE);
 
   // Just do a normal create of a window and return.
-
   nsCOMPtr<nsIXULWindow> newWindow;
   appShell->CreateTopLevelWindow(this, nullptr, aChromeFlags,
                                  nsIAppShellService::SIZE_TO_CONTENT,
@@ -1955,6 +1958,7 @@ NS_IMETHODIMP nsXULWindow::CreateNewChromeWindow(int32_t aChromeFlags,
 
 NS_IMETHODIMP nsXULWindow::CreateNewContentWindow(int32_t aChromeFlags,
                                                   nsITabParent *aOpeningTab,
+                                                  mozIDOMWindowProxy *aOpener,
                                                   nsIXULWindow **_retval)
 {
   nsCOMPtr<nsIAppShellService> appShell(do_GetService(NS_APPSHELLSERVICE_CONTRACTID));
@@ -2007,6 +2011,14 @@ NS_IMETHODIMP nsXULWindow::CreateNewContentWindow(int32_t aChromeFlags,
         break;
     }
   }
+
+  nsCOMPtr<nsIXULBrowserWindow> xbw;
+  newWindow->GetXULBrowserWindow(getter_AddRefs(xbw));
+  MOZ_ASSERT(xbw);
+  // By setting thr initial browser as non-remote, and passing an explicit
+  // aOpener, I am forcing the browser to bounce, and thus correctly setting the
+  // initial tabbrowser state.
+  xbw->ForceInitialBrowserNonRemote(aOpener);
 
   NS_ENSURE_STATE(xulWin->mPrimaryContentShell || xulWin->mPrimaryTabParent);
 

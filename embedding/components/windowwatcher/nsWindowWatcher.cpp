@@ -504,6 +504,7 @@ nsWindowWatcher::CreateChromeWindow(const nsACString& aFeatures,
                                     uint32_t aChromeFlags,
                                     uint32_t aContextFlags,
                                     nsITabParent* aOpeningTabParent,
+                                    mozIDOMWindowProxy* aOpener,
                                     nsIWebBrowserChrome** aResult)
 {
   nsCOMPtr<nsIWindowCreator2> windowCreator2(do_QueryInterface(mWindowCreator));
@@ -522,7 +523,7 @@ nsWindowWatcher::CreateChromeWindow(const nsACString& aFeatures,
   nsCOMPtr<nsIWebBrowserChrome> newWindowChrome;
   nsresult rv =
     windowCreator2->CreateChromeWindow2(aParentChrome, aChromeFlags, aContextFlags,
-                                        aOpeningTabParent, &cancel,
+                                        aOpeningTabParent, aOpener, &cancel,
                                         getter_AddRefs(newWindowChrome));
 
   if (NS_SUCCEEDED(rv) && cancel) {
@@ -642,7 +643,7 @@ nsWindowWatcher::OpenWindowWithTabParent(nsITabParent* aOpeningTabParent,
   nsCOMPtr<nsIWebBrowserChrome> newWindowChrome;
 
   CreateChromeWindow(aFeatures, parentChrome, chromeFlags, contextFlags,
-                     aOpeningTabParent, getter_AddRefs(newWindowChrome));
+                     aOpeningTabParent, nullptr, getter_AddRefs(newWindowChrome));
 
   if (NS_WARN_IF(!newWindowChrome)) {
     return NS_ERROR_UNEXPECTED;
@@ -1014,7 +1015,7 @@ nsWindowWatcher::OpenWindowInternal(mozIDOMWindowProxy* aParent,
         }
 
         rv = CreateChromeWindow(features, parentChrome, chromeFlags, contextFlags,
-                                nullptr, getter_AddRefs(newChrome));
+                                nullptr, aParent, getter_AddRefs(newChrome));
 
       } else {
         rv = mWindowCreator->CreateChromeWindow(parentChrome, chromeFlags,

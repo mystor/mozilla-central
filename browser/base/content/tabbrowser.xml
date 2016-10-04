@@ -1659,12 +1659,14 @@
         <parameter name="aOpener"/>
         <body>
           <![CDATA[
-            if (aShouldBeRemote && aOpener) {
-              throw new Exception("aOpener is only supported for non-remote browsers");
+            // We don't want to do anything if our browser is already remote,
+            // however, if we have an opener set we want to make sure that
+            // the browser is bounced in order to set it!
+            if (aOpener && aShouldBeRemote) {
+              throw new Exception("Cannot set an opener on a browser which should be remote!");
             }
-
             let isRemote = aBrowser.getAttribute("remote") == "true";
-            if (isRemote == aShouldBeRemote)
+            if (isRemote == aShouldBeRemote && !aOpener)
               return false;
 
             let wasActive = document.activeElement == aBrowser;
