@@ -59,4 +59,5 @@ interface nsIBrowser : nsISupports
    * Close the browser (usually means to remove a tab).
    */
   void closeBrowser();
+
 };
