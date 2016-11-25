@@ -1574,6 +1574,7 @@ nsDocShell::LoadURI(nsIURI* aURI,
                       srcdoc,
                       sourceDocShell,
                       baseURI,
+                      false,
                       nullptr,  // No nsIDocShell
                       nullptr); // No nsIRequest
 }
@@ -5385,8 +5386,8 @@ nsDocShell::LoadErrorPage(nsIURI* aURI, const char16_t* aURL,
                       nsContentUtils::GetSystemPrincipal(), nullptr,
                       INTERNAL_LOAD_FLAGS_NONE, EmptyString(),
                       nullptr, NullString(), nullptr, nullptr, LOAD_ERROR_PAGE,
-                      nullptr, true, NullString(), this, nullptr, nullptr,
-                      nullptr);
+                      nullptr, true, NullString(), this, nullptr, false,
+                      nullptr, nullptr);
 }
 
 NS_IMETHODIMP
@@ -5478,6 +5479,7 @@ nsDocShell::Reload(uint32_t aReloadFlags)
                       srcdoc,          // srcdoc argument for iframe
                       this,            // For reloads we are the source
                       baseURI,
+                      false,
                       nullptr,         // No nsIDocShell
                       nullptr);        // No nsIRequest
   }
@@ -7972,7 +7974,8 @@ nsDocShell::EnsureContentViewer()
 nsresult
 nsDocShell::CreateAboutBlankContentViewer(nsIPrincipal* aPrincipal,
                                           nsIURI* aBaseURI,
-                                          bool aTryToSaveOldPresentation)
+                                          bool aTryToSaveOldPresentation,
+                                          bool aCheckPermitUnload)
 {
   nsCOMPtr<nsIDocument> blankDoc;
   nsCOMPtr<nsIContentViewer> viewer;
@@ -8005,29 +8008,30 @@ nsDocShell::CreateAboutBlankContentViewer(nsIPrincipal* aPrincipal,
   bool hadTiming = mTiming;
   MaybeInitTiming();
   if (mContentViewer) {
-    // We've got a content viewer already. Make sure the user
-    // permits us to discard the current document and replace it
-    // with about:blank. And also ensure we fire the unload events
-    // in the current document.
+    if (aCheckPermitUnload) {
+      // We've got a content viewer already. Make sure the user
+      // permits us to discard the current document and replace it
+      // with about:blank. And also ensure we fire the unload events
+      // in the current document.
 
-    // Unload gets fired first for
-    // document loaded from the session history.
-    mTiming->NotifyBeforeUnload();
+      // Unload gets fired first for
+      // document loaded from the session history.
+      mTiming->NotifyBeforeUnload();
 
-    bool okToUnload;
-    rv = mContentViewer->PermitUnload(&okToUnload);
+      bool okToUnload;
+      rv = mContentViewer->PermitUnload(&okToUnload);
 
-    if (NS_SUCCEEDED(rv) && !okToUnload) {
-      // The user chose not to unload the page, interrupt the load.
-      return NS_ERROR_FAILURE;
+      if (NS_SUCCEEDED(rv) && !okToUnload) {
+        // The user chose not to unload the page, interrupt the load.
+        return NS_ERROR_FAILURE;
+      }
+      if (mTiming) {
+        mTiming->NotifyUnloadAccepted(mCurrentURI);
+      }
     }
 
     mSavingOldViewer = aTryToSaveOldPresentation &&
                        CanSavePresentation(LOAD_NORMAL, nullptr, nullptr);
-
-    if (mTiming) {
-      mTiming->NotifyUnloadAccepted(mCurrentURI);
-    }
 
     // Make sure to blow away our mLoadingURI just in case.  No loads
     // from inside this pagehide.
@@ -8110,6 +8114,12 @@ NS_IMETHODIMP
 nsDocShell::CreateAboutBlankContentViewer(nsIPrincipal* aPrincipal)
 {
   return CreateAboutBlankContentViewer(aPrincipal, nullptr);
+}
+
+NS_IMETHODIMP
+nsDocShell::ForceCreateAboutBlankContentViewer(nsIPrincipal* aPrincipal)
+{
+  return CreateAboutBlankContentViewer(aPrincipal, nullptr, true, false);
 }
 
 bool
@@ -9585,13 +9595,13 @@ public:
   InternalLoadEvent(nsDocShell* aDocShell, nsIURI* aURI,
                     nsIURI* aOriginalURI, bool aLoadReplace,
                     nsIURI* aReferrer, uint32_t aReferrerPolicy,
-                    nsIPrincipal* aTriggeringPrincipal, 
+                    nsIPrincipal* aTriggeringPrincipal,
                     nsIPrincipal* aPrincipalToInherit, uint32_t aFlags,
                     const char* aTypeHint, nsIInputStream* aPostData,
                     nsIInputStream* aHeadersData, uint32_t aLoadType,
                     nsISHEntry* aSHEntry, bool aFirstParty,
                     const nsAString& aSrcdoc, nsIDocShell* aSourceDocShell,
-                    nsIURI* aBaseURI)
+                    nsIURI* aBaseURI, bool aCheckForPrerender)
     : mSrcdoc(aSrcdoc)
     , mDocShell(aDocShell)
     , mURI(aURI)
@@ -9609,6 +9619,7 @@ public:
     , mFirstParty(aFirstParty)
     , mSourceDocShell(aSourceDocShell)
     , mBaseURI(aBaseURI)
+    , mCheckForPrerender(aCheckForPrerender)
   {
     // Make sure to keep null things null as needed
     if (aTypeHint) {
@@ -9628,7 +9639,7 @@ public:
                                    NullString(), mPostData, mHeadersData,
                                    mLoadType, mSHEntry, mFirstParty,
                                    mSrcdoc, mSourceDocShell, mBaseURI,
-                                   nullptr, nullptr);
+                                   mCheckForPrerender, nullptr, nullptr);
   }
 
 private:
@@ -9653,6 +9664,7 @@ private:
   bool mFirstParty;
   nsCOMPtr<nsIDocShell> mSourceDocShell;
   nsCOMPtr<nsIURI> mBaseURI;
+  bool mCheckForPrerender;
 };
 
 /**
@@ -9725,6 +9737,7 @@ nsDocShell::InternalLoad(nsIURI* aURI,
                          const nsAString& aSrcdoc,
                          nsIDocShell* aSourceDocShell,
                          nsIURI* aBaseURI,
+                         bool aCheckForPrerender,
                          nsIDocShell** aDocShell,
                          nsIRequest** aRequest)
 {
@@ -9920,7 +9933,7 @@ nsDocShell::InternalLoad(nsIURI* aURI,
     bool inherits;
     // One more twist: Don't inherit the principal for external loads.
     if (aLoadType != LOAD_NORMAL_EXTERNAL && !principalToInherit &&
-        (aFlags & INTERNAL_LOAD_FLAGS_INHERIT_PRINCIPAL) &&   
+        (aFlags & INTERNAL_LOAD_FLAGS_INHERIT_PRINCIPAL) &&
          NS_SUCCEEDED(nsContentUtils::URIInheritsSecurityContext(aURI,
                                                                  &inherits)) &&
          inherits) {
@@ -10084,6 +10097,7 @@ nsDocShell::InternalLoad(nsIURI* aURI,
                                         aSrcdoc,
                                         aSourceDocShell,
                                         aBaseURI,
+                                        aCheckForPrerender,
                                         aDocShell,
                                         aRequest);
       if (rv == NS_ERROR_NO_CONTENT) {
@@ -10154,7 +10168,7 @@ nsDocShell::InternalLoad(nsIURI* aURI,
                               aTriggeringPrincipal, principalToInherit,
                               aFlags, aTypeHint, aPostData, aHeadersData,
                               aLoadType, aSHEntry, aFirstParty, aSrcdoc,
-                              aSourceDocShell, aBaseURI);
+                              aSourceDocShell, aBaseURI, false);
       return NS_DispatchToCurrentThread(ev);
     }
 
@@ -10327,7 +10341,7 @@ nsDocShell::InternalLoad(nsIURI* aURI,
       nsCOMPtr<nsIPrincipal> triggeringPrincipal, principalToInherit;
       if (mOSHE) {
         mOSHE->GetTriggeringPrincipal(getter_AddRefs(triggeringPrincipal));
-        mOSHE->GetPrincipalToInherit(getter_AddRefs(principalToInherit)); 
+        mOSHE->GetPrincipalToInherit(getter_AddRefs(principalToInherit));
       }
       // Pass true for aCloneSHChildren, since we're not
       // changing documents here, so all of our subframes are
@@ -10540,6 +10554,23 @@ nsDocShell::InternalLoad(nsIURI* aURI,
 
   if (mTiming && timeBeforeUnload) {
     mTiming->NotifyUnloadAccepted(mCurrentURI);
+  }
+
+  if (browserChrome3 && aCheckForPrerender) {
+    nsCOMPtr<nsIRunnable> ev =
+      new InternalLoadEvent(this, aURI, aOriginalURI, aLoadReplace,
+                            aReferrer, aReferrerPolicy,
+                            aTriggeringPrincipal, principalToInherit,
+                            aFlags, aTypeHint, aPostData, aHeadersData,
+                            aLoadType, aSHEntry, aFirstParty, aSrcdoc,
+                            aSourceDocShell, aBaseURI, false);
+    // We don't need any success handler since in that case
+    // OnPartialSessionHistoryDeactive would be called, and it would ensure
+    // docshell loads about:blank.
+    rv = browserChrome3->SwitchToPrerenderedDocument(aURI, mCurrentURI, nullptr, ev);
+    if (NS_SUCCEEDED(rv)) {
+      return NS_OK;
+    }
   }
 
   // Whenever a top-level browsing context is navigated, the user agent MUST
@@ -12545,6 +12576,7 @@ nsDocShell::LoadHistoryEntry(nsISHEntry* aEntry, uint32_t aLoadType)
                     srcdoc,
                     nullptr,            // Source docshell, see comment above
                     baseURI,
+                    false,
                     nullptr,            // No nsIDocShell
                     nullptr);           // No nsIRequest
   return rv;
@@ -13893,13 +13925,7 @@ nsDocShell::OnLinkClick(nsIContent* aContent,
                          aPostDataStream, aHeadersDataStream, noOpenerImplied,
                          aIsTrusted);
 
-  if (browserChrome3) {
-    rv = browserChrome3->SwitchToPrerenderedDocument(aURI, mCurrentURI, nullptr, ev);
-  }
-  if (!browserChrome3 || NS_FAILED(rv)) {
-    return NS_DispatchToCurrentThread(ev);
-  }
-  return NS_OK;
+  return NS_DispatchToCurrentThread(ev);
 }
 
 NS_IMETHODIMP
@@ -14057,6 +14083,7 @@ nsDocShell::OnLinkClickSync(nsIContent* aContent,
                              NullString(),              // No srcdoc
                              this,                      // We are the source
                              nullptr,                   // baseURI not needed
+                             true,                      // Check for prerendered doc
                              aDocShell,                 // DocShell out-param
                              aRequest);                 // Request out-param
   if (NS_SUCCEEDED(rv)) {

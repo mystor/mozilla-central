@@ -187,10 +187,11 @@ interface nsIDocShell : nsIDocShellTreeItem
                               in nsIInputStream aHeadersStream,
                               in unsigned long aLoadFlags,
                               in nsISHEntry aSHEntry,
-                              in boolean firstParty,
+                              in boolean aFirstParty,
                               in AString aSrcdoc,
                               in nsIDocShell aSourceDocShell,
                               in nsIURI aBaseURI,
+                              in boolean aCheckForPrerender,
                               out nsIDocShell aDocShell,
                               out nsIRequest aRequest);
 
@@ -697,6 +698,13 @@ interface nsIDocShell : nsIDocShellTreeItem
    * @param aPrincipal the principal to use for the new document.
    */
   void createAboutBlankContentViewer(in nsIPrincipal aPrincipal);
+
+  /**
+   * Like createAboutBlankContentViewer, but don't check for permit unload.
+   * Only used by special session history operation.
+   * @param aPrincipal the principal to use for the new document.
+   */
+  [noscript] void forceCreateAboutBlankContentViewer(in nsIPrincipal aPrincipal);
 
   /**
    * Upon getting, returns the canonical encoding label of the document

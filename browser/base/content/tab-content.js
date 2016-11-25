@@ -685,7 +685,7 @@ let PrerenderContentHandler = {
     }
 
     if (aFailure) {
-      setTimeout(() => aFailure.run(), 0);
+      aFailure.run();
     }
   }
 };
