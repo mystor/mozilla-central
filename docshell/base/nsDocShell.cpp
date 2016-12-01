@@ -13892,7 +13892,14 @@ nsDocShell::OnLinkClick(nsIContent* aContent,
     new OnLinkClickEvent(this, aContent, aURI, target.get(), aFileName,
                          aPostDataStream, aHeadersDataStream, noOpenerImplied,
                          aIsTrusted);
-  return NS_DispatchToCurrentThread(ev);
+
+  if (browserChrome3) {
+    rv = browserChrome3->SwitchToPrerenderedDocument(aURI, mCurrentURI, nullptr, ev);
+  }
+  if (!browserChrome3 || NS_FAILED(rv)) {
+    return NS_DispatchToCurrentThread(ev);
+  }
+  return NS_OK;
 }
 
 NS_IMETHODIMP

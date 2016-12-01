@@ -2909,6 +2909,61 @@ nsIDocument::CreateEventTarget(const char* aName, TaskCategory aCategory)
   return DispatcherTrait::CreateEventTarget(aName, aCategory);
 }
 
+bool
+nsIDocument::PrerenderHref(nsIURI* aHref)
+{
+  MOZ_ASSERT(aHref);
+
+  static bool sPrerenderEnabled = false;
+  static bool sPrerenderPrefCached = false;
+  if (!sPrerenderPrefCached) {
+    sPrerenderPrefCached = true;
+    Preferences::AddBoolVarCache(&sPrerenderEnabled,
+                                 "dom.linkPrerender.enabled",
+                                 false);
+  }
+
+  // Check if prerender is enabled
+  if (!sPrerenderEnabled) {
+    return false;
+  }
+
+  nsCOMPtr<nsIURI> referrer = GetDocumentURI();
+  bool urisMatch = false;
+  aHref->Equals(referrer, &urisMatch);
+  if (urisMatch) {
+    // NOTE: Cannot preload the current document
+    return false;
+  }
+
+  nsCOMPtr<nsIDocShell> docShell = GetDocShell();
+  nsCOMPtr<nsIWebNavigation> webNav = do_QueryInterface(docShell);
+  NS_ENSURE_TRUE(webNav, false);
+
+  bool canGoForward = false;
+  nsresult rv = webNav->GetCanGoForward(&canGoForward);
+  if (NS_FAILED(rv) || canGoForward) {
+    // NOTE: Preloading doesn't occur within history entries.
+    return false;
+  }
+
+  if (docShell->GetProcessLockReason() != nsIDocShell::PROCESS_LOCK_NONE) {
+    return false;
+  }
+
+  TabChild* tabChild = TabChild::GetFrom(docShell);
+  NS_ENSURE_TRUE(tabChild, false);
+
+  nsCOMPtr<nsIWebBrowserChrome3> wbc3;
+  tabChild->GetWebBrowserChrome(getter_AddRefs(wbc3));
+  NS_ENSURE_TRUE(wbc3, false);
+
+  rv = wbc3->StartPrerenderingDocument(aHref, referrer);
+  NS_ENSURE_SUCCESS(rv, false);
+
+  return true;
+}
+
 NS_IMETHODIMP
 nsDocument::GetApplicationCache(nsIApplicationCache **aApplicationCache)
 {

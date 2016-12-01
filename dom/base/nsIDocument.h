@@ -2876,6 +2876,8 @@ public:
   CreateEventTarget(const char* aName,
                     mozilla::dom::TaskCategory aCategory) override;
 
+  bool PrerenderHref(nsIURI* aHref);
+
 protected:
   bool GetUseCounter(mozilla::UseCounter aUseCounter)
   {

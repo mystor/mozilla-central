@@ -8,6 +8,7 @@
 
 interface nsIDocShell;
 interface nsIInputStream;
+interface nsIRunnable;
 
 /**
  * nsIWebBrowserChrome3 is an extension to nsIWebBrowserChrome2.
@@ -60,4 +61,24 @@ interface nsIWebBrowserChrome3 : nsIWebBrowserChrome2
   bool reloadInFreshProcess(in nsIDocShell aDocShell,
                             in nsIURI aURI,
                             in nsIURI aReferrer);
+
+  /**
+   * Tell the browser to start prerendering the given document. This prerendering
+   * _must_ be for the toplevel document.
+   *
+   * @param aHref The URI to begin prerendering
+   * @param aReferrer The URI of the document requesting the prerender.
+   */
+  void startPrerenderingDocument(in nsIURI aHref, in nsIURI aReferrer);
+
+  /**
+   * Switch to a prerendered document, if it is avaliable.
+   *
+   * @param aHref The URI which is being loaded.
+   * @param aReferrer The referrer for the current load.
+   * @param aSuccess A runnable which will be run if the swap is successful.
+   * @param aFailure A runnable which will be run if the swap is not successful.
+   */
+  void switchToPrerenderedDocument(in nsIURI aHref, in nsIURI aReferrer,
+                                   in nsIRunnable aSuccess, in nsIRunnable aFailure);
 };

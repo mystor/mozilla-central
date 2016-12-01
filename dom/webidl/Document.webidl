@@ -222,6 +222,9 @@ partial interface Document {
   [ChromeOnly]
   readonly attribute unsigned long referrerPolicy;
 
+  [ChromeOnly]
+  boolean prerenderHref(URI aHref);
+
 };
 
 // https://fullscreen.spec.whatwg.org/#api
