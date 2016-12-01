@@ -1,6 +1,7 @@
 add_task(function* () {
   yield SpecialPowers.pushPrefEnv({
-    set: [["browser.groupedhistory.enabled", true]]
+    set: [["browser.groupedhistory.enabled", true],
+          ["dom.linkPrerender.enabled", true]]
   });
 
   // Wait for a process change and then fulfil the promise.
@@ -19,17 +20,32 @@ add_task(function* () {
   // Test 1: Create prerendered browser, and don't switch to it, then close the tab
   yield BrowserTestUtils.withNewTab({ gBrowser, url: "data:text/html,a" }, function* (browser1) {
     // Set up the grouped SHEntry setup
-    tab2 = gBrowser.loadOneTab("data:text/html,b", {
-      referrerPolicy: Ci.nsIHttpChannel.REFERRER_POLICY_DEFAULT,
-      allowThirdPartyFixup: true,
-      relatedToCurrent: true,
-      isPrerendered: true,
+
+    let requestMade = new Promise(resolve => {
+      browser1.messageManager.addMessageListener("Prerender:Request", function f() {
+        browser1.messageManager.removeMessageListener("Prerender:Request", f);
+        ok(true, "Successfully received the prerender request");
+        resolve();
+      });
     });
+
+    is(gBrowser.tabs.length, 2);
+    yield ContentTask.spawn(browser1, null, function() {
+      let link = content.document.createElement("link");
+      link.setAttribute("rel", "prerender");
+      link.setAttribute("href", "data:text/html,b");
+      content.document.body.appendChild(link);
+    });
+    yield requestMade;
+
+    is(gBrowser.tabs.length, 3);
   });
 
+  // Wait for a cycle as the other tabs are closed asynchronously.
+  yield new Promise(resolve => setTimeout(resolve, 0));
+
   // At this point tab2 should be closed
-  todo(!tab2.linkedBrowser, "The new tab should be closed");
-  yield BrowserTestUtils.removeTab(tab2); // XXX: Shouldn't be needed once the todo is fixed
+  is(gBrowser.tabs.length, 1, "The new tab and the prerendered 'tab' should be closed");
 
   // Test 2: Create prerendered browser, switch to it, then close the tab
   yield BrowserTestUtils.withNewTab({ gBrowser, url: "data:text/html,a" }, function* (browser1) {
@@ -45,6 +61,9 @@ add_task(function* () {
       tab2.linkedBrowser.frameLoader);
     yield awaitProcessChange(browser1);
   });
+
+  // Wait for a cycle as the other tabs are closed asynchronously.
+  yield new Promise(resolve => setTimeout(resolve, 0));
 
   // At this point tab2 should be closed
   ok(!tab2.linkedBrowser, "The new tab should be closed");
