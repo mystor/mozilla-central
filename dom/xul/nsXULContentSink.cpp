@@ -422,10 +422,10 @@ nsresult
 XULContentSinkImpl::CreateElement(mozilla::dom::NodeInfo *aNodeInfo,
                                   nsXULPrototypeElement** aResult)
 {
-    nsXULPrototypeElement* element = new nsXULPrototypeElement();
+    RefPtr<nsXULPrototypeElement> element = new nsXULPrototypeElement();
     element->mNodeInfo    = aNodeInfo;
 
-    *aResult = element;
+    element.forget(aResult);
     return NS_OK;
 }
 
@@ -738,8 +738,8 @@ XULContentSinkImpl::OpenRoot(const char16_t** aAttributes,
     }
 
     // Create the element
-    nsXULPrototypeElement* element;
-    rv = CreateElement(aNodeInfo, &element);
+    RefPtr<nsXULPrototypeElement> element;
+    rv = CreateElement(aNodeInfo, getter_AddRefs(element));
 
     if (NS_FAILED(rv)) {
         if (MOZ_LOG_TEST(gContentSinkLog, LogLevel::Error)) {
@@ -758,7 +758,6 @@ XULContentSinkImpl::OpenRoot(const char16_t** aAttributes,
     // containers will hook up to us as their parent.
     rv = mContextStack.Push(element, mState);
     if (NS_FAILED(rv)) {
-        element->Release();
         return rv;
     }
 
@@ -779,8 +778,8 @@ XULContentSinkImpl::OpenTag(const char16_t** aAttributes,
     nsresult rv;
 
     // Create the element
-    nsXULPrototypeElement* element;
-    rv = CreateElement(aNodeInfo, &element);
+    RefPtr<nsXULPrototypeElement> element;
+    rv = CreateElement(aNodeInfo, getter_AddRefs(element));
 
     if (NS_FAILED(rv)) {
         if (MOZ_LOG_TEST(gContentSinkLog, LogLevel::Error)) {
@@ -799,7 +798,6 @@ XULContentSinkImpl::OpenTag(const char16_t** aAttributes,
     nsPrototypeArray* children = nullptr;
     rv = mContextStack.GetTopChildren(&children);
     if (NS_FAILED(rv)) {
-        delete element;
         return rv;
     }
 
