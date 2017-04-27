@@ -355,9 +355,9 @@ nsHttpTransaction::Init(uint32_t caps,
         mRequestStream = headers;
 
     nsCOMPtr<nsIThrottledInputChannel> throttled = do_QueryInterface(mChannel);
-    nsIInputChannelThrottleQueue* queue;
+    nsCOMPtr<nsIInputChannelThrottleQueue> queue;
     if (throttled) {
-        rv = throttled->GetThrottleQueue(&queue);
+        rv = throttled->GetThrottleQueue(getter_AddRefs(queue));
         // In case of failure, just carry on without throttling.
         if (NS_SUCCEEDED(rv) && queue) {
             nsCOMPtr<nsIAsyncInputStream> wrappedStream;

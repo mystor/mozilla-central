@@ -3912,7 +3912,8 @@ HttpBaseChannel::SetThrottleQueue(nsIInputChannelThrottleQueue* aQueue)
 NS_IMETHODIMP
 HttpBaseChannel::GetThrottleQueue(nsIInputChannelThrottleQueue** aQueue)
 {
-  *aQueue = mThrottleQueue;
+  nsCOMPtr<nsIInputChannelThrottleQueue> queue = mThrottleQueue;
+  queue.forget(aQueue);
   return NS_OK;
 }
 
