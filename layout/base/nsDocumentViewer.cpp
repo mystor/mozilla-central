@@ -2106,10 +2106,9 @@ nsDocumentViewer::Show(void)
 
     nsCOMPtr<nsIBaseWindow> base_win(mContainer);
     if (base_win) {
-      base_win->GetParentWidget(&mParentWidget);
-      if (mParentWidget) {
-        mParentWidget->Release(); // GetParentWidget AddRefs, but mParentWidget is weak
-      }
+      nsCOMPtr<nsIWidget> parentWidget;
+      base_win->GetParentWidget(getter_AddRefs(parentWidget));
+      mParentWidget = parentWidget; // Only hold a weak reference to the parent widget.
     }
 
     nsView* containerView = FindContainerView();

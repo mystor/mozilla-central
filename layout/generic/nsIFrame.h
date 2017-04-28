@@ -2827,7 +2827,7 @@ public:
    * If the result is true, aLayerResult will be filled in with the
    * transform layer for the frame.
    */
-  bool TryUpdateTransformOnly(Layer** aLayerResult);
+  bool TryUpdateTransformOnly(Layer** MOZ_DOES_NOT_ADDREF aLayerResult);
 
   /**
    * Checks if a frame has had InvalidateFrame() called on it since the

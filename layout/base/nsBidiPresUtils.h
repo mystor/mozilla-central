@@ -414,7 +414,7 @@ private:
    *          false if no potentially-bidi content is present.
    */
   static bool ChildListMayRequireBidi(nsIFrame*    aFirstChild,
-                                      nsIContent** aCurrContent);
+                                      nsIContent** MOZ_NON_OUTPARAM aCurrContent);
 
   /**
    * Position ruby content frames (ruby base/text frame).

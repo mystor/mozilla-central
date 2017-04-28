@@ -56,7 +56,7 @@ nsGenConList::DestroyNodesFor(nsIFrame* aFrame)
  * content), the frame's own element
  * @return -1 for ::before, +1 for ::after, and 0 otherwise.
  */
-inline int32_t PseudoCompareType(nsIFrame* aFrame, nsIContent** aContent)
+inline int32_t PseudoCompareType(nsIFrame* aFrame, nsIContent** MOZ_DOES_NOT_ADDREF aContent)
 {
   nsIAtom *pseudo = aFrame->StyleContext()->GetPseudo();
   if (pseudo == nsCSSPseudoElements::before) {

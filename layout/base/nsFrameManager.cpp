@@ -116,8 +116,8 @@ public:
   void  Clear();
 
 protected:
-  LinkedList<UndisplayedNode>* GetListFor(nsIContent** aParentContent);
-  LinkedList<UndisplayedNode>* GetOrCreateListFor(nsIContent** aParentContent);
+  LinkedList<UndisplayedNode>* GetListFor(nsIContent** MOZ_NON_OUTPARAM aParentContent);
+  LinkedList<UndisplayedNode>* GetOrCreateListFor(nsIContent** MOZ_NON_OUTPARAM aParentContent);
   void AppendNodeFor(UndisplayedNode* aNode, nsIContent* aParentContent);
   /**
    * Get the applicable parent for the map lookup. This is almost always the

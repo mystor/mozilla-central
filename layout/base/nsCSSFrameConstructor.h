@@ -322,7 +322,7 @@ public:
                       nsIContent*  aOldNextSibling,
                       RemoveFlags  aFlags,
                       bool*        aDidReconstruct,
-                      nsIContent** aDestroyedFramesFor = nullptr);
+                      nsIContent** MOZ_DOES_NOT_ADDREF aDestroyedFramesFor = nullptr);
 
   void CharacterDataChanged(nsIContent* aContent,
                             CharacterDataChangeInfo* aInfo);
@@ -361,7 +361,7 @@ public:
    * GetLastCapturedLayoutHistoryState().
    */
   void DestroyFramesFor(nsIContent*  aContent,
-                        nsIContent** aDestroyedFramesFor);
+                        nsIContent** MOZ_DOES_NOT_ADDREF aDestroyedFramesFor);
 
   // Request to create a continuing frame.  This method never returns null.
   nsIFrame* CreateContinuingFrame(nsPresContext*    aPresContext,
@@ -1797,7 +1797,7 @@ private:
   RecreateFramesForContent(nsIContent*  aContent,
                            bool         aAsyncInsert,
                            RemoveFlags  aFlags,
-                           nsIContent** aDestroyedFramesFor);
+                           nsIContent** MOZ_DOES_NOT_ADDREF aDestroyedFramesFor);
 
   // If removal of aFrame from the frame tree requires reconstruction of some
   // containing block (either of aFrame or of its parent) due to {ib} splits or
@@ -1811,7 +1811,7 @@ private:
   // content that was reframed.
   bool MaybeRecreateContainerForFrameRemoval(nsIFrame*    aFrame,
                                              RemoveFlags  aFlags,
-                                             nsIContent** aDestroyedFramesFor);
+                                             nsIContent** MOZ_DOES_NOT_ADDREF aDestroyedFramesFor);
 
   nsIFrame* CreateContinuingOuterTableFrame(nsIPresShell*     aPresShell,
                                             nsPresContext*    aPresContext,

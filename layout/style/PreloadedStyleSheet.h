@@ -39,7 +39,7 @@ public:
 
   // *aResult is not addrefed, since the PreloadedStyleSheet holds a strong
   // reference to the sheet.
-  nsresult GetSheet(StyleBackendType aType, StyleSheet** aResult);
+  nsresult GetSheet(StyleBackendType aType, StyleSheet** MOZ_DOES_NOT_ADDREF aResult);
 
   nsresult Preload();
   nsresult PreloadAsync(NotNull<dom::Promise*> aPromise);

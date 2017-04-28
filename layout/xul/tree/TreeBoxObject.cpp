@@ -534,9 +534,9 @@ TreeBoxObject::GetCellAt(JSContext* cx,
                          ErrorResult& aRv)
 {
   int32_t row;
-  nsITreeColumn* col;
+  nsCOMPtr<nsITreeColumn> col;
   nsAutoString childElt;
-  GetCellAt(x, y, &row, &col, childElt);
+  GetCellAt(x, y, &row, getter_AddRefs(col), childElt);
 
   JS::Rooted<JS::Value> v(cx);
 

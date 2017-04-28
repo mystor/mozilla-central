@@ -62,7 +62,7 @@ public:
     FontFaceSet* GetFontFaceSet() { return mFontFaceSet; }
 
     virtual nsresult CheckFontLoad(const gfxFontFaceSrc* aFontFaceSrc,
-                                   nsIPrincipal** aPrincipal,
+                                   nsIPrincipal** MOZ_DOES_NOT_ADDREF aPrincipal,
                                    bool* aBypassCache) override;
 
     virtual bool IsFontLoadAllowed(nsIURI* aFontLocation,

@@ -376,7 +376,7 @@ public:
 
   // if this returns false, no text-shadow was specified for the selection
   // and the *aShadow parameter was not modified.
-  bool GetSelectionShadow(nsCSSShadowArray** aShadow);
+  bool GetSelectionShadow(nsCSSShadowArray** MOZ_DOES_NOT_ADDREF aShadow);
 
   nsPresContext* PresContext() const { return mPresContext; }
 
@@ -6058,7 +6058,7 @@ nsTextFrame::GetSelectionTextColors(SelectionType aSelectionType,
 static bool GetSelectionTextShadow(nsIFrame* aFrame,
                                    SelectionType aSelectionType,
                                    nsTextPaintStyle& aTextPaintStyle,
-                                   nsCSSShadowArray** aShadow)
+                                   nsCSSShadowArray** MOZ_DOES_NOT_ADDREF aShadow)
 {
   switch (aSelectionType) {
     case SelectionType::eNormal:

@@ -541,7 +541,7 @@ public:
    * the frames are destroyed in the frame constructor.
    */
   virtual void DestroyFramesFor(nsIContent*  aContent,
-                                nsIContent** aDestroyedFramesFor) = 0;
+                                nsIContent** MOZ_DOES_NOT_ADDREF aDestroyedFramesFor) = 0;
   /**
    * Create new frames for aContent.  It will use the last captured layout
    * history state captured in the frame constructor to restore the state

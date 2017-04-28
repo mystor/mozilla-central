@@ -274,7 +274,7 @@ struct nsCSSRendering {
    * @return true if there is some meaningful background.
    */
   static bool FindBackground(nsIFrame* aForFrame,
-                             nsStyleContext** aBackgroundSC);
+                             nsStyleContext** MOZ_DOES_NOT_ADDREF aBackgroundSC);
 
   /**
    * As FindBackground, but the passed-in frame is known to be a root frame

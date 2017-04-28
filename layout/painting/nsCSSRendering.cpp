@@ -1319,7 +1319,7 @@ nsCSSRendering::FindRootFrameBackground(nsIFrame* aForFrame)
 
 inline bool
 FindElementBackground(nsIFrame* aForFrame, nsIFrame* aRootElementFrame,
-                      nsStyleContext** aBackgroundSC)
+                      nsStyleContext** MOZ_DOES_NOT_ADDREF aBackgroundSC)
 {
   if (aForFrame == aRootElementFrame) {
     // We must have propagated our background to the viewport or canvas. Abort.

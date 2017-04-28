@@ -184,7 +184,8 @@ protected:
   // well as the range start node and the node offset. Otherwise, get the frame
   // and offset for the range end in the last range instead.
   nsIFrame* GetFrameForFirstRangeStartOrLastRangeEnd(
-    nsDirection aDirection, int32_t* aOutOffset, nsINode** aOutNode = nullptr,
+    nsDirection aDirection, int32_t* aOutOffset,
+    nsINode** MOZ_DOES_NOT_ADDREF aOutNode = nullptr,
     int32_t* aOutNodeOffset = nullptr) const;
 
   nsresult DragCaretInternal(const nsPoint& aPoint);

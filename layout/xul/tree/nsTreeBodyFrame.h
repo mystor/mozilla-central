@@ -325,8 +325,9 @@ protected:
 
   // An internal hit test.  aX and aY are expected to be in twips in the
   // coordinate system of this frame.
-  void GetCellAt(nscoord aX, nscoord aY, int32_t* aRow, nsTreeColumn** aCol,
-                 nsICSSAnonBoxPseudo** aChildElt);
+  void GetCellAt(nscoord aX, nscoord aY, int32_t* aRow,
+                 nsTreeColumn** MOZ_DOES_NOT_ADDREF aCol,
+                 nsICSSAnonBoxPseudo** MOZ_DOES_NOT_ADDREF aChildElt);
 
   // Retrieve the area for the twisty for a cell.
   nsITheme* GetTwistyRect(int32_t aRowIndex,

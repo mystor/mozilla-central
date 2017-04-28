@@ -133,7 +133,7 @@ public:
   virtual void DoFlushPendingNotifications(mozilla::FlushType aType) override;
   virtual void DoFlushPendingNotifications(mozilla::ChangesToFlush aType) override;
   virtual void DestroyFramesFor(nsIContent*  aContent,
-                                nsIContent** aDestroyedFramesFor) override;
+                                nsIContent** MOZ_DOES_NOT_ADDREF aDestroyedFramesFor) override;
   virtual void CreateFramesFor(nsIContent* aContent) override;
 
   /**
