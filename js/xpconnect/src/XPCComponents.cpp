@@ -890,8 +890,8 @@ nsXPCComponents_ClassesByID::NewEnumerate(nsIXPConnectWrappedNative* wrapper,
     if (NS_FAILED(NS_GetComponentRegistrar(getter_AddRefs(compMgr))) || !compMgr)
         return NS_ERROR_UNEXPECTED;
 
-    nsISimpleEnumerator* e;
-    if (NS_FAILED(compMgr->EnumerateCIDs(&e)) || !e)
+    nsCOMPtr<nsISimpleEnumerator> e;
+    if (NS_FAILED(compMgr->EnumerateCIDs(getter_AddRefs(e))) || !e)
         return NS_ERROR_UNEXPECTED;
 
     bool hasMore;

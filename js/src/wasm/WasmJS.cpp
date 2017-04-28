@@ -519,7 +519,7 @@ WasmModuleObject::finalize(FreeOp* fop, JSObject* obj)
 }
 
 static bool
-IsModuleObject(JSObject* obj, Module** module)
+IsModuleObject(JSObject* obj, Module** MOZ_DOES_NOT_ADDREF module)
 {
     JSObject* unwrapped = CheckedUnwrap(obj);
     if (!unwrapped || !unwrapped->is<WasmModuleObject>())
@@ -530,7 +530,7 @@ IsModuleObject(JSObject* obj, Module** module)
 }
 
 static bool
-GetModuleArg(JSContext* cx, CallArgs args, const char* name, Module** module)
+GetModuleArg(JSContext* cx, CallArgs args, const char* name, Module** MOZ_DOES_NOT_ADDREF module)
 {
     if (!args.requireAtLeast(cx, name, 1))
         return false;

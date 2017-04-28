@@ -227,7 +227,7 @@ public:
     // get assigned to *sharedBuffer.  Otherwise null will be
     // assigned.
     static bool ReadableToJSVal(JSContext* cx, const nsAString& readable,
-                                nsStringBuffer** sharedBuffer,
+                                nsStringBuffer** MOZ_DOES_NOT_ADDREF sharedBuffer,
                                 JS::MutableHandleValue vp);
 
     // Convert the given stringbuffer/length pair to a jsval

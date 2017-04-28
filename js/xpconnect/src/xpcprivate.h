@@ -2177,7 +2177,8 @@ public:
 
     // Note - This return the XPCWrappedNative, rather than the native itself,
     // for the WN case. You probably want UnwrapReflectorToISupports.
-    static bool GetISupportsFromJSObject(JSObject* obj, nsISupports** iface);
+    static bool GetISupportsFromJSObject(JSObject* obj,
+                                         nsISupports** MOZ_DOES_NOT_ADDREF iface);
 
     /**
      * Convert a native array into a JS::Value.
