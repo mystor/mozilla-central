@@ -551,9 +551,15 @@ class Interface(object):
         return True
 
     def nativeType(self, calltype, const=False):
+        if calltype == 'in':
+            stars = '*'
+        elif calltype == 'out':
+            stars = '* *'
+        elif calltype == 'inout':
+            stars = '* * MOZ_NON_OUTPARAM '
         return "%s%s %s" % (const and 'const ' or '',
                             self.name,
-                            calltype != 'in' and '* *' or '*')
+                            stars)
 
     def __str__(self):
         l = ["interface %s\n" % self.name]
@@ -1023,8 +1029,13 @@ class Array(object):
         return self.type.isScriptable()
 
     def nativeType(self, calltype, const=False):
-        return "%s%s*" % (const and 'const ' or '',
-                          self.type.nativeType(calltype))
+        # Arrays can be mistaken as outparams. To clarify to the static
+        # analysis we add the MOZ_NON_OUTPARAM annotation when the type is not
+        # an outparam.
+        annot = ' MOZ_NON_OUTPARAM ' if calltype == 'in' else ''
+        return "%s%s*%s" % (const and 'const ' or '',
+                            self.type.nativeType(calltype),
+                            annot)
 
 
 class IDLParser(object):
