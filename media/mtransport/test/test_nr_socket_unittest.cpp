@@ -348,7 +348,7 @@ class TestNrSocketTest : public MtransportTest {
     return 0;
   }
 
-  int Accept_s(TestNrSocket *to, NrSocketBase **accepted_sock) {
+  int Accept_s(TestNrSocket *to, NrSocketBase** MOZ_DOES_NOT_ADDREF accepted_sock) {
     nr_socket *sock;
     nr_transport_addr source_address;
     int r = to->accept(&source_address, &sock);
@@ -362,7 +362,7 @@ class TestNrSocketTest : public MtransportTest {
 
   bool Connect(TestNrSocket *from,
                TestNrSocket *to,
-               NrSocketBase **accepted_sock) {
+               NrSocketBase ** MOZ_DOES_NOT_ADDREF accepted_sock) {
     int r;
     sts_->Dispatch(WrapRunnableRet(&r,
                                    this,
@@ -390,12 +390,10 @@ class TestNrSocketTest : public MtransportTest {
       return false;
     }
 
-    sts_->Dispatch(WrapRunnableRet(&r,
-                                   this,
-                                   &TestNrSocketTest::Accept_s,
-                                   to,
-                                   accepted_sock),
-                   NS_DISPATCH_SYNC);
+    sts_->Dispatch(NS_NewRunnableFunction([&] () {
+          r = Accept_s(to, accepted_sock);
+        }),
+      NS_DISPATCH_SYNC);
 
     if (r) {
       std::cerr << "Accept_s failed: " << r << std::endl;

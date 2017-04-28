@@ -287,7 +287,7 @@ class TestNrSocket : public NrSocketBase {
 
     bool is_port_mapping_stale(const PortMapping &port_mapping) const;
     bool allow_ingress(const nr_transport_addr &from,
-                       PortMapping **port_mapping_used) const;
+                       PortMapping ** MOZ_DOES_NOT_ADDREF port_mapping_used) const;
     void destroy_stale_port_mappings();
 
     static void socket_readable_callback(void *real_sock_v,
