@@ -310,7 +310,7 @@ private:
 
     nsresult Init();
     nsresult IssueLookup(nsHostRecord *);
-    bool     GetHostToLookup(nsHostRecord **m);
+    bool     GetHostToLookup(nsHostRecord ** MOZ_DOES_NOT_ADDREF m);
 
     enum LookupStatus {
       LOOKUP_OK,
@@ -318,7 +318,7 @@ private:
     };
 
     LookupStatus OnLookupComplete(nsHostRecord *, nsresult, mozilla::net::AddrInfo *);
-    void     DeQueue(PRCList &aQ, nsHostRecord **aResult);
+    void     DeQueue(PRCList &aQ, nsHostRecord ** MOZ_DOES_NOT_ADDREF aResult);
     void     ClearPendingQueue(PRCList *aPendingQueue);
     nsresult ConditionallyCreateThread(nsHostRecord *rec);
 

@@ -489,7 +489,9 @@ HostDB_InitEntry(PLDHashEntryHdr *entry,
                  const void *key)
 {
     nsHostDBEnt *he = static_cast<nsHostDBEnt *>(entry);
-    nsHostRecord::Create(static_cast<const nsHostKey *>(key), &he->rec);
+    RefPtr<nsHostRecord> record;
+    nsHostRecord::Create(static_cast<const nsHostKey *>(key), getter_AddRefs(record));
+    he->rec = record.forget().take(); // Will be freed in HostDB_ClearEntry
 }
 
 static const PLDHashTableOps gHostDB_ops =

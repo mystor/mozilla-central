@@ -130,7 +130,8 @@ NS_NewLocalFileOutputStream(nsIOutputStream **result,
 }
 
 nsresult
-net_EnsureIOService(nsIIOService **ios, nsCOMPtr<nsIIOService> &grip)
+net_EnsureIOService(nsIIOService ** MOZ_DOES_NOT_ADDREF ios,
+                    nsCOMPtr<nsIIOService> &grip)
 {
     nsresult rv = NS_OK;
     if (!*ios) {

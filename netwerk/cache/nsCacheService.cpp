@@ -1237,7 +1237,7 @@ nsCacheService::Shutdown()
         if (mOfflineDevice)
             mOfflineDevice->Shutdown();
 
-        NS_IF_RELEASE(mOfflineDevice);
+        mOfflineDevice = nullptr;
 
         for (auto iter = mCustomOfflineDevices.Iter();
              !iter.Done(); iter.Next()) {
@@ -1741,7 +1741,7 @@ nsCacheService::CreateOfflineDevice()
     nsresult rv = CreateCustomOfflineDevice(
         mObserver->OfflineCacheParentDirectory(),
         mObserver->OfflineCacheCapacity(),
-        &mOfflineDevice);
+        getter_AddRefs(mOfflineDevice));
     NS_ENSURE_SUCCESS(rv, rv);
 
     return NS_OK;
@@ -1856,12 +1856,12 @@ nsCacheService::CreateRequest(nsCacheSession *   session,
 class nsCacheListenerEvent : public Runnable
 {
 public:
-    nsCacheListenerEvent(nsICacheListener *listener,
-                         nsICacheEntryDescriptor *descriptor,
+    nsCacheListenerEvent(already_AddRefed<nsICacheListener> listener,
+                         already_AddRefed<nsICacheEntryDescriptor> descriptor,
                          nsCacheAccessMode accessGranted,
                          nsresult status)
-        : mListener(listener)      // transfers reference
-        , mDescriptor(descriptor)  // transfers reference (may be null)
+        : mListener(listener.take())      // transfers reference
+        , mDescriptor(descriptor.take())  // transfers reference (may be null)
         , mAccessGranted(accessGranted)
         , mStatus(status)
     {}
@@ -1889,19 +1889,20 @@ private:
 
 nsresult
 nsCacheService::NotifyListener(nsCacheRequest *          request,
-                               nsICacheEntryDescriptor * descriptor,
+                               already_AddRefed<nsICacheEntryDescriptor> descriptor,
                                nsCacheAccessMode         accessGranted,
                                nsresult                  status)
 {
     NS_ASSERTION(request->mThread, "no thread set in async request!");
 
     // Swap ownership, and release listener on target thread...
-    nsICacheListener *listener = request->mListener;
-    request->mListener = nullptr;
+    
+    nsCOMPtr<nsICacheListener> listener;
+    listener.swap(request->mListener);
 
     nsCOMPtr<nsIRunnable> ev =
-            new nsCacheListenerEvent(listener, descriptor,
-                                     accessGranted, status);
+        new nsCacheListenerEvent(listener.forget(), mozilla::Move(descriptor),
+                                 accessGranted, status);
     if (!ev) {
         // Better to leak listener and descriptor if we fail because we don't
         // want to destroy them inside the cache service lock or on potentially
@@ -1974,10 +1975,10 @@ nsCacheService::ProcessRequest(nsCacheRequest *           request,
         }
     }
 
-    nsICacheEntryDescriptor *descriptor = nullptr;
+    nsCOMPtr<nsICacheEntryDescriptor> descriptor;
     
     if (NS_SUCCEEDED(rv))
-        rv = entry->CreateDescriptor(request, accessGranted, &descriptor);
+        rv = entry->CreateDescriptor(request, accessGranted, getter_AddRefs(descriptor));
 
     // If doomedEntry is set, ActivatEntry() doomed an existing entry and
     // created a new one for that cache-key. However, any pending requests
@@ -2003,11 +2004,12 @@ nsCacheService::ProcessRequest(nsCacheRequest *           request,
             return rv;  // skip notifying listener, just return rv to caller
             
         // call listener to report error or descriptor
-        nsresult rv2 = NotifyListener(request, descriptor, accessGranted, rv);
+        nsresult rv2 = NotifyListener(request, descriptor.forget(), accessGranted, rv);
         if (NS_FAILED(rv2) && NS_SUCCEEDED(rv)) {
             rv = rv2;  // trigger delete request
         }
     } else {        // Synchronous
+        descriptor.forget(result);
         *result = descriptor;
     }
     return rv;
@@ -2860,13 +2862,13 @@ nsCacheService::ProcessPendingRequests(nsCacheEntry * entry)
                 // XXX if (newWriter)  NS_ASSERTION( accessGranted == request->AccessRequested(), "why not?");
 
                 // entry->CreateDescriptor dequeues request, and queues descriptor
-                nsICacheEntryDescriptor *descriptor = nullptr;
+                nsCOMPtr<nsICacheEntryDescriptor> descriptor = nullptr;
                 rv = entry->CreateDescriptor(request,
                                              accessGranted,
-                                             &descriptor);
+                                             getter_AddRefs(descriptor));
 
                 // post call to listener to report error or descriptor
-                rv = NotifyListener(request, descriptor, accessGranted, rv);
+                rv = NotifyListener(request, descriptor.forget(), accessGranted, rv);
                 delete request;
                 if (NS_FAILED(rv)) {
                     // XXX what to do?

@@ -241,7 +241,7 @@ protected:
      *        The proxy info list to be modified.  This is an inout param.
      */
     void ApplyFilters(nsIChannel *channel, const nsProtocolInfo &info,
-                                  nsIProxyInfo **proxyInfo);
+                                  nsIProxyInfo ** MOZ_NON_OUTPARAM proxyInfo);
 
     /**
      * This method is a simple wrapper around ApplyFilters that takes the

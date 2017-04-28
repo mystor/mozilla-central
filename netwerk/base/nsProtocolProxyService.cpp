@@ -1082,22 +1082,26 @@ nsProtocolProxyService::ProcessPACString(const nsCString &pacString,
 
     const char *proxies = pacString.get();
 
-    nsProxyInfo *pi = nullptr, *first = nullptr, *last = nullptr;
+    nsCOMPtr<nsProxyInfo> pi;
+    nsProxyInfo *first = nullptr, *last = nullptr;
     while (*proxies) {
-        proxies = ExtractProxyInfo(proxies, aResolveFlags, &pi);
+        proxies = ExtractProxyInfo(proxies, aResolveFlags, getter_AddRefs(pi));
         if (pi && (pi->mType == kProxyType_HTTPS) && !mProxyOverTLS) {
-            delete pi;
             pi = nullptr;
         }
 
         if (pi) {
+            // NOTE: This code does crazy stuff with lifetimes and I don't have
+            // the time or energy to rewrite it to use smart pointers correctly.
+            // At this point I just leave it to the existing code.
+            nsProxyInfo* pi_raw = pi.forget().take();
             if (last) {
                 NS_ASSERTION(last->mNext == nullptr, "leaking nsProxyInfo");
-                last->mNext = pi;
+                last->mNext = pi_raw;
             }
             else
-                first = pi;
-            last = pi;
+                first = pi_raw;
+            last = pi_raw;
         }
     }
     *result = first;

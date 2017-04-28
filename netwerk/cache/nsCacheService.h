@@ -286,7 +286,7 @@ private:
     // releases the descriptor on the request's thread.  If this method fails,
     // the descriptor is not released.
     nsresult         NotifyListener(nsCacheRequest *          request,
-                                    nsICacheEntryDescriptor * descriptor,
+                                    already_AddRefed<nsICacheEntryDescriptor> descriptor,
                                     nsCacheAccessMode         accessGranted,
                                     nsresult                  error);
 
@@ -346,7 +346,7 @@ private:
 
     nsMemoryCacheDevice *           mMemoryDevice;
     nsDiskCacheDevice *             mDiskDevice;
-    nsOfflineCacheDevice *          mOfflineDevice;
+    RefPtr<nsOfflineCacheDevice>    mOfflineDevice;
 
     nsRefPtrHashtable<nsStringHashKey, nsOfflineCacheDevice> mCustomOfflineDevices;
 
