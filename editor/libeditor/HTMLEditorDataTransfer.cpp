@@ -242,12 +242,12 @@ HTMLEditor::DoInsertHTMLWithContext(const nsAString& aInputString,
   bool doContinue = true;
 
   rv = DoContentFilterCallback(aFlavor, aSourceDoc, aDeleteSelection,
-                               (nsIDOMNode **)address_of(fragmentAsNode),
-                               (nsIDOMNode **)address_of(streamStartParent),
+                               getter_AddRefs(fragmentAsNode),
+                               getter_AddRefs(streamStartParent),
                                &streamStartOffset,
-                               (nsIDOMNode **)address_of(streamEndParent),
+                               getter_AddRefs(streamEndParent),
                                &streamEndOffset,
-                               (nsIDOMNode **)address_of(targetNode),
+                               getter_AddRefs(targetNode),
                                &targetOffset, &doContinue);
 
   NS_ENSURE_SUCCESS(rv, rv);
@@ -1714,7 +1714,7 @@ HTMLEditor::PasteAsPlaintextQuotation(int32_t aSelectionType)
       textDataObj->GetData(stuffToPaste);
       NS_ASSERTION(stuffToPaste.Length() <= (len/2), "Invalid length!");
       AutoEditBatch beginBatching(this);
-      rv = InsertAsPlaintextQuotation(stuffToPaste, true, 0);
+      rv = InsertAsPlaintextQuotation(stuffToPaste, true, nullptr);
     }
   }
 

@@ -1354,7 +1354,7 @@ TextEditor::PasteAsQuotation(int32_t aSelectionType)
         nsAutoString stuffToPaste;
         textDataObj->GetData ( stuffToPaste );
         AutoEditBatch beginBatching(this);
-        rv = InsertAsQuotation(stuffToPaste, 0);
+        rv = InsertAsQuotation(stuffToPaste, nullptr);
       }
     }
   }

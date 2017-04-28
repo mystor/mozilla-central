@@ -703,7 +703,7 @@ CSSEditUtils::ParseLength(const nsAString& aString,
 
 void
 CSSEditUtils::GetCSSPropertyAtom(nsCSSEditableProperty aProperty,
-                                 nsIAtom** aAtom)
+                                 nsIAtom** MOZ_DOES_NOT_ADDREF aAtom)
 {
   *aAtom = nullptr;
   switch (aProperty) {
