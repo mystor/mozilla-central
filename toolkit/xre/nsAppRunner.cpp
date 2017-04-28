@@ -1407,8 +1407,7 @@ bool gLogConsoleErrors = false;
 class ScopedXPCOMStartup
 {
 public:
-  ScopedXPCOMStartup() :
-    mServiceManager(nullptr) { }
+  ScopedXPCOMStartup() { }
   ~ScopedXPCOMStartup();
 
   nsresult Initialize();
@@ -1417,7 +1416,7 @@ public:
   static nsresult CreateAppSupport(nsISupports* aOuter, REFNSIID aIID, void** aResult);
 
 private:
-  nsIServiceManager* mServiceManager;
+  nsCOMPtr<nsIServiceManager> mServiceManager;
   static nsINativeAppSupport* gNativeAppSupport;
 };
 
@@ -1441,8 +1440,8 @@ ScopedXPCOMStartup::~ScopedXPCOMStartup()
 
     WriteConsoleLog();
 
-    NS_ShutdownXPCOM(mServiceManager);
-    mServiceManager = nullptr;
+    // NOTE: NS_ShutdownXPCOM will release our mServiceManager for us.
+    NS_ShutdownXPCOM(mServiceManager.forget().take());
   }
 }
 
@@ -1501,7 +1500,7 @@ ScopedXPCOMStartup::Initialize()
 
   nsresult rv;
 
-  rv = NS_InitXPCOM2(&mServiceManager, gDirServiceProvider->GetAppDir(),
+  rv = NS_InitXPCOM2(getter_AddRefs(mServiceManager), gDirServiceProvider->GetAppDir(),
                      gDirServiceProvider);
   if (NS_FAILED(rv)) {
     NS_ERROR("Couldn't start xpcom!");
@@ -2439,11 +2438,14 @@ SelectProfile(nsIProfileLock* *aResult, nsIToolkitProfileService* aProfileSvc, n
       if (gDoProfileReset) {
         {
           // Check that the source profile is not in use by temporarily acquiring its lock.
-          nsIProfileLock* tempProfileLock;
+          nsCOMPtr<nsIProfileLock> tempProfileLock;
           nsCOMPtr<nsIProfileUnlocker> unlocker;
-          rv = profile->Lock(getter_AddRefs(unlocker), &tempProfileLock);
+
+          // REVIEWER-NOTE: I think we were just holding this lock forever? I don't see
+          // any way that this lock would ever be released.
+          rv = profile->Lock(getter_AddRefs(unlocker), getter_AddRefs(tempProfileLock));
           if (NS_FAILED(rv))
-            return ProfileLockedDialog(profile, unlocker, aNative, &tempProfileLock);
+            return ProfileLockedDialog(profile, unlocker, aNative, getter_AddRefs(tempProfileLock));
         }
 
         nsresult gotName = profile->GetName(gResetOldProfileName);
@@ -2548,11 +2550,14 @@ SelectProfile(nsIProfileLock* *aResult, nsIToolkitProfileService* aProfileSvc, n
       if (gDoProfileReset) {
         {
           // Check that the source profile is not in use by temporarily acquiring its lock.
-          nsIProfileLock* tempProfileLock;
+          nsCOMPtr<nsIProfileLock> tempProfileLock;
           nsCOMPtr<nsIProfileUnlocker> unlocker;
-          rv = profile->Lock(getter_AddRefs(unlocker), &tempProfileLock);
+
+          // REVIEWER-NOTE: I think we were just holding this lock forever? I don't see
+          // any way that this lock would ever be released.
+          rv = profile->Lock(getter_AddRefs(unlocker), getter_AddRefs(tempProfileLock));
           if (NS_FAILED(rv))
-            return ProfileLockedDialog(profile, unlocker, aNative, &tempProfileLock);
+            return ProfileLockedDialog(profile, unlocker, aNative, getter_AddRefs(tempProfileLock));
         }
 
         nsresult gotName = profile->GetName(gResetOldProfileName);

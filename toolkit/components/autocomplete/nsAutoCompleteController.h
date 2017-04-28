@@ -62,7 +62,8 @@ protected:
   nsresult CompleteDefaultIndex(int32_t aResultIndex);
   nsresult CompleteValue(nsString &aValue);
 
-  nsresult GetResultAt(int32_t aIndex, nsIAutoCompleteResult** aResult,
+  nsresult GetResultAt(int32_t aIndex,
+                       nsIAutoCompleteResult** MOZ_DOES_NOT_ADDREF aResult,
                        int32_t* aRowIndex);
   nsresult GetResultValueAt(int32_t aIndex, bool aGetFinalValue,
                             nsAString & _retval);
@@ -85,7 +86,7 @@ protected:
    *        The defaultIndex relative to _result.
    */
   nsresult GetDefaultCompleteResult(int32_t aResultIndex,
-                                    nsIAutoCompleteResult** _result,
+                                    nsIAutoCompleteResult** MOZ_DOES_NOT_ADDREF _result,
                                     int32_t* _defaultIndex);
 
   /**

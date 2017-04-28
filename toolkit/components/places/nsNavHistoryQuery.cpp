@@ -1502,9 +1502,9 @@ nsNavHistoryQueryOptions::SetAsyncEnabled(bool aAsyncEnabled)
 NS_IMETHODIMP
 nsNavHistoryQueryOptions::Clone(nsINavHistoryQueryOptions** aResult)
 {
-  nsNavHistoryQueryOptions *clone = nullptr;
-  nsresult rv = Clone(&clone);
-  *aResult = clone;
+  RefPtr<nsNavHistoryQueryOptions> clone;
+  nsresult rv = Clone(getter_AddRefs(clone));
+  clone.forget(aResult);
   return rv;
 }
 

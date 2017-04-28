@@ -34,8 +34,8 @@ nsCommandHandler::GetCommandHandler(nsICommandHandler** aCommandHandler)
 
   nsCOMPtr<nsIDocShellTreeItem> docShellAsTreeItem =
     do_QueryInterface(mWindow->GetDocShell());
-  nsIDocShellTreeOwner* treeOwner = nullptr;
-  docShellAsTreeItem->GetTreeOwner(&treeOwner);
+  nsCOMPtr<nsIDocShellTreeOwner> treeOwner;
+  docShellAsTreeItem->GetTreeOwner(getter_AddRefs(treeOwner));
 
   // Make sure the tree owner is an an nsDocShellTreeOwner object
   // by QI'ing for a hidden interface. If it doesn't have the interface
@@ -43,16 +43,13 @@ nsCommandHandler::GetCommandHandler(nsICommandHandler** aCommandHandler)
 
   nsCOMPtr<nsICDocShellTreeOwner> realTreeOwner(do_QueryInterface(treeOwner));
   if (realTreeOwner) {
-    nsDocShellTreeOwner* tree = static_cast<nsDocShellTreeOwner*>(treeOwner);
+    nsDocShellTreeOwner* tree = static_cast<nsDocShellTreeOwner*>(treeOwner.get());
     if (tree->mTreeOwner) {
       nsresult rv;
       rv = tree->mTreeOwner->QueryInterface(NS_GET_IID(nsICommandHandler),
                                             (void**)aCommandHandler);
-      NS_RELEASE(treeOwner);
       return rv;
     }
-
-    NS_RELEASE(treeOwner);
   }
 
   *aCommandHandler = nullptr;
