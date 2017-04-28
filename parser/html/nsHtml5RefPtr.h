@@ -263,7 +263,7 @@ address_of( const nsHtml5RefPtr<T>& aPtr )
   }
 
 template <class T>
-class nsHtml5RefPtrGetterAddRefs
+class MOZ_GETTER_ADDREFS_TYPE nsHtml5RefPtrGetterAddRefs
     /*
       ...
 

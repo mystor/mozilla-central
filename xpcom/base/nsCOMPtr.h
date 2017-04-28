@@ -1233,7 +1233,7 @@ address_of(const nsCOMPtr<T>& aPtr)
  * This type should be a nested class inside |nsCOMPtr<T>|.
  */
 template<class T>
-class nsGetterAddRefs
+class MOZ_GETTER_ADDREFS_TYPE nsGetterAddRefs
 {
 public:
   explicit nsGetterAddRefs(nsCOMPtr<T>& aSmartPtr)
@@ -1269,7 +1269,7 @@ private:
 
 
 template<>
-class nsGetterAddRefs<nsISupports>
+class MOZ_GETTER_ADDREFS_TYPE nsGetterAddRefs<nsISupports>
 {
 public:
   explicit nsGetterAddRefs(nsCOMPtr<nsISupports>& aSmartPtr)

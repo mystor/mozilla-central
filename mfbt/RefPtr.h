@@ -445,7 +445,7 @@ address_of(const RefPtr<T>& aPtr)
 }
 
 template <class T>
-class RefPtrGetterAddRefs
+class MOZ_GETTER_ADDREFS_TYPE RefPtrGetterAddRefs
 /*
   ...
 
