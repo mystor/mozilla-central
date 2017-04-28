@@ -2072,7 +2072,7 @@ imgLoader::LoadImageXPCOM(nsIURI* aURI,
     if (!aContentPolicyType) {
       aContentPolicyType = nsIContentPolicy::TYPE_INTERNAL_IMAGE;
     }
-    imgRequestProxy* proxy;
+    RefPtr<imgRequestProxy> proxy;
     ReferrerPolicy refpol = ReferrerPolicyFromString(aReferrerPolicy);
     nsCOMPtr<nsINode> node = do_QueryInterface(aCX);
     nsCOMPtr<nsIDocument> doc = do_QueryInterface(aCX);
@@ -2089,8 +2089,8 @@ imgLoader::LoadImageXPCOM(nsIURI* aURI,
                             aCacheKey,
                             aContentPolicyType,
                             EmptyString(),
-                            &proxy);
-    *_retval = proxy;
+                            getter_AddRefs(proxy));
+    proxy.forget(_retval);
     return rv;
 }
 
@@ -2384,13 +2384,13 @@ imgLoader::LoadImageWithChannelXPCOM(nsIChannel* channel,
                                      imgIRequest** _retval)
 {
     nsresult result;
-    imgRequestProxy* proxy;
+    RefPtr<imgRequestProxy> proxy;
     result = LoadImageWithChannel(channel,
                                   aObserver,
                                   aCX,
                                   listener,
-                                  &proxy);
-    *_retval = proxy;
+                                  getter_AddRefs(proxy));
+    proxy.forget(_retval);
     return result;
 }
 

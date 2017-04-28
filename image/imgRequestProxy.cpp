@@ -626,9 +626,9 @@ imgRequestProxy::Clone(imgINotificationObserver* aObserver,
                        imgIRequest** aClone)
 {
   nsresult result;
-  imgRequestProxy* proxy;
-  result = Clone(aObserver, &proxy);
-  *aClone = proxy;
+  RefPtr<imgRequestProxy> proxy;
+  result = Clone(aObserver, getter_AddRefs(proxy));
+  proxy.forget(aClone);
   return result;
 }
 
@@ -918,9 +918,9 @@ imgRequestProxy::NullOutListener()
 NS_IMETHODIMP
 imgRequestProxy::GetStaticRequest(imgIRequest** aReturn)
 {
-  imgRequestProxy* proxy;
-  nsresult result = GetStaticRequest(&proxy);
-  *aReturn = proxy;
+  RefPtr<imgRequestProxy> proxy;
+  nsresult result = GetStaticRequest(getter_AddRefs(proxy));
+  proxy.forget(aReturn);
   return result;
 }
 
