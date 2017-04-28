@@ -195,7 +195,7 @@ public:
    * instead.
    */
   static nsresult OpenTempFile(const nsACString& aFilename,
-                               nsIFile** aFile,
+                               nsIFile** MOZ_NON_OUTPARAM aFile,
                                const nsACString& aFoldername = EmptyCString(),
                                Mode aMode = CREATE_UNIQUE);
 };

@@ -85,7 +85,7 @@ class ScopedXPCOM : public nsIDirectoryServiceProvider2
       mTestName = testName;
       printf("Running %s tests...\n", mTestName);
 
-      nsresult rv = NS_InitXPCOM2(&mServMgr, nullptr, this);
+      nsresult rv = NS_InitXPCOM2(getter_AddRefs(mServMgr), nullptr, this);
       if (NS_FAILED(rv))
       {
         fail("NS_InitXPCOM2 returned failure code 0x%x", rv);
@@ -110,13 +110,12 @@ class ScopedXPCOM : public nsIDirectoryServiceProvider2
         if (NS_FAILED(mProfD->Remove(true))) {
           NS_WARNING("Problem removing profile directory");
         }
-
         mProfD = nullptr;
       }
 
       if (mServMgr)
       {
-        NS_RELEASE(mServMgr);
+        mServMgr = nullptr;
         nsresult rv = NS_ShutdownXPCOM(nullptr);
         if (NS_FAILED(rv))
         {
@@ -264,7 +263,7 @@ class ScopedXPCOM : public nsIDirectoryServiceProvider2
 
   private:
     const char* mTestName;
-    nsIServiceManager* mServMgr;
+    nsCOMPtr<nsIServiceManager> mServMgr;
     nsCOMPtr<nsIDirectoryServiceProvider> mDirSvcProvider;
     nsCOMPtr<nsIFile> mProfD;
     nsCOMPtr<nsIFile> mGRED;

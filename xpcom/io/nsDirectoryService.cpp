@@ -330,8 +330,10 @@ FindProviderFile(nsIDirectoryServiceProvider* aElement, FileData* aData)
       }
     }
   } else {
+    nsCOMPtr<nsIFile> fileData;
     rv = aElement->GetFile(aData->property, &aData->persistent,
-                           (nsIFile**)&aData->data);
+                           getter_AddRefs(fileData));
+    aData->data = fileData.forget();
     if (NS_SUCCEEDED(rv) && aData->data) {
       return false;
     }

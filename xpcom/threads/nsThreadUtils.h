@@ -190,17 +190,17 @@ extern bool NS_IsInCompositorThread();
 inline already_AddRefed<nsIThread>
 do_GetCurrentThread()
 {
-  nsIThread* thread = nullptr;
-  NS_GetCurrentThread(&thread);
-  return already_AddRefed<nsIThread>(thread);
+  nsCOMPtr<nsIThread> thread;
+  NS_GetCurrentThread(getter_AddRefs(thread));
+  return thread.forget();
 }
 
 inline already_AddRefed<nsIThread>
 do_GetMainThread()
 {
-  nsIThread* thread = nullptr;
-  NS_GetMainThread(&thread);
-  return already_AddRefed<nsIThread>(thread);
+  nsCOMPtr<nsIThread> thread;
+  NS_GetMainThread(getter_AddRefs(thread));
+  return thread.forget();
 }
 
 //-----------------------------------------------------------------------------

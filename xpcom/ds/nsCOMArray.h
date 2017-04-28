@@ -108,7 +108,7 @@ protected:
     mArray.SwapElements(aOther.mArray);
   }
 
-  void Adopt(nsISupports** aElements, uint32_t aCount);
+  void Adopt(nsISupports** MOZ_NON_OUTPARAM aElements, uint32_t aCount);
   uint32_t Forget(nsISupports*** aElements);
 public:
   // elements in the array (including null elements!)

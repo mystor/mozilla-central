@@ -1645,8 +1645,10 @@ private:
     // wouldn't work.
     nsIFile* logFile = nullptr;
     if (char* env = PR_GetEnv("MOZ_CC_LOG_DIRECTORY")) {
+      nsCOMPtr<nsIFile> ownedLogFile;
       NS_NewNativeLocalFile(nsCString(env), /* followLinks = */ true,
-                            &logFile);
+                            getter_AddRefs(ownedLogFile));
+      logFile = ownedLogFile.forget().take();
     }
 
     // On Android or B2G, this function will open a file named

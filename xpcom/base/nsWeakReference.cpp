@@ -87,18 +87,18 @@ nsQueryReferent::operator()(const nsIID& aIID, void** aAnswer) const
   return status;
 }
 
-nsIWeakReference*  // or else |already_AddRefed<nsIWeakReference>|
+already_AddRefed<nsIWeakReference>
 NS_GetWeakReference(nsISupports* aInstancePtr, nsresult* aErrorPtr)
 {
   nsresult status;
 
-  nsIWeakReference* result = nullptr;
+  nsCOMPtr<nsIWeakReference> result = nullptr;
 
   if (aInstancePtr) {
     nsCOMPtr<nsISupportsWeakReference> factoryPtr =
       do_QueryInterface(aInstancePtr, &status);
     if (factoryPtr) {
-      status = factoryPtr->GetWeakReference(&result);
+      status = factoryPtr->GetWeakReference(getter_AddRefs(result));
     }
     // else, |status| has already been set by |do_QueryInterface|
   } else {
@@ -108,7 +108,7 @@ NS_GetWeakReference(nsISupports* aInstancePtr, nsresult* aErrorPtr)
   if (aErrorPtr) {
     *aErrorPtr = status;
   }
-  return result;
+  return result.forget();
 }
 
 nsresult

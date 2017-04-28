@@ -172,7 +172,7 @@ typedef nsISupports nsISomeInterface;
  */
 XPCOM_API(nsresult)
 NS_GetXPTCallStub(REFNSIID aIID, nsIXPTCProxy* aOuter,
-                  nsISomeInterface* *aStub);
+                  nsISomeInterface* * MOZ_DOES_NOT_ADDREF aStub);
 
 /**
  * Destroys an XPTCall stub previously created with NS_GetXPTCallStub.

@@ -8,6 +8,7 @@
 #define nsMemory_h__
 
 #include "nsXPCOM.h"
+#include "mozilla/AlreadyAddRefed.h"
 
 class nsIMemory;
 
@@ -35,7 +36,7 @@ class nsMemory
 public:
   static nsresult   HeapMinimize(bool aImmediate);
   static void*      Clone(const void* aPtr, size_t aSize);
-  static nsIMemory* GetGlobalMemoryService();       // AddRefs
+  static already_AddRefed<nsIMemory> GetGlobalMemoryService();
 };
 
 /**

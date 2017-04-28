@@ -1957,16 +1957,17 @@ NS_NewPipe(nsIInputStream** aPipeIn,
     segmentCount = aMaxSize / aSegmentSize;
   }
 
-  nsIAsyncInputStream* in;
-  nsIAsyncOutputStream* out;
-  nsresult rv = NS_NewPipe2(&in, &out, aNonBlockingInput, aNonBlockingOutput,
+  nsCOMPtr<nsIAsyncInputStream> in;
+  nsCOMPtr<nsIAsyncOutputStream> out;
+  nsresult rv = NS_NewPipe2(getter_AddRefs(in), getter_AddRefs(out),
+                            aNonBlockingInput, aNonBlockingOutput,
                             aSegmentSize, segmentCount);
   if (NS_FAILED(rv)) {
     return rv;
   }
 
-  *aPipeIn = in;
-  *aPipeOut = out;
+  in.forget(aPipeIn);
+  out.forget(aPipeOut);
   return NS_OK;
 }
 

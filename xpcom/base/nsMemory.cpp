@@ -37,16 +37,16 @@ nsMemory::Clone(const void* aPtr, size_t aSize)
   return newPtr;
 }
 
-nsIMemory*
+already_AddRefed<nsIMemory>
 nsMemory::GetGlobalMemoryService()
 {
-  nsIMemory* mem;
-  nsresult rv = NS_GetMemoryManager(&mem);
+  nsCOMPtr<nsIMemory> mem;
+  nsresult rv = NS_GetMemoryManager(getter_AddRefs(mem));
   if (NS_FAILED(rv)) {
     return nullptr;
   }
 
-  return mem;
+  return mem.forget();
 }
 
 //----------------------------------------------------------------------

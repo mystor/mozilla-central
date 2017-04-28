@@ -19,18 +19,18 @@ class nsTArrayElementTraits<nsISupports*>
   typedef nsISupports* E;
 public:
   // Zero out the value
-  static inline void Construct(E* aE)
+  static inline void Construct(E* MOZ_NON_OUTPARAM aE)
   {
     new (mozilla::KnownNotNull, static_cast<void*>(aE)) E();
   }
   // Invoke the copy-constructor in place.
   template<class A>
-  static inline void Construct(E* aE, const A& aArg)
+  static inline void Construct(E* MOZ_NON_OUTPARAM aE, const A& aArg)
   {
     new (mozilla::KnownNotNull, static_cast<void*>(aE)) E(aArg);
   }
   // Invoke the destructor in place.
-  static inline void Destruct(E* aE)
+  static inline void Destruct(E* MOZ_NON_OUTPARAM aE)
   {
     aE->~E();
   }

@@ -120,9 +120,9 @@ protected:
   // Helper
   already_AddRefed<nsIThreadObserver> GetObserver()
   {
-    nsIThreadObserver* obs;
-    nsThread::GetObserver(&obs);
-    return already_AddRefed<nsIThreadObserver>(obs);
+    nsCOMPtr<nsIThreadObserver> obs;
+    nsThread::GetObserver(getter_AddRefs(obs));
+    return obs.forget();
   }
 
   // Wrappers for event queue methods:
