@@ -488,7 +488,7 @@ class nsHtml5TreeOperation {
     }
 
     nsresult Perform(nsHtml5TreeOpExecutor* aBuilder,
-                     nsIContent** aScriptElement,
+                     nsIContent** MOZ_DOES_NOT_ADDREF aScriptElement,
                      bool* aInterrupted);
 
   private:

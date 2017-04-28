@@ -656,7 +656,7 @@ nsHtml5Highlighter::AllocateContentHandle()
 nsIContent**
 nsHtml5Highlighter::CreateElement(nsIAtom* aName,
                                   nsHtml5HtmlAttributes* aAttributes,
-                                  nsIContent** aIntendedParent)
+                                  nsIContentHandle* aIntendedParent)
 {
   NS_PRECONDITION(aName, "Got null name.");
   nsIContent** content = AllocateContentHandle();

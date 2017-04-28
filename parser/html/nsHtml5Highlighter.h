@@ -231,7 +231,7 @@ class nsHtml5Highlighter
      */
     nsIContent** CreateElement(nsIAtom* aName,
                                nsHtml5HtmlAttributes* aAttributes,
-                               nsIContent** aIntendedParent);
+                               nsIContentHandle* aIntendedParent);
 
     /**
      * Gets the handle for the current node. May be called only after the
