@@ -885,15 +885,14 @@ nsresult nsExternalHelperAppService::GetFileTokenForPath(const char16_t * aPlatf
 {
   nsDependentString platformAppPath(aPlatformAppPath);
   // First, check if we have an absolute path
-  nsIFile* localFile = nullptr;
-  nsresult rv = NS_NewLocalFile(platformAppPath, true, &localFile);
+  nsCOMPtr<nsIFile> localFile;
+  nsresult rv = NS_NewLocalFile(platformAppPath, true, getter_AddRefs(localFile));
   if (NS_SUCCEEDED(rv)) {
-    *aFile = localFile;
     bool exists;
-    if (NS_FAILED((*aFile)->Exists(&exists)) || !exists) {
-      NS_RELEASE(*aFile);
+    if (NS_FAILED(localFile->Exists(&exists)) || !exists) {
       return NS_ERROR_FILE_NOT_FOUND;
     }
+    localFile.forget(aFile);
     return NS_OK;
   }
 

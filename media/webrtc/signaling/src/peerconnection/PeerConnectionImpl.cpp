@@ -1344,12 +1344,12 @@ PeerConnectionImpl::CreateDataChannel(const nsAString& aLabel,
     mHaveDataStream = true;
     OnNegotiationNeeded();
   }
-  nsIDOMDataChannel *retval;
-  rv = NS_NewDOMDataChannel(dataChannel.forget(), mWindow, &retval);
+  nsCOMPtr<nsIDOMDataChannel> retval;
+  rv = NS_NewDOMDataChannel(dataChannel.forget(), mWindow, getter_AddRefs(retval));
   if (NS_FAILED(rv)) {
     return rv;
   }
-  *aRetval = static_cast<nsDOMDataChannel*>(retval);
+  *aRetval = retval.forget().downcast<nsDOMDataChannel>().take();
   return NS_OK;
 }
 

@@ -106,7 +106,7 @@ protected:
                     mozilla::CSSIntPoint aScreenPosition,
                     mozilla::LayoutDeviceIntRect* aScreenDragRect,
                     RefPtr<SourceSurface>* aSurface,
-                    nsPresContext **aPresContext);
+                    nsPresContext ** MOZ_DOES_NOT_ADDREF aPresContext);
 
   /**
    * Draw a drag image for an image node specified by aImageLoader or aCanvas.

@@ -1026,11 +1026,11 @@ nsDocShell::GetInterface(const nsIID& aIID, void** aSink)
 
     // Get the an auth prompter for our window so that the parenting
     // of the dialogs works as it should when using tabs.
-    nsIPrompt* prompt;
-    rv = wwatch->GetNewPrompter(mScriptGlobal->AsOuter(), &prompt);
+    nsCOMPtr<nsIPrompt> prompt;
+    rv = wwatch->GetNewPrompter(mScriptGlobal->AsOuter(), getter_AddRefs(prompt));
     NS_ENSURE_SUCCESS(rv, rv);
 
-    *aSink = prompt;
+    prompt.forget(aSink);
     return NS_OK;
   } else if (aIID.Equals(NS_GET_IID(nsIAuthPrompt)) ||
              aIID.Equals(NS_GET_IID(nsIAuthPrompt2))) {

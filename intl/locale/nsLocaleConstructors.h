@@ -24,11 +24,10 @@ ctor_(nsISupports* aOuter, REFNSIID aIID, void** aResult) \
   *aResult = nullptr;                                      \
   if (aOuter)                                             \
     return NS_ERROR_NO_AGGREGATION;                       \
-  iface_* inst;                                           \
-  nsresult rv = func_(&inst);                             \
+  nsCOMPtr<iface_> inst;                                  \
+  nsresult rv = func_(getter_AddRefs(inst));              \
   if (NS_SUCCEEDED(rv)) {                                 \
     rv = inst->QueryInterface(aIID, aResult);             \
-    NS_RELEASE(inst);                                     \
   }                                                       \
   return rv;                                              \
 }

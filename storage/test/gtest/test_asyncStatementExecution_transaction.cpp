@@ -42,7 +42,7 @@ int commit_hook(void *aArg)
  */
 void
 check_transaction(mozIStorageConnection *aDB,
-                  mozIStorageBaseStatement **aStmts,
+                  mozIStorageBaseStatement ** MOZ_NON_OUTPARAM aStmts,
                   uint32_t aStmtsLen,
                   bool aTransactionExpected)
 {
