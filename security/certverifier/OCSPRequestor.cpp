@@ -27,19 +27,9 @@ ReleaseHttpServerSession(nsNSSHttpServerSession* httpServerSession)
   delete httpServerSession;
 }
 
-void
-ReleaseHttpRequestSession(nsNSSHttpRequestSession* httpRequestSession)
-{
-  httpRequestSession->Release();
-}
-
 MOZ_TYPE_SPECIFIC_UNIQUE_PTR_TEMPLATE(UniqueHTTPServerSession,
                                       nsNSSHttpServerSession,
                                       ReleaseHttpServerSession)
-
-MOZ_TYPE_SPECIFIC_UNIQUE_PTR_TEMPLATE(UniqueHTTPRequestSession,
-                                      nsNSSHttpRequestSession,
-                                      ReleaseHttpRequestSession)
 
 } // namespace mozilla
 
@@ -172,15 +162,13 @@ DoOCSPRequest(const UniquePLArenaPool& arena, const char* url,
     }
   }
 
-  nsNSSHttpRequestSession* requestSessionPtr;
+  RefPtr<nsNSSHttpRequestSession> requestSession;
   rv = nsNSSHttpInterface::createFcn(serverSession.get(), "http", path.get(),
                                      method.get(), originAttributes, timeout,
-                                     &requestSessionPtr);
+                                     getter_AddRefs(requestSession));
   if (rv != Success) {
     return rv;
   }
-
-  UniqueHTTPRequestSession requestSession(requestSessionPtr);
 
   if (!useGET) {
     rv = nsNSSHttpInterface::setPostDataFcn(

@@ -2292,9 +2292,9 @@ PipUIContext::GetInterface(const nsIID& uuid, void** result)
   if (!uuid.Equals(NS_GET_IID(nsIPrompt)))
     return NS_ERROR_NO_INTERFACE;
 
-  nsIPrompt* prompt = nullptr;
-  nsresult rv = nsNSSComponent::GetNewPrompter(&prompt);
-  *result = prompt;
+  nsCOMPtr<nsIPrompt> prompt;
+  nsresult rv = nsNSSComponent::GetNewPrompter(getter_AddRefs(prompt));
+  prompt.forget(result);
   return rv;
 }
 
