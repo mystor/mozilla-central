@@ -12,6 +12,7 @@ SOURCES += [
     'TestBadImplicitConversionCtor.cpp',
     'TestCustomHeap.cpp',
     'TestExplicitOperatorBool.cpp',
+    'TestGetterAddrefs.cpp',
     'TestGlobalClass.cpp',
     'TestHeapClass.cpp',
     'TestInheritTypeAnnotationsFromTemplateArgs.cpp',

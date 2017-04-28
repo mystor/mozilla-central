@@ -522,6 +522,14 @@
  * MOZ_MAY_CALL_AFTER_MUST_RETURN: Applies to function or method declarations.
  *   Calls to these methods may be made in functions after calls a
  *   MOZ_MUST_RETURN_FROM_CALLER function or method.
+ * MOZ_GETTER_ADDREFS_TYPE: Applies to class definitions. Classes with this
+ *   annotation may have the results of their method calls passed to refcounted
+ *   outparam types.
+ * MOZ_NON_OUTPARAM: Applies to paramater declarations. Parameters with this
+ *   annotation will not be treated as outparameters for the purpose of the
+ *   GetterAddrefs analysis.
+ * MOZ_DOES_NOT_ADDREF: Applies to paramater declarations. Parameters with this
+ *   annotation do not addref their outparameter before setting it.
  */
 #ifdef MOZ_CLANG_PLUGIN
 #  define MOZ_MUST_OVERRIDE __attribute__((annotate("moz_must_override")))
@@ -563,6 +571,9 @@
     __attribute__((annotate("moz_must_return_from_caller")))
 #  define MOZ_MAY_CALL_AFTER_MUST_RETURN \
     __attribute__((annotate("moz_may_call_after_must_return")))
+#  define MOZ_GETTER_ADDREFS_TYPE __attribute__((annotate("moz_getter_addrefs_type")))
+#  define MOZ_NON_OUTPARAM __attribute__((annotate("moz_non_outparam")))
+#  define MOZ_DOES_NOT_ADDREF __attribute__((annotate("moz_does_not_addref")))
 /*
  * It turns out that clang doesn't like void func() __attribute__ {} without a
  * warning, so use pragmas to disable the warning. This code won't work on GCC
@@ -601,6 +612,9 @@
 #  define MOZ_REQUIRED_BASE_METHOD /* nothing */
 #  define MOZ_MUST_RETURN_FROM_CALLER /* nothing */
 #  define MOZ_MAY_CALL_AFTER_MUST_RETURN /* nothing */
+#  define MOZ_GETTER_ADDREFS_TYPE /* nothing */
+#  define MOZ_NON_OUTPARAM /* nothing */
+#  define MOZ_DOES_NOT_ADDREF /* nothing */
 #endif /* MOZ_CLANG_PLUGIN */
 
 #define MOZ_RAII MOZ_NON_TEMPORARY_CLASS MOZ_STACK_CLASS

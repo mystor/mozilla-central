@@ -9,6 +9,7 @@
 #include "AssertAssignmentChecker.h"
 #include "ExplicitImplicitChecker.h"
 #include "ExplicitOperatorBoolChecker.h"
+#include "GetterAddrefsChecker.h"
 #include "KungFuDeathGripChecker.h"
 #include "MustOverrideChecker.h"
 #include "MustReturnFromCallerChecker.h"

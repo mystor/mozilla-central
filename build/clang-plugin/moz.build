@@ -15,6 +15,7 @@ UNIFIED_SOURCES += [
     'DiagnosticsMatcher.cpp',
     'ExplicitImplicitChecker.cpp',
     'ExplicitOperatorBoolChecker.cpp',
+    'GetterAddrefsChecker.cpp',
     'KungFuDeathGripChecker.cpp',
     'MozCheckAction.cpp',
     'MustOverrideChecker.cpp',
