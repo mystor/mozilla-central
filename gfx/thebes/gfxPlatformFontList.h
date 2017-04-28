@@ -345,14 +345,14 @@ protected:
     gfxFontEntry* CommonFontFallback(uint32_t aCh, uint32_t aNextCh,
                                      Script aRunScript,
                                      const gfxFontStyle* aMatchStyle,
-                                     gfxFontFamily** aMatchedFamily);
+                                     gfxFontFamily** MOZ_DOES_NOT_ADDREF aMatchedFamily);
 
     // search fonts system-wide for a given character, null otherwise
     virtual gfxFontEntry* GlobalFontFallback(const uint32_t aCh,
                                              Script aRunScript,
                                              const gfxFontStyle* aMatchStyle,
                                              uint32_t& aCmapCount,
-                                             gfxFontFamily** aMatchedFamily);
+                                             gfxFontFamily** MOZ_DOES_NOT_ADDREF aMatchedFamily);
 
     // whether system-based font fallback is used or not
     // if system fallback is used, no need to load all cmaps

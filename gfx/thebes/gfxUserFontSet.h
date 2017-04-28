@@ -252,7 +252,7 @@ public:
     // returns the Principal (for use in the key when caching the loaded font),
     // and whether the load should bypass the cache (force-reload).
     virtual nsresult CheckFontLoad(const gfxFontFaceSrc* aFontFaceSrc,
-                                   nsIPrincipal** aPrincipal,
+                                   nsIPrincipal** MOZ_DOES_NOT_ADDREF aPrincipal,
                                    bool* aBypassCache) = 0;
 
     // check whether content policies allow the given URI to load.

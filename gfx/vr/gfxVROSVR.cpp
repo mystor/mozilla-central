@@ -473,9 +473,7 @@ VRSystemManagerOSVR::Init()
   // OSVR server should be running in the background
   // It would load plugins and take care of detecting HMDs
   if (!mOSVRInitialized) {
-    nsIThread* thread = nullptr;
-    NS_GetCurrentThread(&thread);
-    mOSVRThread = already_AddRefed<nsIThread>(thread);
+    NS_GetCurrentThread(getter_AddRefs(mOSVRThread));
 
     // initialize client context
     InitializeClientContext();
