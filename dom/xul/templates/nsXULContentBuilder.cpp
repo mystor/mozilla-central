@@ -1034,7 +1034,7 @@ nsXULContentBuilder::CreateContainerContents(nsIContent* aElement,
     }
 
     int32_t newIndexInContainer = -1;
-    nsIContent* container = nullptr;
+    nsCOMPtr<nsIContent> container;
 
     int32_t querySetCount = mQuerySets.Length();
 
@@ -1046,7 +1046,7 @@ nsXULContentBuilder::CreateContainerContents(nsIContent* aElement,
             continue;
 
         CreateContainerContentsForQuerySet(aElement, aResult, aNotify, queryset,
-                                           &container, &newIndexInContainer);
+                                           getter_AddRefs(container), &newIndexInContainer);
     }
 
     if (aNotifyAtEnd && container) {
@@ -1056,8 +1056,6 @@ nsXULContentBuilder::CreateContainerContents(nsIContent* aElement,
                                      container->GetChildAt(newIndexInContainer),
                                      newIndexInContainer);
     }
-
-    NS_IF_RELEASE(container);
 
     return NS_OK;
 }

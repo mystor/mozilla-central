@@ -386,7 +386,9 @@ protected:
 
         nsresult Push(nsXULPrototypeElement* aPrototype, nsIContent* aElement);
         nsresult Pop();
-        nsresult Peek(nsXULPrototypeElement** aPrototype, nsIContent** aElement, int32_t* aIndex);
+        nsresult Peek(nsXULPrototypeElement** MOZ_DOES_NOT_ADDREF aPrototype,
+                      nsIContent** aElement,
+                      int32_t* aIndex);
 
         nsresult SetTopIndex(int32_t aIndex);
     };

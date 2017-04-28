@@ -873,9 +873,9 @@ nsXBLContentSink::CreateElement(const char16_t** aAtts, uint32_t aAttsCount,
 
   AddAttributesToXULPrototype(aAtts, aAttsCount, prototype);
 
-  Element* result;
-  nsresult rv = nsXULElement::Create(prototype, mDocument, false, false, &result);
-  *aResult = result;
+  RefPtr<Element> result;
+  nsresult rv = nsXULElement::Create(prototype, mDocument, false, false, getter_AddRefs(result));
+  result.forget(aResult);
   return rv;
 #endif
 }

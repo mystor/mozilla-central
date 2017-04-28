@@ -649,8 +649,8 @@ txEXSLTFunctionCall::evaluate(txIEvalContext *aContext,
             bool isneg = offset < 0;
             if (isneg) offset = -offset;
             
-            StringResult* strRes;
-            rv = aContext->recycler()->getStringResult(&strRes);
+            RefPtr<StringResult> strRes;
+            rv = aContext->recycler()->getStringResult(getter_AddRefs(strRes));
             NS_ENSURE_SUCCESS(rv, rv);
             
             // format: YYYY-MM-DDTTHH:MM:SS.sss+00:00
@@ -662,7 +662,7 @@ txEXSLTFunctionCall::evaluate(txIEvalContext *aContext,
               prtime.tm_usec / 10000,
               isneg ? '-' : '+', offset / 60, offset % 60), strRes->mValue);
               
-            *aResult = strRes;
+            strRes.forget(aResult);
 
             return NS_OK;
         }

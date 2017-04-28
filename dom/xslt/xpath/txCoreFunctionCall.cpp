@@ -166,23 +166,23 @@ txCoreFunctionCall::evaluate(txIEvalContext* aContext, txAExprResult** aResult)
             switch (mType) {
                 case LOCAL_NAME:
                 {
-                    StringResult* strRes = nullptr;
-                    rv = aContext->recycler()->getStringResult(&strRes);
+                    RefPtr<StringResult> strRes;
+                    rv = aContext->recycler()->getStringResult(getter_AddRefs(strRes));
                     NS_ENSURE_SUCCESS(rv, rv);
 
-                    *aResult = strRes;
                     txXPathNodeUtils::getLocalName(node, strRes->mValue);
+                    strRes.forget(aResult);
 
                     return NS_OK;
                 }
                 case NAMESPACE_URI:
                 {
-                    StringResult* strRes = nullptr;
-                    rv = aContext->recycler()->getStringResult(&strRes);
+                    RefPtr<StringResult> strRes;
+                    rv = aContext->recycler()->getStringResult(getter_AddRefs(strRes));
                     NS_ENSURE_SUCCESS(rv, rv);
 
-                    *aResult = strRes;
                     txXPathNodeUtils::getNamespaceURI(node, strRes->mValue);
+                    strRes.forget(aResult);
 
                     return NS_OK;
                 }
@@ -192,12 +192,12 @@ txCoreFunctionCall::evaluate(txIEvalContext* aContext, txAExprResult** aResult)
                     if (txXPathNodeUtils::isAttribute(node) ||
                         txXPathNodeUtils::isElement(node) ||
                         txXPathNodeUtils::isProcessingInstruction(node)) {
-                        StringResult* strRes = nullptr;
-                        rv = aContext->recycler()->getStringResult(&strRes);
+                        RefPtr<StringResult> strRes;
+                        rv = aContext->recycler()->getStringResult(getter_AddRefs(strRes));
                         NS_ENSURE_SUCCESS(rv, rv);
 
-                        *aResult = strRes;
                         txXPathNodeUtils::getNodeName(node, strRes->mValue);
+                        strRes.forget(aResult);
                     }
                     else {
                         aContext->recycler()->getEmptyStringResult(aResult);

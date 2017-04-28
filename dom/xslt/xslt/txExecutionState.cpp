@@ -181,21 +181,22 @@ txExecutionState::getVariable(int32_t aNamespace, nsIAtom* aLName,
     txExpandedName name(aNamespace, aLName);
 
     // look for a local variable
+    RefPtr<txAExprResult> result;
     if (mLocalVariables) {
-        mLocalVariables->getVariable(name, &aResult);
-        if (aResult) {
+        mLocalVariables->getVariable(name, getter_AddRefs(result));
+        if (result) {
+            aResult = result.forget().take();
             return NS_OK;
         }
     }
 
     // look for an evaluated global variable
-    mGlobalVariableValues.getVariable(name, &aResult);
-    if (aResult) {
-        if (aResult == mGlobalVarPlaceholderValue) {
-            // XXX ErrorReport: cyclic variable-value
-            NS_RELEASE(aResult);
+    mGlobalVariableValues.getVariable(name, getter_AddRefs(result));
+    if (result) {
+        if (result == mGlobalVarPlaceholderValue) {
             return NS_ERROR_XSLT_BAD_RECURSION;
         }
+        aResult = result.forget().take();
         return NS_OK;
     }
 
@@ -214,15 +215,15 @@ txExecutionState::getVariable(int32_t aNamespace, nsIAtom* aLName,
     if (var->mIsParam && mGlobalParams) {
         txIGlobalParameter* param = mGlobalParams->get(name);
         if (param) {
-            rv = param->getValue(&aResult);
+            rv = param->getValue(getter_AddRefs(result));
             NS_ENSURE_SUCCESS(rv, rv);
 
-            rv = mGlobalVariableValues.bindVariable(name, aResult);
+            rv = mGlobalVariableValues.bindVariable(name, *getter_AddRefs(result));
             if (NS_FAILED(rv)) {
-                NS_RELEASE(aResult);
                 return rv;
             }
-            
+
+            aResult = result.forget().take();
             return NS_OK;
         }
     }
@@ -236,7 +237,7 @@ txExecutionState::getVariable(int32_t aNamespace, nsIAtom* aLName,
     if (var->mExpr) {
         txVariableMap* oldVars = mLocalVariables;
         mLocalVariables = nullptr;
-        rv = var->mExpr->evaluate(getEvalContext(), &aResult);
+        rv = var->mExpr->evaluate(getEvalContext(), getter_AddRefs(result));
         mLocalVariables = oldVars;
 
         if (NS_FAILED(rv)) {
@@ -275,7 +276,7 @@ txExecutionState::getVariable(int32_t aNamespace, nsIAtom* aLName,
 
         mNextInstruction = prevInstr;
         rtfHandler = (txRtfHandler*)popResultHandler();
-        rv = rtfHandler->getAsRTF(&aResult);
+        rv = rtfHandler->getAsRTF(getter_AddRefs(result));
         if (NS_FAILED(rv)) {
           popAndDeleteEvalContextUntil(mInitialEvalContext);
           return rv;
@@ -285,13 +286,12 @@ txExecutionState::getVariable(int32_t aNamespace, nsIAtom* aLName,
 
     // Remove the placeholder and insert the calculated value
     mGlobalVariableValues.removeVariable(name);
-    rv = mGlobalVariableValues.bindVariable(name, aResult);
+    rv = mGlobalVariableValues.bindVariable(name, *getter_AddRefs(result));
     if (NS_FAILED(rv)) {
-        NS_RELEASE(aResult);
-
         return rv;
     }
 
+    aResult = result.forget().take();
     return NS_OK;
 }
 

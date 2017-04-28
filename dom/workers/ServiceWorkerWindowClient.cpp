@@ -468,7 +468,7 @@ private:
   }
 
   nsresult
-  Navigate(nsIURI* aUrl, nsIPrincipal* aPrincipal, nsGlobalWindow** aWindow)
+  Navigate(nsIURI* aUrl, nsIPrincipal* aPrincipal, nsGlobalWindow** MOZ_DOES_NOT_ADDREF aWindow)
   {
     MOZ_ASSERT(aWindow);
 

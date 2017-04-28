@@ -75,7 +75,8 @@ private:
 
   VoiceData* FindBestMatch(const nsAString& aUri, const nsAString& lang);
 
-  bool FindVoiceByLang(const nsAString& aLang, VoiceData** aRetval);
+  bool FindVoiceByLang(const nsAString& aLang,
+                       VoiceData** MOZ_DOES_NOT_ADDREF aRetval);
 
   nsresult AddVoiceImpl(nsISpeechService* aService,
                         const nsAString& aUri,

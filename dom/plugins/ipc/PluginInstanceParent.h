@@ -332,7 +332,7 @@ public:
     virtual PluginInstanceParent* GetInstance() override { return this; }
 
     static PluginInstanceParent* Cast(NPP instance,
-                                      PluginAsyncSurrogate** aSurrogate = nullptr);
+                                      PluginAsyncSurrogate** MOZ_DOES_NOT_ADDREF aSurrogate = nullptr);
 
     // for IME hook
     virtual mozilla::ipc::IPCResult

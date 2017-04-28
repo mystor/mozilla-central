@@ -3698,11 +3698,11 @@ nsContentUtils::EnsureStringBundle(PropertiesFile aFile)
         CallGetService(NS_STRINGBUNDLE_CONTRACTID, &sStringBundleService);
       NS_ENSURE_SUCCESS(rv, rv);
     }
-    nsIStringBundle *bundle;
+    nsCOMPtr<nsIStringBundle> bundle;
     nsresult rv =
-      sStringBundleService->CreateBundle(gPropertiesFiles[aFile], &bundle);
+      sStringBundleService->CreateBundle(gPropertiesFiles[aFile], getter_AddRefs(bundle));
     NS_ENSURE_SUCCESS(rv, rv);
-    sStringBundles[aFile] = bundle; // transfer ownership
+    sStringBundles[aFile] = bundle.forget().take(); // transfer ownership
   }
   return NS_OK;
 }

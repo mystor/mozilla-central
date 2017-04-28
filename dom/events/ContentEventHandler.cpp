@@ -2944,7 +2944,7 @@ ContentEventHandler::ConvertToRootRelativeOffset(nsIFrame* aFrame,
 }
 
 static void AdjustRangeForSelection(nsIContent* aRoot,
-                                    nsINode** aNode,
+                                    nsINode** MOZ_NON_OUTPARAM aNode,
                                     int32_t* aNodeOffset)
 {
   nsINode* node = *aNode;

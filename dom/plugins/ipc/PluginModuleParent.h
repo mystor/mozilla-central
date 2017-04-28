@@ -210,7 +210,7 @@ protected:
     RecvNP_InitializeResult(const NPError& aError) override;
 
     static BrowserStreamParent* StreamCast(NPP instance, NPStream* s,
-                                           PluginAsyncSurrogate** aSurrogate = nullptr);
+                                           PluginAsyncSurrogate** MOZ_DOES_NOT_ADDREF aSurrogate = nullptr);
 
     virtual mozilla::ipc::IPCResult
     AnswerNPN_SetValue_NPPVpluginRequiresAudioDeviceChanges(

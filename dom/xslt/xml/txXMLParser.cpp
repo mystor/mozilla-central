@@ -32,10 +32,7 @@ txParseDocumentFromURI(const nsAString& aHref,
 
     // For the system principal loaderUri will be null here, which is good
     // since that means that chrome documents can load any uri.
-
-    // Raw pointer, we want the resulting txXPathNode to hold a reference to
-    // the document.
-    nsIDOMDocument* theDocument = nullptr;
+    RefPtr<nsIDOMDocument> theDocument;
     nsAutoSyncOperation sync(loaderDocument);
     rv = nsSyncLoadService::LoadDocument(documentURI,
                                          nsIContentPolicy::TYPE_INTERNAL_XMLHTTPREQUEST,
@@ -43,7 +40,7 @@ txParseDocumentFromURI(const nsAString& aHref,
                                          nsILoadInfo::SEC_REQUIRE_CORS_DATA_INHERITS,
                                          loadGroup, true,
                                          loaderDocument->GetReferrerPolicy(),
-                                         &theDocument);
+                                         getter_AddRefs(theDocument));
 
     if (NS_FAILED(rv)) {
         aErrMsg.AppendLiteral("Document load of ");
@@ -54,9 +51,15 @@ txParseDocumentFromURI(const nsAString& aHref,
 
     *aResult = txXPathNativeNode::createXPathNode(theDocument);
     if (!*aResult) {
-        NS_RELEASE(theDocument);
         return NS_ERROR_FAILURE;
     }
+
+    // NOTE: We leak a reference here. the node we created above will have its
+    // mNode field NS_RELEASE()-ed by txXPathNodeUtils::release called from
+    // txLoadedDocumentEntry (the mDocument field of that type is what aResult
+    // points to here) when it goes away, so we need to do the addref here for
+    // it.
+    mozilla::Unused << do_AddRef(theDocument);
 
     return NS_OK;
 }

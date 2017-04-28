@@ -349,7 +349,7 @@ public:
 
   void HandleEvent(nsPresContext* aPresContext,
                    WidgetEvent* aEvent, 
-                   nsIDOMEvent** aDOMEvent,
+                   nsIDOMEvent** MOZ_NON_OUTPARAM aDOMEvent,
                    dom::EventTarget* aCurrentTarget,
                    nsEventStatus* aEventStatus)
   {
@@ -475,7 +475,7 @@ public:
 protected:
   void HandleEventInternal(nsPresContext* aPresContext,
                            WidgetEvent* aEvent,
-                           nsIDOMEvent** aDOMEvent,
+                           nsIDOMEvent** MOZ_NON_OUTPARAM aDOMEvent,
                            dom::EventTarget* aCurrentTarget,
                            nsEventStatus* aEventStatus);
 

@@ -47,15 +47,15 @@ GenerateIdFunctionCall::evaluate(txIEvalContext* aContext,
 
     nsresult rv = NS_OK;
     if (mParams.IsEmpty()) {
-        StringResult* strRes;
-        rv = aContext->recycler()->getStringResult(&strRes);
+        RefPtr<StringResult> strRes;
+        rv = aContext->recycler()->getStringResult(getter_AddRefs(strRes));
         NS_ENSURE_SUCCESS(rv, rv);
 
         txXPathNodeUtils::getXSLTId(aContext->getContextNode(),
                                     es->getSourceDocument(),
                                     strRes->mValue);
 
-        *aResult = strRes;
+        strRes.forget(aResult);
  
         return NS_OK;
     }
@@ -71,14 +71,14 @@ GenerateIdFunctionCall::evaluate(txIEvalContext* aContext,
         return NS_OK;
     }
     
-    StringResult* strRes;
-    rv = aContext->recycler()->getStringResult(&strRes);
+    RefPtr<StringResult> strRes;
+    rv = aContext->recycler()->getStringResult(getter_AddRefs(strRes));
     NS_ENSURE_SUCCESS(rv, rv);
 
     txXPathNodeUtils::getXSLTId(nodes->get(0), es->getSourceDocument(),
                                 strRes->mValue);
 
-    *aResult = strRes;
+    strRes.forget(aResult);
  
     return NS_OK;
 }

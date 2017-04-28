@@ -2112,11 +2112,11 @@ RoundUpToMultipleOf(const V& value, const M& multiple)
 bool
 ValidateTexTarget(WebGLContext* webgl, const char* funcName, uint8_t funcDims,
                   GLenum rawTexTarget, TexTarget* const out_texTarget,
-                  WebGLTexture** const out_tex);
+                  WebGLTexture** const MOZ_DOES_NOT_ADDREF out_tex);
 bool
 ValidateTexImageTarget(WebGLContext* webgl, const char* funcName, uint8_t funcDims,
                        GLenum rawTexImageTarget, TexImageTarget* const out_texImageTarget,
-                       WebGLTexture** const out_tex);
+                       WebGLTexture** const MOZ_DOES_NOT_ADDREF out_tex);
 
 class ScopedUnpackReset final
     : public gl::ScopedGLWrapper<ScopedUnpackReset>

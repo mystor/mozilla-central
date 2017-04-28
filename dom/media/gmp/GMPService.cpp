@@ -370,13 +370,13 @@ GeckoMediaPluginService::GetDecryptingGMPVideoDecoder(GMPCrashHelper* aHelper,
       [rawCallback, helper, aDecryptorId](RefPtr<GMPContentParent::CloseBlocker> wrapper) {
         RefPtr<GMPContentParent> parent = wrapper->mParent;
         UniquePtr<GetGMPVideoDecoderCallback> callback(rawCallback);
-        GMPVideoDecoderParent* actor = nullptr;
+        RefPtr<GMPVideoDecoderParent> actor;
         GMPVideoHostImpl* host = nullptr;
-        if (parent && NS_SUCCEEDED(parent->GetGMPVideoDecoder(&actor, aDecryptorId))) {
+        if (parent && NS_SUCCEEDED(parent->GetGMPVideoDecoder(getter_AddRefs(actor), aDecryptorId))) {
           host = &(actor->Host());
           actor->SetCrashHelper(helper);
         }
-        callback->Done(actor, host);
+        callback->Done(actor.forget().take(), host);
       },
       [rawCallback] {
         UniquePtr<GetGMPVideoDecoderCallback> callback(rawCallback);
@@ -408,13 +408,13 @@ GeckoMediaPluginService::GetGMPVideoEncoder(GMPCrashHelper* aHelper,
       [rawCallback, helper](RefPtr<GMPContentParent::CloseBlocker> wrapper) {
         RefPtr<GMPContentParent> parent = wrapper->mParent;
         UniquePtr<GetGMPVideoEncoderCallback> callback(rawCallback);
-        GMPVideoEncoderParent* actor = nullptr;
+        RefPtr<GMPVideoEncoderParent> actor;
         GMPVideoHostImpl* host = nullptr;
-        if (parent && NS_SUCCEEDED(parent->GetGMPVideoEncoder(&actor))) {
+        if (parent && NS_SUCCEEDED(parent->GetGMPVideoEncoder(getter_AddRefs(actor)))) {
           host = &(actor->Host());
           actor->SetCrashHelper(helper);
         }
-        callback->Done(actor, host);
+        callback->Done(actor.forget().take(), host);
       },
       [rawCallback] {
         UniquePtr<GetGMPVideoEncoderCallback> callback(rawCallback);
@@ -454,11 +454,11 @@ GeckoMediaPluginService::GetGMPDecryptor(GMPCrashHelper* aHelper,
       [rawCallback, helper](RefPtr<GMPContentParent::CloseBlocker> wrapper) {
         RefPtr<GMPContentParent> parent = wrapper->mParent;
         UniquePtr<GetGMPDecryptorCallback> callback(rawCallback);
-        GMPDecryptorParent* actor = nullptr;
-        if (parent && NS_SUCCEEDED(parent->GetGMPDecryptor(&actor))) {
+        RefPtr<GMPDecryptorParent> actor;
+        if (parent && NS_SUCCEEDED(parent->GetGMPDecryptor(getter_AddRefs(actor)))) {
           actor->SetCrashHelper(helper);
         }
-        callback->Done(actor);
+        callback->Done(actor.forget().take());
       },
       [rawCallback] {
         UniquePtr<GetGMPDecryptorCallback> callback(rawCallback);
