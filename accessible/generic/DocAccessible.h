@@ -531,7 +531,7 @@ protected:
    *                      subtree if any
    */
   void CacheChildrenInSubtree(Accessible* aRoot,
-                              Accessible** aFocusedAcc = nullptr);
+                              Accessible** MOZ_DOES_NOT_ADDREF aFocusedAcc = nullptr);
   void CreateSubtree(Accessible* aRoot);
 
   /**

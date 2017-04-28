@@ -761,8 +761,8 @@ public:
   /**
    * Returns a text point for the accessible element.
    */
-  void ToTextPoint(HyperTextAccessible** aContainer, int32_t* aOffset,
-                   bool aIsBefore = true) const;
+  void ToTextPoint(HyperTextAccessible** MOZ_DOES_NOT_ADDREF aContainer,
+                   int32_t* aOffset, bool aIsBefore = true) const;
 
   //////////////////////////////////////////////////////////////////////////////
   // SelectAccessible
