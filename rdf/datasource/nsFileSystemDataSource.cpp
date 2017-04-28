@@ -292,9 +292,9 @@ FileSystemDataSource::GetTarget(nsIRDFResource *source,
     {
         if (property == mNC_pulse)
         {
-            nsIRDFLiteral   *pulseLiteral;
-            mRDFService->GetLiteral(u"12", &pulseLiteral);
-            *target = pulseLiteral;
+            nsCOMPtr<nsIRDFLiteral> pulseLiteral;
+            mRDFService->GetLiteral(u"12", getter_AddRefs(pulseLiteral));
+            pulseLiteral.forget(target);
             return NS_OK;
         }
     }

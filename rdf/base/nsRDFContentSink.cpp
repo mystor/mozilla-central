@@ -659,17 +659,17 @@ RDFContentSinkImpl::ParseText(nsIRDFNode **aResult)
     switch (mParseMode) {
     case eRDFContentSinkParseMode_Literal:
         {
-            nsIRDFLiteral *result;
-            gRDFService->GetLiteral(value.get(), &result);
-            *aResult = result;
+            nsCOMPtr<nsIRDFLiteral> result;
+            gRDFService->GetLiteral(value.get(), getter_AddRefs(result));
+            result.forget(aResult);
         }
         break;
 
     case eRDFContentSinkParseMode_Resource:
         {
-            nsIRDFResource *result;
-            gRDFService->GetUnicodeResource(value, &result);
-            *aResult = result;
+            nsCOMPtr<nsIRDFResource> result;
+            gRDFService->GetUnicodeResource(value, getter_AddRefs(result));
+            result.forget(aResult);
         }
         break;
 
@@ -677,18 +677,18 @@ RDFContentSinkImpl::ParseText(nsIRDFNode **aResult)
         {
             nsresult err;
             int32_t i = value.ToInteger(&err);
-            nsIRDFInt *result;
-            gRDFService->GetIntLiteral(i, &result);
-            *aResult = result;
+            nsCOMPtr<nsIRDFInt> result;
+            gRDFService->GetIntLiteral(i, getter_AddRefs(result));
+            result.forget(aResult);
         }
         break;
 
     case eRDFContentSinkParseMode_Date:
         {
             PRTime t = rdf_ParseDate(nsDependentCString(NS_LossyConvertUTF16toASCII(value).get(), value.Length()));
-            nsIRDFDate *result;
-            gRDFService->GetDateLiteral(t, &result);
-            *aResult = result;
+            nsCOMPtr<nsIRDFDate> result;
+            gRDFService->GetDateLiteral(t, getter_AddRefs(result));
+            result.forget(aResult);
         }
         break;
 
@@ -1222,20 +1222,14 @@ RDFContentSinkImpl::OpenMember(const char16_t* aName,
     if (! container)
         return NS_ERROR_NULL_POINTER;
 
-    nsIRDFResource* resource;
-    if (NS_SUCCEEDED(rv = GetResourceAttribute(aAttributes, &resource))) {
+    nsCOMPtr<nsIRDFResource> resource;
+    if (NS_SUCCEEDED(rv = GetResourceAttribute(aAttributes, getter_AddRefs(resource)))) {
         // Okay, this node has an RDF:resource="..." attribute. That
         // means that it's a "referenced item," as covered in [6.29].
         nsCOMPtr<nsIRDFContainer> c;
         NS_NewRDFContainer(getter_AddRefs(c));
         c->Init(mDataSource, container);
         c->AppendElement(resource);
-
-        // XXX Technically, we should _not_ fall through here and push
-        // the element onto the stack: this is supposed to be a closed
-        // node. But right now I'm lazy and the code will just Do The
-        // Right Thing so long as the RDF is well-formed.
-        NS_RELEASE(resource);
     }
 
     // Change state. Pushing a null context element is a bit weird,

@@ -125,7 +125,7 @@ protected:
 
     CompositeDataSourceImpl* mCompositeDataSource;
 
-    nsISimpleEnumerator* mCurrent;
+    nsCOMPtr<nsISimpleEnumerator> mCurrent;
     nsIRDFNode*  mResult;
     int32_t      mNext;
     AutoTArray<nsCOMPtr<nsIRDFNode>, 8>  mAlreadyReturned;
@@ -138,7 +138,6 @@ CompositeEnumeratorImpl::CompositeEnumeratorImpl(CompositeDataSourceImpl* aCompo
                                                  bool aAllowNegativeAssertions,
                                                  bool aCoalesceDuplicateArcs)
     : mCompositeDataSource(aCompositeDataSource),
-      mCurrent(nullptr),
       mResult(nullptr),
 	  mNext(0),
       mAllowNegativeAssertions(aAllowNegativeAssertions),
@@ -150,7 +149,6 @@ CompositeEnumeratorImpl::CompositeEnumeratorImpl(CompositeDataSourceImpl* aCompo
 
 CompositeEnumeratorImpl::~CompositeEnumeratorImpl(void)
 {
-    NS_IF_RELEASE(mCurrent);
     NS_IF_RELEASE(mResult);
     NS_RELEASE(mCompositeDataSource);
 }
@@ -184,7 +182,7 @@ CompositeEnumeratorImpl::HasMoreElements(bool* aResult)
             nsIRDFDataSource* datasource =
                 mCompositeDataSource->mDataSources[mNext];
 
-            rv = GetEnumerator(datasource, &mCurrent);
+            rv = GetEnumerator(datasource, getter_AddRefs(mCurrent));
             if (NS_FAILED(rv)) return rv;
             if (rv == NS_RDF_NO_VALUE)
                 continue;
@@ -203,7 +201,7 @@ CompositeEnumeratorImpl::HasMoreElements(bool* aResult)
 
             // Is the current enumerator depleted?
             if (! hasMore) {
-                NS_RELEASE(mCurrent);
+                mCurrent = nullptr;
                 break;
             }
 

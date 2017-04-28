@@ -967,21 +967,19 @@ static int32_t kShift = 6;
             id >>= kShift;
         }
 
-        nsIRDFResource* resource;
-        rv = GetResource(s, &resource);
+        nsCOMPtr<nsIRDFResource> resource;
+        rv = GetResource(s, getter_AddRefs(resource));
         if (NS_FAILED(rv)) return rv;
 
         // XXX an ugly but effective way to make sure that this
         // resource is really unique in the world.
-        resource->AddRef();
-        nsrefcnt refcnt = resource->Release();
+        resource.get()->AddRef();
+        nsrefcnt refcnt = resource.get()->Release();
 
         if (refcnt == 1) {
-            *aResult = resource;
+            resource.forget(aResult);
             break;
         }
-
-        NS_RELEASE(resource);
     } while (1);
 
     return NS_OK;

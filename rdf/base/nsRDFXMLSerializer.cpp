@@ -931,9 +931,14 @@ nsRDFXMLSerializer::SerializeContainer(nsIOutputStream* aStream,
         if (! hasMore)
             break;
 
-        nsIRDFResource* property;
-        rv = arcs->GetNext((nsISupports**) &property);
+        nsCOMPtr<nsISupports> propertySupports;
+        rv = arcs->GetNext(getter_AddRefs(propertySupports));
         if (NS_FAILED(rv)) break;
+
+        // XXX: This seems really sketchy to me - is this performance sensitive
+        // code or can I replace this with a do_QueryInterface?
+        nsIRDFResource* property =
+            static_cast<nsIRDFResource*>(propertySupports.get());
 
         // If it's a membership property, then output a "LI"
         // tag. Otherwise, output a property.
@@ -942,7 +947,6 @@ nsRDFXMLSerializer::SerializeContainer(nsIOutputStream* aStream,
             wroteDescription = true;
         }
 
-        NS_RELEASE(property);
         if (NS_FAILED(rv))
             break;
     }

@@ -39,8 +39,8 @@ CreateNew##_func(nsISupports* aOuter, REFNSIID aIID, void **aResult) \
         *aResult = nullptr;                                           \
         return NS_ERROR_NO_AGGREGATION;                              \
     }                                                                \
-    nsI##_ifname* inst;                                              \
-    nsresult rv = NS_New##_new(&inst);                               \
+    nsCOMPtr<nsI##_ifname> inst;                                     \
+    nsresult rv = NS_New##_new(getter_AddRefs(inst));                \
     if (NS_FAILED(rv)) {                                             \
         *aResult = nullptr;                                           \
         return rv;                                                   \
@@ -49,7 +49,6 @@ CreateNew##_func(nsISupports* aOuter, REFNSIID aIID, void **aResult) \
     if (NS_FAILED(rv)) {                                             \
         *aResult = nullptr;                                           \
     }                                                                \
-    NS_RELEASE(inst);             /* get rid of extra refcnt */      \
     return rv;                                                       \
 }
 
