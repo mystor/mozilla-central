@@ -922,8 +922,8 @@ nsCocoaWindow::Show(bool bState)
           // Only set contextInfo if the parent of the parent sheet we're about
           // to restore isn't itself a sheet.
           NSWindow* contextInfo = sheetParent;
-          nsIWidget* grandparentWidget = nil;
-          if (NS_SUCCEEDED(piParentWidget->GetRealParent(&grandparentWidget)) && grandparentWidget) {
+          nsCOMPtr<nsIWidget> grandparentWidget = nil;
+          if (NS_SUCCEEDED(piParentWidget->GetRealParent(getter_AddRefs(grandparentWidget))) && grandparentWidget) {
             nsCOMPtr<nsPIWidgetCocoa> piGrandparentWidget(do_QueryInterface(grandparentWidget));
             bool grandparentIsSheet = false;
             if (piGrandparentWidget && NS_SUCCEEDED(piGrandparentWidget->GetIsSheet(&grandparentIsSheet)) &&
@@ -1876,7 +1876,7 @@ NS_IMETHODIMP nsCocoaWindow::GetChildSheet(bool aShown, nsIWidget** _retval)
 
 NS_IMETHODIMP nsCocoaWindow::GetRealParent(nsIWidget** parent)
 {
-  *parent = mParent;
+  NS_IF_ADDREF(*parent = mParent);
   return NS_OK;
 }
 

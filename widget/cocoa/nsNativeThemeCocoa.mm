@@ -448,7 +448,7 @@ static ChildView* ChildViewForFrame(nsIFrame* aFrame)
 }
 
 static NSWindow* NativeWindowForFrame(nsIFrame* aFrame,
-                                      nsIWidget** aTopLevelWidget = NULL)
+                                      nsIWidget** MOZ_DOES_NOT_ADDREF aTopLevelWidget = NULL)
 {
   if (!aFrame)
     return nil;

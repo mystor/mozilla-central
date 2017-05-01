@@ -298,7 +298,10 @@ static const char sHeaderFooterTags[][4] =  {"", "&T", "&U", "&D", "&P", "&PT"};
 - (void)initBundle
 {
   nsCOMPtr<nsIStringBundleService> bundleSvc = do_GetService(NS_STRINGBUNDLE_CONTRACTID);
-  bundleSvc->CreateBundle("chrome://global/locale/printdialog.properties", &mPrintBundle);
+  nsCOMPtr<nsIStringBundle> printBundle;
+  bundleSvc->CreateBundle("chrome://global/locale/printdialog.properties", getter_AddRefs(printBundle));
+  // NOTE: This will be released in dealloc above.
+  mPrintBundle = printBundle.forget().take();
 }
 
 - (NSString*)localizedString:(const char*)aKey
