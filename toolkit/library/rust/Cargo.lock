@@ -321,6 +321,7 @@ dependencies = [
  "nsstring 0.1.0",
  "rust_url_capi 0.0.1",
  "webrender_bindings 0.1.0",
+ "xpcom 0.1.0",
 ]
 
 [[package]]
@@ -1059,6 +1060,15 @@ version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "bitflags 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "xpcom"
+version = "0.1.0"
+dependencies = [
+ "libc 0.2.20 (registry+https://github.com/rust-lang/crates.io-index)",
+ "nserror 0.1.0",
+ "nsstring 0.1.0",
 ]
 
 [metadata]
