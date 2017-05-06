@@ -28,6 +28,9 @@ pub use refptr::*;
 mod statics;
 pub use statics::*;
 
+mod util;
+pub use util::*;
+
 // The reexports module is intentionally not re-exported into the root, as it is
 // intended to only be used internally by the `xpcom_macros` crate.
 #[doc(hidden)]
