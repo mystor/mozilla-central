@@ -10,3 +10,5 @@ pub extern crate libc;
 pub use nsstring::{nsACString, nsAString};
 
 pub use nserror::{nsresult, NS_ERROR_NO_INTERFACE, NS_OK};
+
+pub use std::ops::Deref;

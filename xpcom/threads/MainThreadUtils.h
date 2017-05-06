@@ -27,6 +27,8 @@ extern nsresult NS_GetMainThread(nsIThread** aResult);
 extern nsIThread* NS_GetCurrentThread();
 #endif
 
+// NS_IsMainThread is extern "C" so it can be called from the xpcom rust crate.
+extern "C" {
 #ifdef MOZILLA_INTERNAL_API
 bool NS_IsMainThread();
 #else
@@ -38,5 +40,6 @@ bool NS_IsMainThread();
  */
 extern bool NS_IsMainThread();
 #endif
+}
 
 #endif // MainThreadUtils_h_

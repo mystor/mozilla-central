@@ -352,6 +352,8 @@ fn xpcom(input: &str) -> Result<Tokens> {
         quote!{ #id : __init.#id, }
     });
 
+    let vis = &real.vis;
+
     // Generate the implementation for QueryInterface
     let mut seen = HashSet::new();
     let mut qi_impl = Vec::new();
@@ -391,12 +393,12 @@ fn xpcom(input: &str) -> Result<Tokens> {
             }
 
             /// Automatically generated implementation of AddRef for nsISupports.
-            pub unsafe fn AddRef(&self) -> ::xpcom::nsrefcnt {
+            #vis unsafe fn AddRef(&self) -> ::xpcom::nsrefcnt {
                 self.__refcnt.inc()
             }
 
             /// Automatically generated implementation of Release for nsISupports.
-            pub unsafe fn Release(&self) -> ::xpcom::nsrefcnt {
+            #vis unsafe fn Release(&self) -> ::xpcom::nsrefcnt {
                 let new = self.__refcnt.dec();
                 if new == 0 {
                     // XXX: dealloc
@@ -406,12 +408,12 @@ fn xpcom(input: &str) -> Result<Tokens> {
             }
 
             /// Automatically generated implementation of QueryInterface for nsISupports.
-            pub unsafe fn QueryInterface(&self,
-                                         uuid: *const ::xpcom::nsIID,
-                                         // XXX: Will this work in crates which
-                                         // don't directly import libc?
-                                         result: *mut *const ::xpcom::reexports::libc::c_void)
-                                         -> ::xpcom::reexports::nsresult {
+            #vis unsafe fn QueryInterface(&self,
+                                          uuid: *const ::xpcom::nsIID,
+                                          // XXX: Will this work in crates which
+                                          // don't directly import libc?
+                                          result: *mut *const ::xpcom::reexports::libc::c_void)
+                                          -> ::xpcom::reexports::nsresult {
                 #[allow(unused_imports)]
                 use ::xpcom::*;
 
@@ -422,7 +424,7 @@ fn xpcom(input: &str) -> Result<Tokens> {
 
             /// Coerce this type safely to any of the interfaces which it
             /// implements without AddRefing it.
-            pub fn coerce<T: #coerce_name>(&self) -> &T {
+            #vis fn coerce<T: #coerce_name>(&self) -> &T {
                 T::coerce_from(self)
             }
         }
@@ -434,7 +436,7 @@ fn xpcom(input: &str) -> Result<Tokens> {
         /// The trait and its method should usually not be used directly, but
         /// rather acts as a trait bound and implementation for the `coerce`
         /// method's.
-        pub trait #coerce_name {
+        #vis trait #coerce_name {
             /// Convert a value of the `#[derive(xpcom)]` type into the
             /// implementing interface type.
             fn coerce_from(v: &#name) -> &Self;

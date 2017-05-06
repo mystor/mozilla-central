@@ -822,6 +822,13 @@ NS_ShutdownXPCOM(nsIServiceManager* aServMgr)
   return mozilla::ShutdownXPCOM(aServMgr);
 }
 
+extern "C" {
+
+// Clean up any statically allocated XPCOM services held by rust code.
+void Rust_ShutdownXpcomServices();
+
+}
+
 namespace mozilla {
 
 void
@@ -937,6 +944,9 @@ ShutdownXPCOM(nsIServiceManager* aServMgr)
   // Set this only after the observers have been notified as this
   // will cause servicemanager to become inaccessible.
   mozilla::services::Shutdown();
+
+  // Also shutdown any services kept alive by rust's services.
+  Rust_ShutdownXpcomServices();
 
   // We may have AddRef'd for the caller of NS_InitXPCOM, so release it
   // here again:

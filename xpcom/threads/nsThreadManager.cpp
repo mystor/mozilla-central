@@ -23,10 +23,13 @@ using namespace mozilla;
 
 static MOZ_THREAD_LOCAL(bool) sTLSIsMainThread;
 
+// NS_IsMainThread is extern "C" so it can be called from the xpcom rust crate.
+extern "C" {
 bool
 NS_IsMainThread()
 {
   return sTLSIsMainThread.get();
+}
 }
 
 void
