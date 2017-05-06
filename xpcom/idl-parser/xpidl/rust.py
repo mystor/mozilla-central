@@ -396,6 +396,13 @@ struct_tmpl = """\
 #[repr(C)]
 pub struct %(name)s {
     vtable: *const %(name)sVTable,
+
+    /// This field is a phantomdata to ensure that the VTable type and any
+    /// struct containing it is not safe to send across threads, as XPCOM is
+    /// generally not threadsafe.
+    ///
+    /// XPCOM interfaces in general are not safe to send across threads.
+    __nosync: ::std::marker::PhantomData<::std::rc::Rc<u8>>,
 }
 
 unsafe impl XpCom for %(name)s {
