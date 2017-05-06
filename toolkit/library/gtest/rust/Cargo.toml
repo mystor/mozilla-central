@@ -15,6 +15,7 @@ gecko_debug = ["gkrust-shared/gecko_debug"]
 [dependencies]
 mp4parse-gtest = { path = "../../../../dom/media/gtest" }
 nsstring-gtest = { path = "../../../../xpcom/rust/nsstring/gtest" }
+xpcom-gtest = { path = "../../../../xpcom/rust/xpcom/gtest" }
 gkrust-shared = { path = "../../rust/shared" }
 
 [lib]
