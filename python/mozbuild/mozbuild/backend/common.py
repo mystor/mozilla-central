@@ -284,6 +284,7 @@ class CommonBackend(BuildBackend):
 
     def consume_finished(self):
         if len(self._idl_manager.idls):
+            self._write_rust_xpidl_summary(self._idl_manager)
             self._handle_idl_manager(self._idl_manager)
 
         self._handle_webidl_collection(self._webidls)
@@ -498,3 +499,11 @@ class CommonBackend(BuildBackend):
                     m.replace('%', mozpath.basename(jarinfo.name) + '/'))
                 self.consume_object(ChromeManifestEntry(
                     jar_context, '%s.manifest' % jarinfo.name, entry))
+
+    def _write_rust_xpidl_summary(self, manager):
+        """Write out a rust file which includes the generated xpcom rust modules"""
+        topobjdir = self.environment.topobjdir
+        with self._write_file(mozpath.join(topobjdir, 'dist', 'xpcrs', 'all.rs')) as fh:
+            fh.write("// THIS FILE IS GENERATED - DO NOT EDIT\n\n")
+            for idl in manager.idls.values():
+                fh.write("include!(concat!(env!(\"MOZ_TOPOBJDIR\"), \"/dist/xpcrs/%s.rs\"));\n" % idl['root'])

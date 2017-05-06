@@ -30,6 +30,32 @@ Interface members const/method/attribute conform to the following pattern:
         'returns the member signature as IDL'
 """
 
+def rust_sanitize(s):
+    keywords = [
+        "abstract", "alignof", "as", "become", "box",
+        "break", "const", "continue", "crate", "do",
+        "else", "enum", "extern", "false", "final",
+        "fn", "for", "if", "impl", "in",
+        "let", "loop", "macro", "match", "mod",
+        "move", "mut", "offsetof", "override", "priv",
+        "proc", "pub", "pure", "ref", "return",
+        "Self", "self", "sizeof", "static", "struct",
+        "super", "trait", "true", "type", "typeof",
+        "unsafe", "unsized", "use", "virtual", "where",
+        "while", "yield"
+    ]
+    if s in keywords:
+        return s + "_"
+    return s
+
+def rust_blacklisted_forward(s):
+    blacklisted = [
+        "nsIFrame",
+        "nsIObjectFrame",
+        "nsSubDocumentFrame",
+    ]
+    return s in blacklisted
+
 
 def attlistToIDL(attlist):
     if len(attlist) == 0:
@@ -102,9 +128,10 @@ class Builtin(object):
     kind = 'builtin'
     location = BuiltinLocation
 
-    def __init__(self, name, nativename, signed=False, maybeConst=False):
+    def __init__(self, name, nativename, rustname, signed=False, maybeConst=False):
         self.name = name
         self.nativename = nativename
+        self.rustname = rustname
         self.signed = signed
         self.maybeConst = maybeConst
 
@@ -126,22 +153,38 @@ class Builtin(object):
         return "%s%s %s" % (const, self.nativename,
                             calltype != 'in' and '*' or '')
 
+    def rustTypeInfo(self, calltype, varname='_'):
+        if calltype == 'in':
+            return {
+                'vtable': self.rustname,
+                'param_ty': self.rustname,
+                'arg': varname,
+            }
+        return {
+            'vtable': "*mut %s" % self.rustname,
+            'ret_ty': self.rustname,
+            'setup': "let mut %s: %s = ::std::mem::zeroed();" % (varname, self.rustname),
+            'arg': "&mut %s as *mut _" % varname,
+            'ret': varname,
+        }
+
+
 builtinNames = [
-    Builtin('boolean', 'bool'),
-    Builtin('void', 'void'),
-    Builtin('octet', 'uint8_t'),
-    Builtin('short', 'int16_t', True, True),
-    Builtin('long', 'int32_t', True, True),
-    Builtin('long long', 'int64_t', True, False),
-    Builtin('unsigned short', 'uint16_t', False, True),
-    Builtin('unsigned long', 'uint32_t', False, True),
-    Builtin('unsigned long long', 'uint64_t', False, False),
-    Builtin('float', 'float', True, False),
-    Builtin('double', 'double', True, False),
-    Builtin('char', 'char', True, False),
-    Builtin('string', 'char *', False, False),
-    Builtin('wchar', 'char16_t', False, False),
-    Builtin('wstring', 'char16_t *', False, False),
+    Builtin('boolean', 'bool', 'bool'),
+    Builtin('void', 'void', '::libc::c_void'),
+    Builtin('octet', 'uint8_t', '::libc::uint8_t'),
+    Builtin('short', 'int16_t', '::libc::int16_t', True, True),
+    Builtin('long', 'int32_t', '::libc::int32_t', True, True),
+    Builtin('long long', 'int64_t', '::libc::int64_t', True, False),
+    Builtin('unsigned short', 'uint16_t', '::libc::uint16_t', False, True),
+    Builtin('unsigned long', 'uint32_t', '::libc::uint32_t', False, True),
+    Builtin('unsigned long long', 'uint64_t', '::libc::uint64_t', False, False),
+    Builtin('float', 'float', '::libc::c_float', True, False),
+    Builtin('double', 'double', '::libc::c_double', True, False),
+    Builtin('char', 'char', '::libc::c_char', True, False),
+    Builtin('string', 'char *', '*const ::libc::c_char', False, False),
+    Builtin('wchar', 'char16_t', '::libc::int16_t', False, False),
+    Builtin('wstring', 'char16_t *', '*const ::libc::int16_t', False, False),
 ]
 
 builtinMap = {}
@@ -229,6 +272,10 @@ class NameMap(object):
             return self[id]
         except KeyError:
             raise IDLError("Name '%s' not found", location)
+
+
+class NonRustType(Exception):
+    pass
 
 
 class IDLError(Exception):
@@ -355,6 +402,21 @@ class Typedef(object):
         return "%s %s" % (self.name,
                           calltype != 'in' and '*' or '')
 
+    def rustTypeInfo(self, calltype, varname='_'):
+        if calltype == 'in':
+            return {
+                'vtable': self.name,
+                'param_ty': self.name,
+                'arg': varname,
+            }
+        return {
+            'vtable': "*mut %s" % self.name,
+            'ret_ty': self.name,
+            'setup': "let mut %s: %s = ::std::mem::zeroed();" % (varname, self.name),
+            'arg': "&mut %s as *mut _" % varname,
+            'ret': varname,
+        }
+
     def __str__(self):
         return "typedef %s %s\n" % (self.type, self.name)
 
@@ -390,6 +452,25 @@ class Forward(object):
     def nativeType(self, calltype):
         return "%s %s" % (self.name,
                           calltype != 'in' and '* *' or '*')
+
+    def rustTypeInfo(self, calltype, varname='_'):
+        if rust_blacklisted_forward(self.name):
+            raise NonRustType()
+        if calltype == 'in':
+            return {
+                'vtable': "*const %s" % self.name,
+                'param_ty': "Option<&%s>" % self.name,
+                'arg': "%s.map_or(::std::ptr::null(), |x| x as *const _)" % varname,
+            }
+        return {
+            'vtable': "*mut *const %s" % self.name,
+            'ret_ty': "Option<RefPtr<%s>>" % self.name,
+            'setup': "let mut %s = GetterAddrefs::new();" % varname,
+            'arg': "%s.ptr()" % varname,
+            'ret': "%s.refptr()" % varname,
+            'ret_notxpcom': "RefPtr::from_raw(%s)" % varname,
+        }
+
 
     def __str__(self):
         return "forward-declared %s\n" % self.name
@@ -477,6 +558,70 @@ class Native(object):
             m = calltype != 'in' and '*' or ''
         return "%s%s %s" % (const and 'const ' or '', self.nativename, m)
 
+    def rustTypeInfo(self, calltype, varname='_'):
+        if self.specialtype == 'domstring' or self.specialtype == 'astring':
+            if calltype == 'in':
+                return {
+                    'vtable': "*const nsAString",
+                    'param_ty': "&[u16]",
+                    'setup': "let %s = nsString::from(%s);" % (varname, varname),
+                    'arg': "&*%s" % varname,
+                }
+            return {
+                'vtable': "*mut nsAString",
+                'ret_ty': "nsString",
+                'setup': "let mut %s = nsString::new();" % varname,
+                'arg': "&mut *%s" % varname,
+                'ret': varname,
+            }
+
+        if self.specialtype == 'utf8string' or self.specialtype == 'cstring':
+            if calltype == 'in':
+                return {
+                    'vtable': "*const nsACString",
+                    'param_ty': "&[u8]",
+                    'setup': "let %s = nsCString::from(%s);" % (varname, varname),
+                    'arg': "&*%s" % varname,
+                }
+            return {
+                'vtable': "*mut nsACString",
+                'ret_ty': "nsCString",
+                'setup': "let mut %s = nsCString::new();" % varname,
+                'arg': "&mut *%s" % varname,
+                'ret': varname,
+            }
+
+        supported_nativenames = {
+            'void': "::libc::c_void",
+            'char': "u8",
+            'char16_t': "u16",
+            'nsID': "nsID",
+            'nsIID': "nsIID",
+            'nsCID': "nsCID",
+        }
+
+        if self.nativename in supported_nativenames:
+            rnativename = supported_nativenames[self.nativename]
+            if self.isPtr(calltype) or self.isRef(calltype):
+                if calltype == 'in':
+                    return {
+                        'vtable': "*const %s" % rnativename,
+                        'param_ty': "*const %s" % rnativename,
+                        'arg': varname
+                    }
+                return {
+                    'vtable': "*mut *const %s" % rnativename,
+                    'ret_ty': "*const %s" % rnativename,
+                    'setup': "let mut %s: *const %s = ::std::ptr::null();" % (varname, rnativename),
+                    'arg': "&mut %s as *mut _" % varname,
+                    'ret': varname
+                }
+
+
+        # This isn't one of the native types we support - raise an error to
+        # prevent this member from being generated as a callable function
+        raise NonRustType()
+
     def __str__(self):
         return "native %s(%s)\n" % (self.name, self.nativename)
 
@@ -554,6 +699,22 @@ class Interface(object):
         return "%s%s %s" % (const and 'const ' or '',
                             self.name,
                             calltype != 'in' and '* *' or '*')
+
+    def rustTypeInfo(self, calltype, varname='_'):
+        if calltype == 'in':
+            return {
+                'vtable': "*const %s" % self.name,
+                'param_ty': "Option<&%s>" % self.name,
+                'arg': "%s.map_or(::std::ptr::null(), |x| x as *const _)" % varname,
+            }
+        return {
+            'vtable': "*mut *const %s" % self.name,
+            'ret_ty': "Option<RefPtr<%s>>" % self.name,
+            'setup': "let mut %s = GetterAddrefs::new();" % varname,
+            'arg': "%s.ptr()" % varname,
+            'ret': "%s.refptr()" % varname,
+            'ret_notxpcom': "RefPtr::from_raw(%s)" % varname,
+        }
 
     def __str__(self):
         l = ["interface %s\n" % self.name]
@@ -984,7 +1145,7 @@ class Param(object):
     def resolve(self, method):
         self.realtype = method.iface.idl.getName(self.type, self.location)
         if self.array:
-            self.realtype = Array(self.realtype)
+            self.realtype = Array(self.realtype, self.size_is)
         if (self.null is not None and
                 getBuiltinOrNativeTypeName(self.realtype) != '[domstring]'):
             raise IDLError("'Null' attribute can only be used on DOMString",
@@ -1008,6 +1169,15 @@ class Param(object):
         except TypeError, e:
             raise IDLError("Unexpected parameter attribute", self.location)
 
+    def rustTypeInfo(self):
+        try:
+            return self.realtype.rustTypeInfo(self.paramtype, rust_sanitize(self.name))
+        except IDLError, e:
+            raise IDLError(e.message, self.location)
+        except TypeError, e:
+            print(e)
+            raise IDLError("Unexpected parameter attribute", self.location)
+
     def toIDL(self):
         return "%s%s %s %s" % (paramAttlistToIDL(self.attlist),
                                self.paramtype,
@@ -1016,8 +1186,9 @@ class Param(object):
 
 
 class Array(object):
-    def __init__(self, basetype):
+    def __init__(self, basetype, size_is):
         self.type = basetype
+        self.size_is = size_is
 
     def isScriptable(self):
         return self.type.isScriptable()
@@ -1025,6 +1196,11 @@ class Array(object):
     def nativeType(self, calltype, const=False):
         return "%s%s*" % (const and 'const ' or '',
                           self.type.nativeType(calltype))
+
+    def rustTypeInfo(self, calltype, name='_'):
+        # We don't support the array type yet - could potentially support it in
+        # future.
+        raise NonRustType()
 
 
 class IDLParser(object):
