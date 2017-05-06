@@ -171,20 +171,20 @@ class Builtin(object):
 
 builtinNames = [
     Builtin('boolean', 'bool', 'bool'),
-    Builtin('void', 'void', '::libc::c_void'),
-    Builtin('octet', 'uint8_t', '::libc::uint8_t'),
-    Builtin('short', 'int16_t', '::libc::int16_t', True, True),
-    Builtin('long', 'int32_t', '::libc::int32_t', True, True),
-    Builtin('long long', 'int64_t', '::libc::int64_t', True, False),
-    Builtin('unsigned short', 'uint16_t', '::libc::uint16_t', False, True),
-    Builtin('unsigned long', 'uint32_t', '::libc::uint32_t', False, True),
-    Builtin('unsigned long long', 'uint64_t', '::libc::uint64_t', False, False),
-    Builtin('float', 'float', '::libc::c_float', True, False),
-    Builtin('double', 'double', '::libc::c_double', True, False),
-    Builtin('char', 'char', '::libc::c_char', True, False),
-    Builtin('string', 'char *', '*const ::libc::c_char', False, False),
-    Builtin('wchar', 'char16_t', '::libc::int16_t', False, False),
-    Builtin('wstring', 'char16_t *', '*const ::libc::int16_t', False, False),
+    Builtin('void', 'void', 'libc::c_void'),
+    Builtin('octet', 'uint8_t', 'libc::uint8_t'),
+    Builtin('short', 'int16_t', 'libc::int16_t', True, True),
+    Builtin('long', 'int32_t', 'libc::int32_t', True, True),
+    Builtin('long long', 'int64_t', 'libc::int64_t', True, False),
+    Builtin('unsigned short', 'uint16_t', 'libc::uint16_t', False, True),
+    Builtin('unsigned long', 'uint32_t', 'libc::uint32_t', False, True),
+    Builtin('unsigned long long', 'uint64_t', 'libc::uint64_t', False, False),
+    Builtin('float', 'float', 'libc::c_float', True, False),
+    Builtin('double', 'double', 'libc::c_double', True, False),
+    Builtin('char', 'char', 'libc::c_char', True, False),
+    Builtin('string', 'char *', '*const libc::c_char', False, False),
+    Builtin('wchar', 'char16_t', 'libc::int16_t', False, False),
+    Builtin('wstring', 'char16_t *', '*const libc::int16_t', False, False),
 ]
 
 builtinMap = {}
@@ -592,7 +592,7 @@ class Native(object):
             }
 
         supported_nativenames = {
-            'void': "::libc::c_void",
+            'void': "libc::c_void",
             'char': "u8",
             'char16_t': "u16",
             'nsID': "nsID",

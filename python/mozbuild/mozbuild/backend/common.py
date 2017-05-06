@@ -503,7 +503,19 @@ class CommonBackend(BuildBackend):
     def _write_rust_xpidl_summary(self, manager):
         """Write out a rust file which includes the generated xpcom rust modules"""
         topobjdir = self.environment.topobjdir
-        with self._write_file(mozpath.join(topobjdir, 'dist', 'xpcrs', 'all.rs')) as fh:
+
+        include_tmpl = "include!(concat!(env!(\"MOZ_TOPOBJDIR\"), \"/dist/xpcrs/%s/%s.rs\"))"
+
+        with self._write_file(mozpath.join(topobjdir, 'dist', 'xpcrs', 'rt', 'all.rs')) as fh:
             fh.write("// THIS FILE IS GENERATED - DO NOT EDIT\n\n")
             for idl in manager.idls.values():
-                fh.write("include!(concat!(env!(\"MOZ_TOPOBJDIR\"), \"/dist/xpcrs/%s.rs\"));\n" % idl['root'])
+                fh.write(include_tmpl % ("rt", idl['root']))
+                fh.write(";\n")
+
+        with self._write_file(mozpath.join(topobjdir, 'dist', 'xpcrs', 'bt', 'all.rs')) as fh:
+            fh.write("// THIS FILE IS GENERATED - DO NOT EDIT\n\n")
+            fh.write("&[\n")
+            for idl in manager.idls.values():
+                fh.write(include_tmpl % ("bt", idl['root']))
+                fh.write(",\n")
+            fh.write("]\n")

@@ -47,7 +47,8 @@ def process(input_dir, inc_paths, cache_dir, header_dir, xpcrs_dir,
         idl.resolve([input_dir] + inc_paths, p)
 
         header_path = os.path.join(header_dir, '%s.h' % stem)
-        rs_path = os.path.join(xpcrs_dir, '%s.rs' % stem)
+        rs_rt_path = os.path.join(xpcrs_dir, 'rt', '%s.rs' % stem)
+        rs_bt_path = os.path.join(xpcrs_dir, 'bt', '%s.rs' % stem)
 
         xpt = BytesIO()
         write_typelib(idl, xpt, path)
@@ -59,8 +60,9 @@ def process(input_dir, inc_paths, cache_dir, header_dir, xpcrs_dir,
         with FileAvoidWrite(header_path) as fh:
             print_header(idl, fh, path)
 
-        with FileAvoidWrite(rs_path) as fh:
-            print_rust_bindings(idl, fh, path)
+        with FileAvoidWrite(rs_rt_path) as rt_fh, \
+             FileAvoidWrite(rs_bt_path) as bt_fh:
+            print_rust_bindings(idl, rt_fh, bt_fh, path)
 
     # TODO use FileAvoidWrite once it supports binary mode.
     xpt_path = os.path.join(xpt_dir, '%s.xpt' % module)

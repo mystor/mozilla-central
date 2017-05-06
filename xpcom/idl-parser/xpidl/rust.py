@@ -39,13 +39,17 @@ def attributeVTableParamName(a):
     return "a" + firstCap(a.name)
 
 
-def attributeVTableParamlist(iface, a, getter):
-    l = ["this: *const " + iface.name]
-    l += ["%s: %s" % (attributeVTableParamName(a),
-                      a.realtype.rustTypeInfo('out' if getter else 'in')['vtable'])]
+def attributeVTableRawParamList(iface, a, getter):
+    l = [(attributeVTableParamName(a),
+          a.realtype.rustTypeInfo('out' if getter else 'in')['vtable'])]
     if a.implicit_jscontext:
         raise xpidl.NonRustType()
+    return l
 
+
+def attributeVTableParamlist(iface, a, getter):
+    l = ["this: *const " + iface.name]
+    l += ["%s: %s" % x for x in attributeVTableRawParamList(iface, a, getter)]
     return ", ".join(l)
 
 
@@ -58,6 +62,17 @@ def attrAsVTableEntry(iface, m, getter):
         return """\
 /// Unable to call function as its signature contains a non-rust type
 pub %s: *const ::libc::c_void""" % attributeNativeName(m, getter)
+
+
+def attrAsMethodStruct(iface, m, getter):
+    params = ['Param { name: "%s", ty: "%s" }' % x
+              for x in attributeVTableRawParamList(iface, m, getter)]
+    return derive_method_tmpl % {
+        'name': attributeNativeName(m, getter),
+        'abi': getVTableABI(m),
+        'params': ', '.join(params),
+        'ret': 'nsresult',
+    }
 
 
 def getVTableABI(m):
@@ -81,9 +96,8 @@ def methodVTableReturnType(m):
     return "nsresult"
 
 
-def methodVTableParamList(iface, m):
-    l = ["this: *const %s" % iface.name]
-    l += ["%s: %s" % (xpidl.rust_sanitize(p.name), p.rustTypeInfo()['vtable']) for p in m.params]
+def methodVTableRawParamList(iface, m):
+    l = [(xpidl.rust_sanitize(p.name), p.rustTypeInfo()['vtable']) for p in m.params]
 
     if m.implicit_jscontext:
         # XXX: Not implemented yet
@@ -94,8 +108,14 @@ def methodVTableParamList(iface, m):
         raise xpidl.NonRustType()
 
     if not m.notxpcom and m.realtype.name != 'void':
-        l.append("_retval: %s" % m.realtype.rustTypeInfo('out', '_retval')['vtable'])
+        l.append(("_retval", m.realtype.rustTypeInfo('out', '_retval')['vtable']))
 
+    return l
+
+
+def methodVTableParamList(iface, m):
+    l = ["this: *const %s" % iface.name]
+    l += ["%s: %s" % x for x in methodVTableRawParamList(iface, m)]
     return ", ".join(l)
 
 
@@ -109,6 +129,16 @@ def methodAsVTableEntry(iface, m):
         return """\
 /// Unable to call function as its signature contains a non-rust type
 pub %s: *const ::libc::c_void""" % methodNativeName(m)
+
+
+def methodAsMethodStruct(iface, m):
+    params = ['Param { name: "%s", ty: "%s" }' % x for x in methodVTableRawParamList(iface, m)]
+    return derive_method_tmpl % {
+        'name': methodNativeName(m),
+        'abi': getVTableABI(m),
+        'params': ', '.join(params),
+        'ret': methodVTableReturnType(m),
+    }
 
 
 nsresult_method_impl_tmpl = """\
@@ -265,7 +295,7 @@ def idl_basename(f):
     return os.path.basename(f).rpartition('.')[0]
 
 
-def print_rust_bindings(idl, fd, filename):
+def print_rust_bindings(idl, rt_fd, bt_fd, filename):
     class FDWrapper(object):
         def __init__(self, fd):
             self.fd = fd
@@ -289,9 +319,12 @@ def print_rust_bindings(idl, fd, filename):
                     elif c == ')' or c == '}' or c == ']':
                         self.indent -= 1
 
-    fd = FDWrapper(fd)
+    rt_fd = FDWrapper(rt_fd)
+    bt_fd = FDWrapper(bt_fd)
 
-    fd.write(header % {'filename': filename})
+    rt_fd.write(header % {'filename': filename})
+    bt_fd.write(header % {'filename': filename})
+    bt_fd.write("{static D: &'static [Interface] = &[\n")
 
     # All of the idl files will be included into the same rust module, as we
     # can't do forward declarations. Because of this, we want to ignore all
@@ -302,18 +335,20 @@ def print_rust_bindings(idl, fd, filename):
             continue
 
         if p.kind == 'interface':
-            write_interface(p, fd)
+            write_interface(p, rt_fd, bt_fd)
             continue
 
         if p.kind == 'typedef':
-            printComments(fd, p.doccomments, '')
+            printComments(rt_fd, p.doccomments, '')
             try:
                 # We have to skip the typedef of bool to bool (it doesn't make any sense anyways)
                 if p.name == "bool":
                     continue
-                fd.write("pub type %s = %s;\n\n" % (p.name, p.realtype.rustTypeInfo('in')['vtable']))
+                rt_fd.write("pub type %s = %s;\n\n" % (p.name, p.realtype.rustTypeInfo('in')['vtable']))
             except xpidl.NonRustType:
-                fd.write("/* ignored typedef for non rust type %s */\n\n" % p.name)
+                rt_fd.write("/* ignored typedef for non rust type %s */\n\n" % p.name)
+
+    bt_fd.write("]; D}\n")
 
 
 uuid_decoder = re.compile(r"""(?P<m0>[a-f0-9]{8})-
@@ -416,8 +451,24 @@ pub mod %(name)s_consts {
 
 """
 
+derive_iface_tmpl = """\
+Interface {
+    name: "%(name)s",
+    base: %(base)s,
+    methods: %(methods)s,
+},
 
-def write_interface(iface, fd):
+"""
+
+derive_method_tmpl = """\
+Method {
+    name: "%(name)s",
+    abi: "%(abi)s",
+    params: &[%(params)s],
+    ret: "%(ret)s",
+}"""
+
+def write_interface(iface, rt_fd, bt_fd):
     if iface.namemap is None:
         raise Exception("Interface was not resolved.")
 
@@ -428,7 +479,7 @@ def write_interface(iface, fd):
             consts += "pub const %s: i64 = %s;\n" % (member.name, member.getValue())
 
     if len(consts) > 0:
-        fd.write(constants_tmpl % {
+        rt_fd.write(constants_tmpl % {
             'name': iface.name,
             'consts': consts,
         })
@@ -446,10 +497,10 @@ def write_interface(iface, fd):
     names['m3joined'] = ", ".join(["0x%s" % m3str[i:i+2] for i in xrange(0, 16, 2)])
     names['name'] = iface.name
 
-    fd.write(struct_tmpl % names)
+    rt_fd.write(struct_tmpl % names)
 
     if iface.base is not None:
-        fd.write(deref_tmpl % {
+        rt_fd.write(deref_tmpl % {
             'name': iface.name,
             'base': iface.base,
         })
@@ -468,11 +519,11 @@ def write_interface(iface, fd):
             entries += "%s,\n\n" % methodAsVTableEntry(iface, member)
 
 
-    fd.write(vtable_tmpl % {
+    rt_fd.write(vtable_tmpl % {
         'name': iface.name,
         'base': base_vtable_tmpl % iface.base if iface.base is not None else "",
         'entries': entries,
-    });
+    })
 
     methods = ""
     for member in iface.members:
@@ -488,10 +539,37 @@ def write_interface(iface, fd):
             methods += "/* %s */\n" % member.toIDL()
             methods += "%s\n\n" % methodAsWrapper(iface, member)
 
-    fd.write(wrapper_tmpl % {
+    rt_fd.write(wrapper_tmpl % {
         'name': iface.name,
         'methods': methods
     })
+
+    rust_base = 'Some("%s")' % iface.base if iface.base is not None else 'None'
+    try:
+        derive_methods = ""
+        for member in iface.members:
+            if type(member) == xpidl.Attribute:
+                derive_methods += "/* %s */\n" % member.toIDL()
+                derive_methods += "%s,\n" % attrAsMethodStruct(iface, member, True)
+                if not member.readonly:
+                    derive_methods += "%s,\n" % attrAsMethodStruct(iface, member, False)
+                derive_methods += "\n"
+
+            elif type(member) == xpidl.Method:
+                derive_methods += "/* %s */\n" % member.toIDL()
+                derive_methods += "%s,\n\n" % methodAsMethodStruct(iface, member)
+        bt_fd.write(derive_iface_tmpl % {
+            'name': iface.name,
+            'base': rust_base,
+            'methods': 'Some(&[\n%s])' % derive_methods,
+        })
+    except xpidl.NonRustType:
+        bt_fd.write(derive_iface_tmpl % {
+            'name': iface.name,
+            'base': rust_base,
+            'methods': 'None',
+        })
+
 
 
 def main(outputfile):

@@ -7,3 +7,4 @@ authors = ["michael@thelayzells.com"]
 libc = "0.2"
 nsstring = { path = "../nsstring" }
 nserror = { path = "../nserror" }
+xpcom_macros = { path = "xpcom_macros" }

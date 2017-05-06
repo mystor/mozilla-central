@@ -1083,13 +1083,24 @@ dependencies = [
  "libc 0.2.20 (registry+https://github.com/rust-lang/crates.io-index)",
  "nserror 0.1.0",
  "nsstring 0.1.0",
+ "xpcom_macros 0.1.0",
 ]
 
 [[package]]
 name = "xpcom-gtest"
 version = "0.1.0"
 dependencies = [
+ "nserror 0.1.0",
  "xpcom 0.1.0",
+]
+
+[[package]]
+name = "xpcom_macros"
+version = "0.1.0"
+dependencies = [
+ "lazy_static 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "quote 0.3.14 (registry+https://github.com/rust-lang/crates.io-index)",
+ "syn 0.11.8 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [metadata]
