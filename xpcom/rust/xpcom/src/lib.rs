@@ -17,3 +17,6 @@ pub use nonidl::*;
 
 mod refptr;
 pub use refptr::*;
+
+mod statics;
+pub use statics::*;
