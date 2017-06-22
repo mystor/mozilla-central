@@ -1238,6 +1238,7 @@ nsIntPoint
 PuppetWidget::GetChromeDimensions()
 {
   if (!GetOwningTabChild()) {
+    NS_ASSERTION(false, "PuppetWidget without Tab does not have chrome information.");
     NS_WARNING("PuppetWidget without Tab does not have chrome information.");
     return nsIntPoint();
   }

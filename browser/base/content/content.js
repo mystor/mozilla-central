@@ -684,6 +684,14 @@ var ClickEventHandler = {
    *       to behave like an <a> element, which SVG links (XLink) don't.
    */
   _hrefAndLinkNodeForClickEvent(event) {
+    if (!content) {
+      dump("content.js Stack = " + new Error().stack + "\n");
+      let debug = Cc["@mozilla.org/xpcom/debug;1"].getService(Ci.nsIDebug2);
+      if (debug.isDebugBuild) {
+        debug.assertion("content is null", "false", "content.js", 0);
+      }
+    }
+
     function isHTMLLink(aNode) {
       // Be consistent with what nsContextMenu.js does.
       return ((aNode instanceof content.HTMLAnchorElement && aNode.href) ||

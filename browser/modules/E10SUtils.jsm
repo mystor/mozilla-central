@@ -124,6 +124,14 @@ this.E10SUtils = {
       return NOT_REMOTE;
     }
 
+    if (!aURI) {
+      dump("Stack = " + new Error().stack + "\n");
+      let debug = Cc["@mozilla.org/xpcom/debug;1"].getService(Ci.nsIDebug2);
+      if (debug.isDebugBuild) {
+        debug.assertion("aURI is null", "false", "E10SUtils.jsm", 0);
+      }
+    }
+
     switch (aURI.scheme) {
       case "javascript":
         // javascript URIs can load in any, they apply to the current document.
