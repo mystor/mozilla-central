@@ -38,9 +38,6 @@ XPCOMUtils.defineLazyModuleGetter(this, "SessionHistory",
 XPCOMUtils.defineLazyModuleGetter(this, "SessionStorage",
   "resource:///modules/sessionstore/SessionStorage.jsm");
 
-Cu.import("resource:///modules/sessionstore/FrameTree.jsm", this);
-var gFrameTree = new FrameTree(this);
-
 Cu.import("resource:///modules/sessionstore/ContentRestore.jsm", this);
 XPCOMUtils.defineLazyGetter(this, "gContentRestore",
                             () => { return new ContentRestore(this) });
@@ -75,6 +72,109 @@ function createLazy(fn) {
     return cachedValue;
   };
 }
+
+function mapNonDynamicFramesInternal(docShell, cb) {
+  if (docShell.createdDynamically) {
+    return null;
+  }
+
+  let ifreq = docShell.QueryInterface(Ci.nsIInterfaceRequestor);
+  let obj = cb(ifreq.getInterface(Ci.nsIDOMWindow)) || {};
+  let children = [];
+  for (let i = 0; i < docShell.childCount; ++i) {
+    let childShell = docShell.getChildAt(i);
+    // Get the child offset, which is the subframe index in the document which
+    // the docshell was added at, if that docshell was non-dynamic.
+    let childOffset = childShell.childOffset;
+    let result = mapNonDynamicFramesInternal(childShell, cb);
+    if (result && Object.keys(result).length) {
+      children[childOffset] = result;
+    }
+  }
+
+  if (children.length) {
+    obj.children = children;
+  }
+
+  return Object.keys(obj).length ? obj : null;
+}
+
+function mapNonDynamicFrames(cb) {
+  return mapNonDynamicFramesInternal(docShell, cb);
+}
+
+var StateChangeListener = {
+  init() {
+    this._observers = new Set();
+
+    let ifreq = docShell.QueryInterface(Ci.nsIInterfaceRequestor);
+    let webProgress = ifreq.getInterface(Ci.nsIWebProgress);
+    webProgress.addProgressListener(this, Ci.nsIWebProgress.NOTIFY_STATE_DOCUMENT);
+  },
+
+  /**
+   * Adds a given observer |obs| to the set of observers that will be notified
+   * when the frame tree is reset (when a new document starts loading) or
+   * recollected (when a document finishes loading).
+   *
+   * @param obs (object)
+   */
+  addObserver(obs) {
+    this._observers.add(obs);
+  },
+
+  /**
+   * Notifies all observers that implement the given |method|.
+   *
+   * @param method (string)
+   */
+  notifyObservers(method) {
+    for (let obs of this._observers) {
+      if (obs.hasOwnProperty(method)) {
+        obs[method]();
+      }
+    }
+  },
+
+  /**
+   * @see nsIWebProgressListener.onStateChange
+   *
+   * We want to be notified about:
+   *  - new documents that start loading to collect an empty state.
+   *  - completed document loads to recollect reachable docshells.
+   */
+  onStateChange(webProgress, request, stateFlags, status) {
+    // Ignore state changes for subframes because we're only interested in the
+    // top-document starting or stopping its load. We thus only care about any
+    // changes to the root of the frame tree, not to any of its nodes/leafs.
+    if (!webProgress.isTopLevel || webProgress.DOMWindow != content) {
+      return;
+    }
+
+    // onStateChange will be fired when loading the initial about:blank URI for
+    // a browser, which we don't actually care about. This is particularly for
+    // the case of unrestored background tabs, where the content has not yet
+    // been restored: we don't want to accidentally send any updates to the
+    // parent when the about:blank placeholder page has loaded.
+    if (!docShell.hasLoadedNonBlankURI) {
+      return;
+    }
+
+    if (stateFlags & Ci.nsIWebProgressListener.STATE_START) {
+      // Notify observers that the frame tree has been reset.
+      this.notifyObservers("onFrameTreeReset");
+    } else if (stateFlags & Ci.nsIWebProgressListener.STATE_STOP) {
+      // Notify observers that the frame tree has been reset.
+      this.notifyObservers("onFrameTreeCollected");
+    }
+  },
+
+
+  QueryInterface: XPCOMUtils.generateQI([
+    Ci.nsIWebProgressListener,
+    Ci.nsISupportsWeakReference,
+  ])
+};
 
 /**
  * Listens for and handles content events that we need for the
@@ -252,10 +352,10 @@ var MessageListener = {
  */
 var SessionHistoryListener = {
   init() {
-    // The frame tree observer is needed to handle initial subframe loads.
-    // It will redundantly invalidate with the SHistoryListener in some cases
-    // but these invalidations are very cheap.
-    gFrameTree.addObserver(this);
+    // This is used to handle initial subframe loads. It will redundantly
+    // invalidate with the SHistoryListener in some cases, but these
+    // invalidations are cheap.
+    StateChangeListener.addObserver(this);
 
     // By adding the SHistoryListener immediately, we will unfortunately be
     // notified of every history entry as the tab is restored. We don't bother
@@ -399,15 +499,13 @@ var SessionHistoryListener = {
 var ScrollPositionListener = {
   init() {
     addEventListener("scroll", this);
-    gFrameTree.addObserver(this);
+    StateChangeListener.addObserver(this);
   },
 
   handleEvent(event) {
-    let frame = event.target.defaultView;
-
     // Don't collect scroll data for frames created at or after the load event
     // as SessionStore can't restore scroll data for those.
-    if (gFrameTree.contains(frame)) {
+    if (!event.targetInDynamicDocShell) {
       MessageQueue.push("scroll", () => this.collect());
     }
   },
@@ -421,7 +519,7 @@ var ScrollPositionListener = {
   },
 
   collect() {
-    return gFrameTree.map(ScrollPosition.collect);
+    return mapNonDynamicFrames(ScrollPosition.collect);
   }
 };
 
@@ -446,15 +544,16 @@ var FormDataListener = {
   init() {
     addEventListener("input", this, true);
     addEventListener("change", this, true);
-    gFrameTree.addObserver(this);
+    StateChangeListener.addObserver(this);
   },
 
   handleEvent(event) {
-    let frame = event.target.ownerGlobal;
-
+    dump("Handling an input event\n");
+    dump("Target = " + event.target + "\n");
+    dump("TargetInDynamicDocShell = " + event.targetInDynamicDocShell + "\n");
     // Don't collect form data for frames created at or after the load event
     // as SessionStore can't restore form data for those.
-    if (gFrameTree.contains(frame)) {
+    if (!event.targetInDynamicDocShell) {
       MessageQueue.push("formdata", () => this.collect());
     }
   },
@@ -464,7 +563,7 @@ var FormDataListener = {
   },
 
   collect() {
-    return gFrameTree.map(FormData.collect);
+    return mapNonDynamicFrames(FormData.collect);
   }
 };
 
@@ -483,7 +582,7 @@ var PageStyleListener = {
   init() {
     Services.obs.addObserver(this, "author-style-disabled-changed");
     Services.obs.addObserver(this, "style-sheet-applicable-state-changed");
-    gFrameTree.addObserver(this);
+    StateChangeListener.addObserver(this);
   },
 
   uninit() {
@@ -493,14 +592,20 @@ var PageStyleListener = {
 
   observe(subject, topic) {
     let frame = subject.defaultView;
+    if (!frame) {
+      return;
+    }
 
-    if (frame && gFrameTree.contains(frame)) {
+    let createdDynamically = frame.QueryInterface(Ci.nsIInterfaceRequestor)
+                                  .getInterface(Ci.nsIDocShell)
+                                  .createdDynamically;
+    if (!createdDynamically) {
       MessageQueue.push("pageStyle", () => this.collect());
     }
   },
 
   collect() {
-    return PageStyle.collect(docShell, gFrameTree);
+    return PageStyle.collect(docShell, mapNonDynamicFrames);
   },
 
   onFrameTreeCollected() {
@@ -529,7 +634,7 @@ var DocShellCapabilitiesListener = {
   _latestCapabilities: "",
 
   init() {
-    gFrameTree.addObserver(this);
+    StateChangeListener.addObserver(this);
   },
 
   /**
@@ -561,7 +666,7 @@ var SessionStorageListener = {
   init() {
     addEventListener("MozSessionStorageChanged", this, true);
     Services.obs.addObserver(this, "browser:purge-domain-data");
-    gFrameTree.addObserver(this);
+    StateChangeListener.addObserver(this);
   },
 
   uninit() {
@@ -569,7 +674,7 @@ var SessionStorageListener = {
   },
 
   handleEvent(event) {
-    if (gFrameTree.contains(event.target)) {
+    if (event.targetInDynamicDocShell) {
       this.collectFromEvent(event);
     }
   },
@@ -640,7 +745,7 @@ var SessionStorageListener = {
     this.resetChanges();
 
     MessageQueue.push("storage", () => {
-      return SessionStorage.collect(docShell, gFrameTree);
+      return SessionStorage.collect(docShell);
     });
   },
 
@@ -836,6 +941,7 @@ var MessageQueue = {
   },
 };
 
+StateChangeListener.init();
 EventListener.init();
 MessageListener.init();
 FormDataListener.init();
@@ -892,7 +998,6 @@ addEventListener("unload", () => {
   // Remove progress listeners.
   gContentRestore.resetRestore();
 
-  // We don't need to take care of any gFrameTree observers as the gFrameTree
-  // will die with the content script. The same goes for the privacy transition
-  // observer that will die with the docShell when the tab is closed.
+  // We don't need to take care of the privacy transition observer that will die
+  // with the docShell when the tab is closed.
 });

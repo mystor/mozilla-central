@@ -34,6 +34,7 @@
 #include "nsPIWindowRoot.h"
 #include "nsRFPService.h"
 #include "WorkerPrivate.h"
+#include "nsIDocShell.h"
 
 namespace mozilla {
 namespace dom {
@@ -1324,6 +1325,33 @@ Event::SetCancelBubble(bool aCancelBubble)
     mEvent->StopPropagation();
   }
   return NS_OK;
+}
+
+bool
+Event::TargetInDynamicDocShell()
+{
+  bool result = false;
+  EventTarget* target = GetTarget();
+  if (!target) {
+    return result;
+  }
+
+  nsPIDOMWindowOuter* outer = target->GetOwnerGlobalForBindings();
+  if (!outer) {
+    return result;
+  }
+
+  nsIDocShell* docShell = outer->GetDocShell();
+  if (!docShell) {
+    return result;
+  }
+
+  nsresult rv = docShell->GetCreatedDynamically(&result);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return result;
+  }
+
+  return result;
 }
 
 } // namespace dom

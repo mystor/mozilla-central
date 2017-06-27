@@ -274,6 +274,13 @@ public:
    */
   static void GetWidgetEventType(WidgetEvent* aEvent, nsAString& aType);
 
+  /**
+   * Check if this event was dispatched within a DocShell which was not
+   * dynamically added to the document. This method was added for performance
+   * reasons in SessionStorage.
+   */
+  bool TargetInDynamicDocShell();
+
 protected:
 
   // Internal helper functions

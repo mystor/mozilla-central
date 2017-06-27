@@ -54,6 +54,9 @@ interface Event {
                  optional boolean bubbles = false,
                  optional boolean cancelable = false);
   attribute boolean cancelBubble;
+
+  [ChromeOnly]
+  readonly attribute boolean targetInDynamicDocShell;
 };
 
 // Mozilla specific legacy stuff.

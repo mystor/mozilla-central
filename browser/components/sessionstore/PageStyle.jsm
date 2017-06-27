@@ -12,8 +12,8 @@ const Ci = Components.interfaces;
  * The external API exported by this module.
  */
 this.PageStyle = Object.freeze({
-  collect(docShell, frameTree) {
-    return PageStyleInternal.collect(docShell, frameTree);
+  collect(docShell, mapNonDynamicFrames) {
+    return PageStyleInternal.collect(docShell, mapNonDynamicFrames);
   },
 
   restoreTree(docShell, data) {
@@ -28,8 +28,8 @@ var PageStyleInternal = {
   /**
    * Collects the selected style sheet sets for all reachable frames.
    */
-  collect(docShell, frameTree) {
-    let result = frameTree.map(({document: doc}) => {
+  collect(docShell, mapNonDynamicFrames) {
+    let result = mapNonDynamicFrames(({document: doc}) => {
       let style;
 
       if (doc) {

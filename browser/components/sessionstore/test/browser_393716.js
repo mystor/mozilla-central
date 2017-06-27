@@ -3,7 +3,8 @@
 
 "use strict";
 
-const URL = "about:config";
+const URL = "http://mochi.test:8888/browser/" +
+        "browser/components/sessionstore/test/browser_393716_page.html";
 
 /**
  * Bug 393716 - Basic tests for getTabState(), setTabState(), and duplicateTab().

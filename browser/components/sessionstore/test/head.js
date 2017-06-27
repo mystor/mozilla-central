@@ -539,6 +539,11 @@ function modifySessionStorage(browser, storageData, storageOptions = {}) {
 
         if (keys.size == 0) {
           removeEventListener("MozSessionStorageChanged", onStorageChanged, true);
+          for (let key of keys) {
+            dump("key = " + key + "\n");
+            dump("data = " + frame.sessionStorage[key] + "\n");
+            // frame.sessionStorage[key] = data[key];
+          }
           resolve();
         }
       }, true);

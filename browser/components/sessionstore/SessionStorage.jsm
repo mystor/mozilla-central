@@ -25,19 +25,30 @@ function getPrincipalForFrame(docShell, frame) {
   return ssm.getDocShellCodebasePrincipal(uri, docShell);
 }
 
+// Loops over all of the non-dynamic docshells in the frame tree
+function eachNonDynamicDocShell(docShell, cb) {
+  if (!docShell || docShell.createdDynamically) {
+    return;
+  }
+
+  let ifreq = docShell.QueryInterface(Ci.nsIInterfaceRequestor);
+  cb(ifreq.getInterface(Ci.nsIDOMWindow));
+  for (let i = 0; i < docShell.childCount; ++i) {
+    eachNonDynamicDocShell(docShell.getChildAt(i), cb);
+  }
+}
+
 this.SessionStorage = Object.freeze({
   /**
    * Updates all sessionStorage "super cookies"
    * @param docShell
    *        That tab's docshell (containing the sessionStorage)
-   * @param frameTree
-   *        The docShell's FrameTree instance.
    * @return Returns a nested object that will have hosts as keys and per-origin
    *         session storage data as strings. For example:
    *         {"https://example.com^userContextId=1": {"key": "value", "my_number": "123"}}
    */
-  collect(docShell, frameTree) {
-    return SessionStorageInternal.collect(docShell, frameTree);
+  collect(docShell) {
+    return SessionStorageInternal.collect(docShell);
   },
 
   /**
@@ -59,17 +70,17 @@ var SessionStorageInternal = {
    * Reads all session storage data from the given docShell.
    * @param docShell
    *        A tab's docshell (containing the sessionStorage)
-   * @param frameTree
-   *        The docShell's FrameTree instance.
    * @return Returns a nested object that will have hosts as keys and per-origin
    *         session storage data as strings. For example:
    *         {"https://example.com^userContextId=1": {"key": "value", "my_number": "123"}}
    */
-  collect(docShell, frameTree) {
+  collect(docShell) {
+    dump("SessionStorageInternal.collect()\n");
+    dump(( new Error() ).stack + "\n");
     let data = {};
     let visitedOrigins = new Set();
 
-    frameTree.forEach(frame => {
+    eachNonDynamicDocShell(docShell, frame => {
       let principal = getPrincipalForFrame(docShell, frame);
       if (!principal) {
         return;
@@ -98,6 +109,8 @@ var SessionStorageInternal = {
         data[origin] = originData;
       }
     });
+
+    dump(JSON.stringify(data, null, 2) + "\n");
 
     return Object.keys(data).length ? data : null;
   },
