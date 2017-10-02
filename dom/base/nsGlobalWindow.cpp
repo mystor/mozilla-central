@@ -3842,7 +3842,7 @@ nsGlobalWindow::ConfirmDialogIfNeeded()
 {
   MOZ_ASSERT(IsOuterWindow());
 
-  NS_ENSURE_TRUE(mDocShell, false);
+  NS_ENSURE_TRUE(!IsCleanedUp(), false);
   nsCOMPtr<nsIPromptService> promptSvc =
     do_GetService("@mozilla.org/embedcomp/prompt-service;1");
 
@@ -4747,6 +4747,12 @@ nsGlobalWindow::GetParentOuter()
 {
   MOZ_RELEASE_ASSERT(IsOuterWindow());
 
+  // If we've been cleaned up, we shouldn't report that we have a parent
+  // anymore.
+  if (mCleanedUp) {
+    return nullptr;
+  }
+
   if (!mDocShell) {
     return nullptr;
   }
@@ -5090,7 +5096,7 @@ nsGlobalWindow::GetClosedOuter()
   MOZ_RELEASE_ASSERT(IsOuterWindow());
 
   // If someone called close(), or if we don't have a docshell, we're closed.
-  return mIsClosed || !mDocShell;
+  return mIsClosed || mCleanedUp;
 }
 
 bool
@@ -5429,6 +5435,12 @@ nsGlobalWindow::GetSanitizedOpener(nsPIDOMWindowOuter* aOpener)
 
   // First, ensure that we're not handing back a chrome window to content:
   if (win->IsChromeWindow()) {
+    return nullptr;
+  }
+
+  // If we or the opener have been cleaned up we should report a null as our
+  // opener.
+  if (mCleanedUp || win->mCleanedUp) {
     return nullptr;
   }
 
@@ -9373,7 +9385,7 @@ nsGlobalWindow::CloseOuter(bool aTrustedCaller)
 {
   MOZ_RELEASE_ASSERT(IsOuterWindow());
 
-  if (!mDocShell || IsInModalState() ||
+  if (mCleanedUp || !mDocShell || IsInModalState() ||
       (IsFrame() && !mDocShell->GetIsMozBrowser())) {
     // window.close() is called on a frame in a frameset, on a window
     // that's already closed, or on a window for which there's
@@ -9463,7 +9475,7 @@ nsGlobalWindow::ForceClose()
   MOZ_ASSERT(IsOuterWindow());
   MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
 
-  if (IsFrame() || !mDocShell) {
+  if (IsFrame() || mCleanedUp) {
     // This may be a frame in a frameset, or a window that's already closed.
     // Ignore such calls.
     return;
