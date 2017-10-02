@@ -5974,7 +5974,6 @@ nsDocShell::Destroy()
 
   if (mScriptGlobal) {
     mScriptGlobal->DetachFromDocShell();
-    mScriptGlobal = nullptr;
   }
 
   if (mSessionHistory) {
