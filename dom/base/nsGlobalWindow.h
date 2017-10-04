@@ -1917,9 +1917,6 @@ protected:
   // For |window.arguments|, via |openDialog|.
   nsCOMPtr<nsIArray>            mArguments;
 
-  // Only used in the outer.
-  RefPtr<DialogValueHolder> mReturnValue;
-
   RefPtr<mozilla::dom::Navigator> mNavigator;
   RefPtr<nsScreen>            mScreen;
   RefPtr<nsDOMWindowList>     mFrames;
