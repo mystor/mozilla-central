@@ -4651,6 +4651,12 @@ nsDocShell::GetWindow()
   return mScriptGlobal->AsOuter();
 }
 
+nsIDocShell*
+nsDocShell::GetDocShell()
+{
+  return this;
+}
+
 NS_IMETHODIMP
 nsDocShell::SetDeviceSizeIsPageSize(bool aValue)
 {

@@ -553,6 +553,12 @@ nsWebBrowser::GetWindow()
   return mDocShell ? mDocShell->GetWindow() : nullptr;
 }
 
+nsIDocShell*
+nsWebBrowser::GetDocShell()
+{
+  return mDocShell;
+}
+
 NS_IMETHODIMP
 nsWebBrowser::GetTreeOwner(nsIDocShellTreeOwner** aTreeOwner)
 {
