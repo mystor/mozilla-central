@@ -415,6 +415,65 @@ static uint32_t gThrottledIdlePeriodLength;
   }                                                                           \
   PR_END_MACRO
 
+#define FORWARD_TO_DOCSHELL(method, args, err_rval)                     \
+  PR_BEGIN_MACRO                                                        \
+  nsIDocShell* docShell = mDocShell;                                    \
+  if (IsInnerWindow()) {                                                \
+    nsGlobalWindow* outer = GetOuterWindowInternal();                   \
+    if (!AsInner()->HasActiveDocument()) {                              \
+      NS_WARNING(outer ?                                                \
+                 "Inner window does not have active document." :        \
+                 "No outer window available!");                         \
+      return err_rval;                                                  \
+    }                                                                   \
+    docShell = outer->mDocShell;                                        \
+  }                                                                     \
+  if (!docShell) {                                                      \
+    NS_WARNING("Outer window doesn't have a docshell!");                \
+    return err_rval;                                                    \
+  }                                                                     \
+  return nsDocShell::Cast(docShell)->method args;                       \
+  PR_END_MACRO
+
+#define FORWARD_TO_DOCSHELL_OR_THROW(method, args, errorresult, err_rval) \
+  PR_BEGIN_MACRO                                                        \
+  MOZ_RELEASE_ASSERT(IsInnerWindow());                                  \
+  nsGlobalWindow* outer = GetOuterWindowInternal();                     \
+  if (MOZ_LIKELY(AsInner()->HasActiveDocument() && outer->mDocShell)) { \
+    return nsDocShell::Cast(outer->mDocShell)->method args;             \
+  }                                                                     \
+  if (!outer) {                                                         \
+    NS_WARNING("No outer window available!");                           \
+    errorresult.Throw(NS_ERROR_NOT_INITIALIZED);                        \
+  } else if (!outer->mDocShell) {                                       \
+    NS_WARNING("No docshell available!");                               \
+    errorresult.Throw(NS_ERROR_NOT_INITIALIZED);                        \
+  } else {                                                              \
+    errorresult.Throw(NS_ERROR_XPC_SECURITY_MANAGER_VETO);              \
+  }                                                                     \
+  return err_rval;                                                      \
+  PR_END_MACRO
+
+#define FORWARD_TO_DOCSHELL_VOID(method, args, err_rval)                \
+  PR_BEGIN_MACRO                                                        \
+  nsIDocShell* docShell = mDocShell;                                    \
+  if (IsInnerWindow()) {                                                \
+    nsGlobalWindow* outer = GetOuterWindowInternal();                   \
+    if (!AsInner()->HasActiveDocument()) {                              \
+      NS_WARNING(outer ?                                                \
+                 "Inner window does not have active document." :        \
+                 "No outer window available!");                         \
+      return err_rval;                                                  \
+    }                                                                   \
+    docShell = outer->mDocShell;                                        \
+  }                                                                     \
+  if (!docShell) {                                                      \
+    NS_WARNING("Outer window doesn't have a docshell!");                \
+    return err_rval;                                                    \
+  }                                                                     \
+  nsDocShell::Cast(docShell)->method args;                              \
+  PR_END_MACRO
+
 // CIDs
 static NS_DEFINE_CID(kXULControllersCID, NS_XULCONTROLLERS_CID);
 
