@@ -39,6 +39,7 @@
 #include "nsCharsetSource.h"
 #include "nsJSEnvironment.h"
 #include "nsJSUtils.h"
+#include "nsDocShell.h"
 
 #include "mozilla/ChaosMode.h"
 #include "mozilla/EventStateManager.h"
@@ -3796,7 +3797,7 @@ nsDOMWindowUtils::AllowScriptsToClose()
 {
   nsCOMPtr<nsPIDOMWindowOuter> window = do_QueryReferent(mWindow);
   NS_ENSURE_STATE(window);
-  nsGlobalWindow::Cast(window)->AllowScriptsToClose();
+  nsDocShell::Cast(window->GetDocShell())->AllowScriptsToClose();
   return NS_OK;
 }
 

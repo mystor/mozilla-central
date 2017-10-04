@@ -1112,6 +1112,10 @@ nsDocShell::nsDocShell()
   , mBlankTiming(false)
   , mFullScreen(false)
   , mFullscreenMode(false)
+  , mIsClosed(false)
+  , mInClose(false)
+  , mHavePendingClose(false)
+  , mAllowScriptsToClose(false)
   , mCreatingDocument(false)
 #ifdef DEBUG
   , mInEnsureScriptEnv(false)
@@ -1235,7 +1239,8 @@ NS_IMPL_CYCLE_COLLECTION_INHERITED(nsDocShell,
                                    nsDocLoader,
                                    mSessionStorageManager,
                                    mScriptGlobal,
-                                   mWakeLock)
+                                   mWakeLock,
+                                   mBrowserDOMWindow)
 
 NS_IMPL_ADDREF_INHERITED(nsDocShell, nsDocLoader)
 NS_IMPL_RELEASE_INHERITED(nsDocShell, nsDocLoader)
@@ -15804,5 +15809,275 @@ nsDocShell::FullScreen()
 
   return Cast(docShell)->FullScreen();
 }
+
+class nsCloseEvent : public Runnable {
+
+  RefPtr<nsDocShell> mDocShell;
+  bool mIndirect;
+
+  nsCloseEvent(nsDocShell* aDocShell, bool aIndirect)
+    : mozilla::Runnable("nsCloseEvent")
+    , mDocShell(aDocShell)
+    , mIndirect(aIndirect)
+    {}
+
+public:
+
+  static nsresult
+  PostCloseEvent(nsDocShell* aDocShell, bool aIndirect) {
+    nsCOMPtr<nsIRunnable> ev = new nsCloseEvent(aDocShell, aIndirect);
+    nsresult rv =
+      aDocShell->DispatchToTabGroup(TaskCategory::Other, ev.forget());
+    if (NS_SUCCEEDED(rv)) {
+      nsGlobalWindow::Cast(aDocShell->GetWindow())->MaybeForgiveSpamCount();
+    }
+    return rv;
+  }
+
+  NS_IMETHOD Run() override {
+    if (mDocShell) {
+      if (mIndirect) {
+        return PostCloseEvent(mDocShell, false);
+      }
+      mDocShell->ReallyCloseWindow();
+    }
+    return NS_OK;
+  }
+
+};
+
+
+bool
+nsDocShell::CanClose()
+{
+  if (mItemType == typeChrome) {
+    bool canClose = true;
+    if (mBrowserDOMWindow && NS_SUCCEEDED(mBrowserDOMWindow->CanClose(&canClose))) {
+      return canClose;
+    }
+  }
+
+  // Ask the content viewer whether the toplevel window can close.
+  // If the content viewer returns false, it is responsible for calling
+  // Close() as soon as it is possible for the window to close.
+  // This allows us to not close the window while printing is happening.
+
+  nsCOMPtr<nsIContentViewer> cv;
+  GetContentViewer(getter_AddRefs(cv));
+  if (cv) {
+    bool canClose;
+    nsresult rv = cv->PermitUnload(&canClose);
+    if (NS_SUCCEEDED(rv) && !canClose) {
+      return false;
+    }
+
+    rv = cv->RequestWindowClose(&canClose);
+    if (NS_SUCCEEDED(rv) && !canClose) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+void
+nsDocShell::Close(bool aTrustedCaller)
+{
+  if (!mScriptGlobal || mIsBeingDestroyed ||
+      mScriptGlobal->IsInModalState() ||
+      (mScriptGlobal->IsFrame() && !GetIsMozBrowser())) {
+    // window.close() is called on a frame in a frameset, on a window
+    // that's already closed, or on a window for which there's
+    // currently a modal dialog open. Ignore such calls.
+    return;
+  }
+
+  if (mHavePendingClose) {
+    // We're going to be closed anyway; do nothing since we don't want
+    // to double-close
+    return;
+  }
+
+  // XXX(nika): Move this onto nsDocShell?
+  if (mScriptGlobal->mBlockScriptedClosingFlag)
+  {
+    // A script's popup has been blocked and we don't want
+    // the window to be closed directly after this event,
+    // so the user can see that there was a blocked popup.
+    return;
+  }
+
+  // Don't allow scripts from content to close non-neterror windows that
+  // were not opened by script.
+  nsAutoString url;
+  nsresult rv = mScriptGlobal->GetExtantDoc()->GetURL(url);
+  NS_ENSURE_SUCCESS_VOID(rv);
+
+  if (!StringBeginsWith(url, NS_LITERAL_STRING("about:neterror")) &&
+      !mScriptGlobal->mHadOriginalOpener && !aTrustedCaller) {
+    bool allowClose = mAllowScriptsToClose ||
+      Preferences::GetBool("dom.allow_scripts_to_close_windows", true);
+    if (!allowClose) {
+      // We're blocking the close operation
+      // report localized error msg in JS console
+      nsContentUtils::ReportToConsole(
+          nsIScriptError::warningFlag,
+          NS_LITERAL_CSTRING("DOM Window"),  // Better name for the category?
+          mScriptGlobal->GetExtantDoc(),
+          nsContentUtils::eDOM_PROPERTIES,
+          "WindowCloseBlockedWarning");
+
+      return;
+    }
+  }
+
+  if (!mInClose && !mIsClosed && !CanClose()) {
+    return;
+  }
+
+  // Fire a DOM event notifying listeners that this window is about to
+  // be closed. The tab UI code may choose to cancel the default
+  // action for this event, if so, we won't actually close the window
+  // (since the tab UI code will close the tab in stead). Sure, this
+  // could be abused by content code, but do we care? I don't think
+  // so...
+
+  bool wasInClose = mInClose;
+  mInClose = true;
+
+  if (!mScriptGlobal->DispatchCustomEvent(NS_LITERAL_STRING("DOMWindowClose"))) {
+    // Someone chose to prevent the default action for this event, if
+    // so, let's not close this window after all...
+
+    mInClose = wasInClose;
+    return;
+  }
+
+  FinalClose();
+}
+
+void
+nsDocShell::ForceClose()
+{
+  MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
+
+  if (!mScriptGlobal || mScriptGlobal->IsFrame() || mIsBeingDestroyed) {
+    // This may be a frame in a frameset, or a window that's already closed.
+    // Ignore such calls.
+    return;
+  }
+
+  if (mHavePendingClose) {
+    // We're going to be closed anyway; do nothing since we don't want
+    // to double-close
+    return;
+  }
+
+  mInClose = true;
+
+  mScriptGlobal->DispatchCustomEvent(NS_LITERAL_STRING("DOMWindowClose"));
+
+  FinalClose();
+}
+
+void
+nsDocShell::FinalClose()
+{
+  // Flag that we were closed.
+  mIsClosed = true;
+
+  // If we get here from CloseOuter then it means that the parent process is
+  // going to close our window for us. It's just important to set mIsClosed.
+  if (XRE_GetProcessType() == GeckoProcessType_Content) {
+    return;
+  }
+
+  // This stuff is non-sensical but incredibly fragile. The reasons for the
+  // behavior here don't make sense today and may not have ever made sense,
+  // but various bits of frontend code break when you change them. If you need
+  // to fix up this behavior, feel free to. It's a righteous task, but involves
+  // wrestling with various download manager tests, frontend code, and possible
+  // broken addons. The chrome tests in toolkit/mozapps/downloads are a good
+  // testing ground.
+  //
+  // In particular, if some inner of |win| is the entry global, we must
+  // complete _two_ round-trips to the event loop before the call to
+  // ReallyCloseWindow. This allows setTimeout handlers that are set after
+  // FinalClose() is called to run before the window is torn down.
+  nsCOMPtr<nsPIDOMWindowInner> entryWindow =
+    do_QueryInterface(GetEntryGlobal());
+  bool indirect = entryWindow && entryWindow->GetDocShell() == this;
+  if (NS_FAILED(nsCloseEvent::PostCloseEvent(this, indirect))) {
+    ReallyCloseWindow();
+  } else {
+    mHavePendingClose = true;
+  }
+}
+
+void
+nsDocShell::ReallyCloseWindow()
+{
+  // Make sure we never reenter this method.
+  mHavePendingClose = true;
+
+  nsCOMPtr<nsIBaseWindow> treeOwnerAsWin = do_QueryInterface(mTreeOwner);
+
+  // If there's no treeOwnerAsWin, this window must already be closed.
+
+  if (treeOwnerAsWin) {
+
+    // but if we're a browser window we could be in some nasty
+    // self-destroying cascade that we should mostly ignore
+
+    nsCOMPtr<nsIDocShellTreeItem> rootItem;
+    GetRootTreeItem(getter_AddRefs(rootItem));
+    nsCOMPtr<nsIDocShell> rootShell =
+      rootItem ? rootItem->GetDocShell() : nullptr;
+
+    if (rootShell) {
+      nsCOMPtr<nsIBrowserDOMWindow> bwin;
+      if (rootShell->ItemType() == typeChrome) {
+        bwin = Cast(rootShell)->mBrowserDOMWindow;
+      }
+
+      /* Normally we destroy the entire window, but not if
+          this DOM window belongs to a tabbed browser and doesn't
+          correspond to a tab. This allows a well-behaved tab
+          to destroy the container as it should but is a final measure
+          to prevent an errant tab from doing so when it shouldn't.
+          This works because we reach this code when we shouldn't only
+          in the particular circumstance that we belong to a tab
+          that has just been closed (and is therefore already missing
+          from the list of browsers) (and has an unload handler
+          that closes the window). */
+      // XXXbz now that we have mHavePendingClose, is this needed?
+      bool isTab;
+      if (rootShell == this ||
+          !bwin ||
+          (NS_SUCCEEDED(bwin->IsTabContentWindow(Cast(rootShell)->mScriptGlobal,
+                                                 &isTab)) && isTab)) {
+        treeOwnerAsWin->Destroy();
+      }
+    }
+
+    if (mScriptGlobal) {
+      mScriptGlobal->CleanUp();
+    }
+  }
+}
+
+nsIBrowserDOMWindow*
+nsDocShell::GetBrowserDOMWindow() {
+  MOZ_ASSERT(mItemType == typeChrome);
+  return mBrowserDOMWindow;
+}
+
+void
+nsDocShell::SetBrowserDOMWindow(nsIBrowserDOMWindow* aWindow)
+{
+  MOZ_ASSERT(mItemType == typeChrome);
+  mBrowserDOMWindow = aWindow;
+}
+
 
 // END MEMBER FUNCTIONS

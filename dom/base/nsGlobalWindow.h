@@ -308,9 +308,6 @@ public:
   // public methods
   nsPIDOMWindowOuter* GetPrivateParent();
 
-  // callback for close event
-  void ReallyCloseWindow();
-
   // nsISupports
   NS_DECL_CYCLE_COLLECTING_ISUPPORTS
 
@@ -432,10 +429,6 @@ public:
 
   virtual void EnterModalState() override;
   virtual void LeaveModalState() override;
-
-  // Outer windows only.
-  virtual bool CanClose() override;
-  virtual void ForceClose() override;
 
   virtual void MaybeUpdateTouchState() override;
 
@@ -653,12 +646,7 @@ public:
   virtual nsresult SetArguments(nsIArray* aArguments) override;
 
   void MaybeForgiveSpamCount();
-  bool IsClosedOrClosing() {
-    return (mIsClosed ||
-            mInClose ||
-            mHavePendingClose ||
-            mCleanedUp);
-  }
+  bool IsClosedOrClosing();
 
   bool
   IsCleanedUp() const
@@ -730,11 +718,6 @@ public:
   nsresult HandleIdleActiveEvent();
   bool ContainsIdleObserver(nsIIdleObserver* aIdleObserver, uint32_t timeInS);
   void HandleIdleObserverCallback();
-
-  void AllowScriptsToClose()
-  {
-    mAllowScriptsToClose = true;
-  }
 
   enum SlowScriptResponse {
     ContinueSlowScript = 0,
@@ -1263,9 +1246,7 @@ public:
   // fact chrome.
   uint16_t WindowState();
   bool IsFullyOccluded();
-  nsIBrowserDOMWindow* GetBrowserDOMWindowOuter();
   nsIBrowserDOMWindow* GetBrowserDOMWindow(mozilla::ErrorResult& aError);
-  void SetBrowserDOMWindowOuter(nsIBrowserDOMWindow* aBrowserWindow);
   void SetBrowserDOMWindow(nsIBrowserDOMWindow* aBrowserWindow,
                            mozilla::ErrorResult& aError);
   void GetAttention(mozilla::ErrorResult& aError);
@@ -1447,8 +1428,6 @@ protected:
   void DropOuterWindowDocs();
   void CleanUp();
   void ClearControllers();
-  // Outer windows only.
-  void FinalClose();
 
   inline void MaybeClearInnerWindow(nsGlobalWindow* aExpectedInner)
   {
@@ -1836,12 +1815,7 @@ public:
 protected:
   // These members are only used on outer window objects. Make sure
   // you never set any of these on an inner object!
-  bool                          mIsClosed : 1;
-  bool                          mInClose : 1;
-  // mHavePendingClose means we've got a termination function set to
-  // close us when the JS stops executing or that we have a close
-  // event posted.  If this is set, just ignore window.close() calls.
-  bool                          mHavePendingClose : 1;
+
   bool                          mHadOriginalOpener : 1;
   bool                          mOriginalOpenerWasSecureContext : 1;
   bool                          mIsSecureContextIfOpenerIgnored : 1;
@@ -1904,9 +1878,6 @@ protected:
 
   // whether we've sent the destroy notification for our window id
   bool                   mNotifiedIDDestroyed : 1;
-  // whether scripts may close the window,
-  // even if "dom.allow_scripts_to_close_windows" is false.
-  bool                   mAllowScriptsToClose : 1;
 
   bool mTopLevelOuterContentWindow : 1;
 
@@ -2052,7 +2023,6 @@ protected:
       : mGroupMessageManagers(1)
     {}
 
-    nsCOMPtr<nsIBrowserDOMWindow> mBrowserDOMWindow;
     nsCOMPtr<nsIMessageBroadcaster> mMessageManager;
     nsInterfaceHashtable<nsStringHashKey, nsIMessageBroadcaster> mGroupMessageManagers;
     nsCOMPtr<mozIDOMWindowProxy> mOpenerForInitialContentBrowser;
@@ -2060,6 +2030,7 @@ protected:
 
   friend class nsDOMScriptableHelper;
   friend class nsDOMWindowUtils;
+  friend class nsDocShell;
   friend class mozilla::dom::PostMessageEvent;
   friend class DesktopNotification;
   friend class mozilla::dom::TimeoutManager;

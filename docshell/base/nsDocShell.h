@@ -84,6 +84,7 @@ class nsIScrollableFrame;
 class OnLinkClickEvent;
 class nsDSURIContentListener;
 class nsDocShellEditorData;
+class nsIBrowserDOMWindow;
 class nsIClipboardDragDropHookList;
 class nsICommandManager;
 class nsIContentViewer;
@@ -162,9 +163,11 @@ class nsDocShell final
   , public nsIDeprecationWarner
   , public mozilla::SupportsWeakPtr<nsDocShell>
 {
+  friend class nsGlobalWindow;
   friend class nsDSURIContentListener;
   friend class FramingChecker;
   friend class FullscreenTransitionTask;
+  friend class nsCloseEvent;
   using Encoding = mozilla::Encoding;
 
 public:
@@ -903,6 +906,24 @@ public:
                            nsIWidget* aWidget, nsIScreen* aScreen);
   bool FullScreen();
 
+  /**
+   * Sets the mAllowScriptsToClose member, which overrides the
+   * dom.allow_scripts_to_close_windows pref.
+   */
+  void AllowScriptsToClose()
+  {
+    mAllowScriptsToClose = true;
+  }
+
+  void Close(bool aTrustedCaller);
+  void ReallyCloseWindow();
+  bool CanClose();
+  void ForceClose();
+
+  // NOTE: Chrome docshells only
+  nsIBrowserDOMWindow* GetBrowserDOMWindow();
+  void SetBrowserDOMWindow(nsIBrowserDOMWindow* aWindow);
+
 protected:
   bool JustStartedNetworkLoad();
 
@@ -929,6 +950,8 @@ protected:
   void UpdateGlobalHistoryTitle(nsIURI* aURI);
 
   NS_IMETHOD_(void) GetOriginAttributes(mozilla::OriginAttributes& aAttrs) override;
+
+  void FinalClose();
 
   // Dimensions of the docshell
   nsIntRect mBounds;
@@ -1001,6 +1024,9 @@ protected:
   // the LOAD_NORMAL_ALLOW_MIXED_CONTENT flag is set.
   // Checked in nsMixedContentBlocker, to see if the channels match.
   nsCOMPtr<nsIChannel> mMixedContentChannel;
+
+  // This field is only present on chrome docshells.
+  nsCOMPtr<nsIBrowserDOMWindow> mBrowserDOMWindow;
 
   // WEAK REFERENCES BELOW HERE.
   // Note these are intentionally not addrefd. Doing so will create a cycle.
@@ -1134,6 +1160,18 @@ protected:
 
   bool mFullScreen : 1;
   bool mFullscreenMode : 1;
+
+  bool mIsClosed : 1;
+  bool mInClose : 1;
+
+  // mHavePendingClose means we've got a termination function set to
+  // close us when the JS stops executing or that we have a close
+  // event posted.  If this is set, just ignore window.close() calls.
+  bool mHavePendingClose : 1;
+
+  // whether scripts may close the window,
+  // even if "dom.allow_scripts_to_close_windows" is false.
+  bool mAllowScriptsToClose : 1;
 
   // The following two fields cannot be declared as bit fields
   // because of uses with AutoRestore.
