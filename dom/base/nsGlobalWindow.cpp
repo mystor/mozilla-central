@@ -166,6 +166,7 @@
 #include "nsIJARChannel.h"
 #include "nsIScreenManager.h"
 #include "nsIEffectiveTLDService.h"
+#include "nsDocShell.h"
 
 #include "xpcprivate.h"
 
@@ -1535,8 +1536,6 @@ nsGlobalWindow::nsGlobalWindow(nsGlobalWindow *aOuterWindow)
     mIdleCallbackIndex(-1),
     mCurrentlyIdle(false),
     mAddActiveEventFuzzTime(true),
-    mFullScreen(false),
-    mFullscreenMode(false),
     mIsClosed(false),
     mInClose(false),
     mHavePendingClose(false),
@@ -2290,7 +2289,6 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INTERNAL(nsGlobalWindow)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mTabChild)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mDoc)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mIdleService)
-  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mWakeLock)
 
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mIdleRequestExecutor)
   for (IdleRequest* request : tmp->mIdleRequestCallbacks) {
@@ -2381,7 +2379,6 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(nsGlobalWindow)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mTabChild)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mDoc)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mIdleService)
-  NS_IMPL_CYCLE_COLLECTION_UNLINK(mWakeLock)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mIdleObservers)
 
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mGamepads)
@@ -6889,7 +6886,13 @@ nsGlobalWindow::SetFullScreenOuter(bool aFullScreen, mozilla::ErrorResult& aErro
 {
   MOZ_RELEASE_ASSERT(IsOuterWindow());
 
-  aError = SetFullscreenInternal(FullscreenReason::ForFullscreenMode, aFullScreen);
+  if (!mDocShell) {
+    aError.Throw(NS_ERROR_FAILURE);
+    return;
+  }
+
+  aError = nsDocShell::Cast(mDocShell)->
+    SetFullscreenInternal(FullscreenReason::ForFullscreenMode, aFullScreen);
 }
 
 void
@@ -6903,509 +6906,20 @@ nsGlobalWindow::SetFullScreen(bool aFullScreen)
 {
   FORWARD_TO_OUTER(SetFullScreen, (aFullScreen), NS_ERROR_NOT_INITIALIZED);
 
-  return SetFullscreenInternal(FullscreenReason::ForFullscreenMode, aFullScreen);
-}
-
-static void
-FinishDOMFullscreenChange(nsIDocument* aDoc, bool aInDOMFullscreen)
-{
-  if (aInDOMFullscreen) {
-    // Ask the document to handle any pending DOM fullscreen change.
-    if (!nsIDocument::HandlePendingFullscreenRequests(aDoc)) {
-      // If we don't end up having anything in fullscreen,
-      // async request exiting fullscreen.
-      nsIDocument::AsyncExitFullscreen(aDoc);
-    }
-  } else {
-    // If the window is leaving fullscreen state, also ask the document
-    // to exit from DOM Fullscreen.
-    nsIDocument::ExitFullscreenInDocTree(aDoc);
-  }
-}
-
-struct FullscreenTransitionDuration
-{
-  // The unit of the durations is millisecond
-  uint16_t mFadeIn = 0;
-  uint16_t mFadeOut = 0;
-  bool IsSuppressed() const
-  {
-    return mFadeIn == 0 && mFadeOut == 0;
-  }
-};
-
-static void
-GetFullscreenTransitionDuration(bool aEnterFullscreen,
-                                FullscreenTransitionDuration* aDuration)
-{
-  const char* pref = aEnterFullscreen ?
-    "full-screen-api.transition-duration.enter" :
-    "full-screen-api.transition-duration.leave";
-  nsAutoCString prefValue;
-  Preferences::GetCString(pref, prefValue);
-  if (!prefValue.IsEmpty()) {
-    sscanf(prefValue.get(), "%hu%hu",
-           &aDuration->mFadeIn, &aDuration->mFadeOut);
-  }
-}
-
-class FullscreenTransitionTask : public Runnable
-{
-public:
-  FullscreenTransitionTask(const FullscreenTransitionDuration& aDuration,
-                           nsGlobalWindow* aWindow,
-                           bool aFullscreen,
-                           nsIWidget* aWidget,
-                           nsIScreen* aScreen,
-                           nsISupports* aTransitionData)
-    : mozilla::Runnable("FullscreenTransitionTask")
-    , mWindow(aWindow)
-    , mWidget(aWidget)
-    , mScreen(aScreen)
-    , mTransitionData(aTransitionData)
-    , mDuration(aDuration)
-    , mStage(eBeforeToggle)
-    , mFullscreen(aFullscreen)
-  {
-  }
-
-  NS_IMETHOD Run() override;
-
-private:
-  ~FullscreenTransitionTask() override
-  {
-  }
-
-  /**
-   * The flow of fullscreen transition:
-   *
-   *         parent process         |         child process
-   * ----------------------------------------------------------------
-   *
-   *                                    | request/exit fullscreen
-   *                              <-----|
-   *         BeforeToggle stage |
-   *                            |
-   *  ToggleFullscreen stage *1 |----->
-   *                                    | HandleFullscreenRequests
-   *                                    |
-   *                              <-----| MozAfterPaint event
-   *       AfterToggle stage *2 |
-   *                            |
-   *                  End stage |
-   *
-   * Note we also start a timer at *1 so that if we don't get MozAfterPaint
-   * from the child process in time, we continue going to *2.
-   */
-  enum Stage {
-    // BeforeToggle stage happens before we enter or leave fullscreen
-    // state. In this stage, the task triggers the pre-toggle fullscreen
-    // transition on the widget.
-    eBeforeToggle,
-    // ToggleFullscreen stage actually executes the fullscreen toggle,
-    // and wait for the next paint on the content to continue.
-    eToggleFullscreen,
-    // AfterToggle stage happens after we toggle the fullscreen state.
-    // In this stage, the task triggers the post-toggle fullscreen
-    // transition on the widget.
-    eAfterToggle,
-    // End stage is triggered after the final transition finishes.
-    eEnd
-  };
-
-  class Observer final : public nsIObserver
-  {
-  public:
-    NS_DECL_ISUPPORTS
-    NS_DECL_NSIOBSERVER
-
-    explicit Observer(FullscreenTransitionTask* aTask)
-      : mTask(aTask) { }
-
-  private:
-    ~Observer() = default;
-
-    RefPtr<FullscreenTransitionTask> mTask;
-  };
-
-  static const char* const kPaintedTopic;
-
-  RefPtr<nsGlobalWindow> mWindow;
-  nsCOMPtr<nsIWidget> mWidget;
-  nsCOMPtr<nsIScreen> mScreen;
-  nsCOMPtr<nsITimer> mTimer;
-  nsCOMPtr<nsISupports> mTransitionData;
-
-  TimeStamp mFullscreenChangeStartTime;
-  FullscreenTransitionDuration mDuration;
-  Stage mStage;
-  bool mFullscreen;
-};
-
-const char* const
-FullscreenTransitionTask::kPaintedTopic = "fullscreen-painted";
-
-NS_IMETHODIMP
-FullscreenTransitionTask::Run()
-{
-  Stage stage = mStage;
-  mStage = Stage(mStage + 1);
-  if (MOZ_UNLIKELY(mWidget->Destroyed())) {
-    // If the widget has been destroyed before we get here, don't try to
-    // do anything more. Just let it go and release ourselves.
-    NS_WARNING("The widget to fullscreen has been destroyed");
-    return NS_OK;
-  }
-  if (stage == eBeforeToggle) {
-    PROFILER_ADD_MARKER("Fullscreen transition start");
-    mWidget->PerformFullscreenTransition(nsIWidget::eBeforeFullscreenToggle,
-                                         mDuration.mFadeIn, mTransitionData,
-                                         this);
-  } else if (stage == eToggleFullscreen) {
-    PROFILER_ADD_MARKER("Fullscreen toggle start");
-    mFullscreenChangeStartTime = TimeStamp::Now();
-    if (MOZ_UNLIKELY(mWindow->mFullScreen != mFullscreen)) {
-      // This could happen in theory if several fullscreen requests in
-      // different direction happen continuously in a short time. We
-      // need to ensure the fullscreen state matches our target here,
-      // otherwise the widget would change the window state as if we
-      // toggle for Fullscreen Mode instead of Fullscreen API.
-      NS_WARNING("The fullscreen state of the window does not match");
-      mWindow->mFullScreen = mFullscreen;
-    }
-    // Toggle the fullscreen state on the widget
-    if (!mWindow->SetWidgetFullscreen(FullscreenReason::ForFullscreenAPI,
-                                      mFullscreen, mWidget, mScreen)) {
-      // Fail to setup the widget, call FinishFullscreenChange to
-      // complete fullscreen change directly.
-      mWindow->FinishFullscreenChange(mFullscreen);
-    }
-    // Set observer for the next content paint.
-    nsCOMPtr<nsIObserver> observer = new Observer(this);
-    nsCOMPtr<nsIObserverService> obs = mozilla::services::GetObserverService();
-    obs->AddObserver(observer, kPaintedTopic, false);
-    // There are several edge cases where we may never get the paint
-    // notification, including:
-    // 1. the window/tab is closed before the next paint;
-    // 2. the user has switched to another tab before we get here.
-    // Completely fixing those cases seems to be tricky, and since they
-    // should rarely happen, it probably isn't worth to fix. Hence we
-    // simply add a timeout here to ensure we never hang forever.
-    // In addition, if the page is complicated or the machine is less
-    // powerful, layout could take a long time, in which case, staying
-    // in black screen for that long could hurt user experience even
-    // more than exposing an intermediate state.
-    uint32_t timeout =
-      Preferences::GetUint("full-screen-api.transition.timeout", 1000);
-    NS_NewTimerWithObserver(getter_AddRefs(mTimer),
-                            observer, timeout, nsITimer::TYPE_ONE_SHOT);
-  } else if (stage == eAfterToggle) {
-    Telemetry::AccumulateTimeDelta(Telemetry::FULLSCREEN_TRANSITION_BLACK_MS,
-                                   mFullscreenChangeStartTime);
-    mWidget->PerformFullscreenTransition(nsIWidget::eAfterFullscreenToggle,
-                                         mDuration.mFadeOut, mTransitionData,
-                                         this);
-  } else if (stage == eEnd) {
-    PROFILER_ADD_MARKER("Fullscreen transition end");
-  }
-  return NS_OK;
-}
-
-NS_IMPL_ISUPPORTS(FullscreenTransitionTask::Observer, nsIObserver)
-
-NS_IMETHODIMP
-FullscreenTransitionTask::Observer::Observe(nsISupports* aSubject,
-                                            const char* aTopic,
-                                            const char16_t* aData)
-{
-  bool shouldContinue = false;
-  if (strcmp(aTopic, FullscreenTransitionTask::kPaintedTopic) == 0) {
-    nsCOMPtr<nsPIDOMWindowInner> win(do_QueryInterface(aSubject));
-    nsCOMPtr<nsIWidget> widget = win ?
-      nsGlobalWindow::Cast(win)->GetMainWidget() : nullptr;
-    if (widget == mTask->mWidget) {
-      // The paint notification arrives first. Cancel the timer.
-      mTask->mTimer->Cancel();
-      shouldContinue = true;
-      PROFILER_ADD_MARKER("Fullscreen toggle end");
-    }
-  } else {
-#ifdef DEBUG
-    MOZ_ASSERT(strcmp(aTopic, NS_TIMER_CALLBACK_TOPIC) == 0,
-               "Should only get fullscreen-painted or timer-callback");
-    nsCOMPtr<nsITimer> timer(do_QueryInterface(aSubject));
-    MOZ_ASSERT(timer && timer == mTask->mTimer,
-               "Should only trigger this with the timer the task created");
-#endif
-    shouldContinue = true;
-    PROFILER_ADD_MARKER("Fullscreen toggle timeout");
-  }
-  if (shouldContinue) {
-    nsCOMPtr<nsIObserverService> obs = mozilla::services::GetObserverService();
-    obs->RemoveObserver(this, kPaintedTopic);
-    mTask->mTimer = nullptr;
-    mTask->Run();
-  }
-  return NS_OK;
-}
-
-static bool
-MakeWidgetFullscreen(nsGlobalWindow* aWindow, FullscreenReason aReason,
-                     bool aFullscreen)
-{
-  nsCOMPtr<nsIWidget> widget = aWindow->GetMainWidget();
-  if (!widget) {
-    return false;
-  }
-
-  FullscreenTransitionDuration duration;
-  bool performTransition = false;
-  nsCOMPtr<nsISupports> transitionData;
-  if (aReason == FullscreenReason::ForFullscreenAPI) {
-    GetFullscreenTransitionDuration(aFullscreen, &duration);
-    if (!duration.IsSuppressed()) {
-      performTransition = widget->
-        PrepareForFullscreenTransition(getter_AddRefs(transitionData));
-    }
-  }
-  // We pass nullptr as the screen to SetWidgetFullscreen
-  // and FullscreenTransitionTask, as we do not wish to override
-  // the default screen selection behavior.  The screen containing
-  // most of the widget will be selected.
-  if (!performTransition) {
-    return aWindow->SetWidgetFullscreen(aReason, aFullscreen, widget, nullptr);
-  }
-  nsCOMPtr<nsIRunnable> task =
-    new FullscreenTransitionTask(duration, aWindow, aFullscreen,
-                                 widget, nullptr, transitionData);
-  task->Run();
-  return true;
-}
-
-nsresult
-nsGlobalWindow::SetFullscreenInternal(FullscreenReason aReason,
-                                      bool aFullScreen)
-{
-  MOZ_ASSERT(IsOuterWindow());
-  MOZ_ASSERT(nsContentUtils::IsSafeToRunScript(),
-             "Requires safe to run script as it "
-             "may call FinishDOMFullscreenChange");
-
-  NS_ENSURE_TRUE(mDocShell, NS_ERROR_FAILURE);
-
-  MOZ_ASSERT(aReason != FullscreenReason::ForForceExitFullscreen || !aFullScreen,
-             "FullscreenReason::ForForceExitFullscreen can "
-             "only be used with exiting fullscreen");
-
-  // Only chrome can change our fullscreen mode. Otherwise, the state
-  // can only be changed for DOM fullscreen.
-  if (aReason == FullscreenReason::ForFullscreenMode &&
-      !nsContentUtils::LegacyIsCallerChromeOrNativeCode()) {
-    return NS_OK;
-  }
-
-  // SetFullScreen needs to be called on the root window, so get that
-  // via the DocShell tree, and if we are not already the root,
-  // call SetFullScreen on that window instead.
-  nsCOMPtr<nsIDocShellTreeItem> rootItem;
-  mDocShell->GetRootTreeItem(getter_AddRefs(rootItem));
-  nsCOMPtr<nsPIDOMWindowOuter> window = rootItem ? rootItem->GetWindow() : nullptr;
-  if (!window)
+  if (!mDocShell) {
     return NS_ERROR_FAILURE;
-  if (rootItem != mDocShell)
-    return window->SetFullscreenInternal(aReason, aFullScreen);
-
-  // make sure we don't try to set full screen on a non-chrome window,
-  // which might happen in embedding world
-  if (mDocShell->ItemType() != nsIDocShellTreeItem::typeChrome)
-    return NS_ERROR_FAILURE;
-
-  // If we are already in full screen mode, just return.
-  if (mFullScreen == aFullScreen)
-    return NS_OK;
-
-  // Note that although entering DOM fullscreen could also cause
-  // consequential calls to this method, those calls will be skipped
-  // at the condition above.
-  if (aReason == FullscreenReason::ForFullscreenMode) {
-    if (!aFullScreen && !mFullscreenMode) {
-      // If we are exiting fullscreen mode, but we actually didn't
-      // entered fullscreen mode, the fullscreen state was only for
-      // the Fullscreen API. Change the reason here so that we can
-      // perform transition for it.
-      aReason = FullscreenReason::ForFullscreenAPI;
-    } else {
-      mFullscreenMode = aFullScreen;
-    }
-  } else {
-    // If we are exiting from DOM fullscreen while we initially make
-    // the window fullscreen because of fullscreen mode, don't restore
-    // the window. But we still need to exit the DOM fullscreen state.
-    if (!aFullScreen && mFullscreenMode) {
-      FinishDOMFullscreenChange(mDoc, false);
-      return NS_OK;
-    }
   }
 
-  // Prevent chrome documents which are still loading from resizing
-  // the window after we set fullscreen mode.
-  nsCOMPtr<nsIBaseWindow> treeOwnerAsWin = GetTreeOwnerWindow();
-  nsCOMPtr<nsIXULWindow> xulWin(do_GetInterface(treeOwnerAsWin));
-  if (aFullScreen && xulWin) {
-    xulWin->SetIntrinsicallySized(false);
-  }
-
-  // Set this before so if widget sends an event indicating its
-  // gone full screen, the state trap above works.
-  mFullScreen = aFullScreen;
-
-  // Sometimes we don't want the top-level widget to actually go fullscreen,
-  // for example in the B2G desktop client, we don't want the emulated screen
-  // dimensions to appear to increase when entering fullscreen mode; we just
-  // want the content to fill the entire client area of the emulator window.
-  if (!Preferences::GetBool("full-screen-api.ignore-widgets", false)) {
-    if (MakeWidgetFullscreen(this, aReason, aFullScreen)) {
-      // The rest of code for switching fullscreen is in nsGlobalWindow::
-      // FinishFullscreenChange() which will be called after sizemodechange
-      // event is dispatched.
-      return NS_OK;
-    }
-  }
-
-  FinishFullscreenChange(aFullScreen);
-  return NS_OK;
-}
-
-bool
-nsGlobalWindow::SetWidgetFullscreen(FullscreenReason aReason, bool aIsFullscreen,
-                                    nsIWidget* aWidget, nsIScreen* aScreen)
-{
-  MOZ_ASSERT(IsOuterWindow());
-  MOZ_ASSERT(this == GetTopInternal(), "Only topmost window should call this");
-  MOZ_ASSERT(!AsOuter()->GetFrameElementInternal(), "Content window should not call this");
-  MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
-
-  if (!NS_WARN_IF(!IsChromeWindow())) {
-    if (!NS_WARN_IF(mChromeFields.mFullscreenPresShell)) {
-      if (nsIPresShell* shell = mDocShell->GetPresShell()) {
-        if (nsRefreshDriver* rd = shell->GetRefreshDriver()) {
-          mChromeFields.mFullscreenPresShell = do_GetWeakReference(shell);
-          MOZ_ASSERT(mChromeFields.mFullscreenPresShell);
-          rd->SetIsResizeSuppressed();
-          rd->Freeze();
-        }
-      }
-    }
-  }
-  nsresult rv = aReason == FullscreenReason::ForFullscreenMode ?
-    // If we enter fullscreen for fullscreen mode, we want
-    // the native system behavior.
-    aWidget->MakeFullScreenWithNativeTransition(aIsFullscreen, aScreen) :
-    aWidget->MakeFullScreen(aIsFullscreen, aScreen);
-  return NS_SUCCEEDED(rv);
-}
-
-/* virtual */ void
-nsGlobalWindow::FullscreenWillChange(bool aIsFullscreen)
-{
-  if (aIsFullscreen) {
-    DispatchCustomEvent(NS_LITERAL_STRING("willenterfullscreen"));
-  } else {
-    DispatchCustomEvent(NS_LITERAL_STRING("willexitfullscreen"));
-  }
-}
-
-/* virtual */ void
-nsGlobalWindow::FinishFullscreenChange(bool aIsFullscreen)
-{
-  MOZ_ASSERT(IsOuterWindow());
-
-  if (aIsFullscreen != mFullScreen) {
-    NS_WARNING("Failed to toggle fullscreen state of the widget");
-    // We failed to make the widget enter fullscreen.
-    // Stop further changes and restore the state.
-    if (!aIsFullscreen) {
-      mFullScreen = false;
-      mFullscreenMode = false;
-    } else {
-      MOZ_ASSERT_UNREACHABLE("Failed to exit fullscreen?");
-      mFullScreen = true;
-      // We don't know how code can reach here. Not sure
-      // what value should be set for fullscreen mode.
-      mFullscreenMode = false;
-    }
-    return;
-  }
-
-  // Note that we must call this to toggle the DOM fullscreen state
-  // of the document before dispatching the "fullscreen" event, so
-  // that the chrome can distinguish between browser fullscreen mode
-  // and DOM fullscreen.
-  FinishDOMFullscreenChange(mDoc, mFullScreen);
-
-  // dispatch a "fullscreen" DOM event so that XUL apps can
-  // respond visually if we are kicked into full screen mode
-  DispatchCustomEvent(NS_LITERAL_STRING("fullscreen"));
-
-  if (!NS_WARN_IF(!IsChromeWindow())) {
-    if (nsCOMPtr<nsIPresShell> shell =
-        do_QueryReferent(mChromeFields.mFullscreenPresShell)) {
-      if (nsRefreshDriver* rd = shell->GetRefreshDriver()) {
-        rd->Thaw();
-      }
-      mChromeFields.mFullscreenPresShell = nullptr;
-    }
-  }
-
-  if (!mWakeLock && mFullScreen) {
-    RefPtr<power::PowerManagerService> pmService =
-      power::PowerManagerService::GetInstance();
-    if (!pmService) {
-      return;
-    }
-
-    // XXXkhuey using the inner here, do we need to do something if it changes?
-    ErrorResult rv;
-    mWakeLock = pmService->NewWakeLock(NS_LITERAL_STRING("DOM_Fullscreen"),
-                                       AsOuter()->GetCurrentInnerWindow(), rv);
-    NS_WARNING_ASSERTION(!rv.Failed(), "Failed to lock the wakelock");
-    rv.SuppressException();
-  } else if (mWakeLock && !mFullScreen) {
-    ErrorResult rv;
-    mWakeLock->Unlock(rv);
-    mWakeLock = nullptr;
-    rv.SuppressException();
-  }
+  return nsDocShell::Cast(mDocShell)->
+    SetFullscreenInternal(FullscreenReason::ForFullscreenMode, aFullScreen);
 }
 
 bool
 nsGlobalWindow::FullScreen() const
 {
   MOZ_ASSERT(IsOuterWindow());
-
-  NS_ENSURE_TRUE(mDocShell, mFullScreen);
-
-  // Get the fullscreen value of the root window, to always have the value
-  // accurate, even when called from content.
-  nsCOMPtr<nsIDocShellTreeItem> rootItem;
-  mDocShell->GetRootTreeItem(getter_AddRefs(rootItem));
-  if (rootItem == mDocShell) {
-    if (!XRE_IsContentProcess()) {
-      // We are the root window. Return our internal value.
-      return mFullScreen;
-    }
-    if (nsCOMPtr<nsIWidget> widget = GetNearestWidget()) {
-      // We are in content process, figure out the value from
-      // the sizemode of the puppet widget.
-      return widget->SizeMode() == nsSizeMode_Fullscreen;
-    }
-    return false;
-  }
-
-  nsCOMPtr<nsPIDOMWindowOuter> window = rootItem->GetWindow();
-  NS_ENSURE_TRUE(window, mFullScreen);
-
-  return nsGlobalWindow::Cast(window)->FullScreen();
+  NS_ENSURE_TRUE(mDocShell, false);
+  return nsDocShell::Cast(mDocShell)->FullScreen();
 }
 
 bool

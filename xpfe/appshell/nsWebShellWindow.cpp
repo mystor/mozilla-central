@@ -18,6 +18,7 @@
 #include "nsNetCID.h"
 #include "nsIStringBundle.h"
 #include "nsReadableUtils.h"
+#include "nsDocShell.h"
 
 #include "nsContentUtils.h"
 #include "nsEscape.h"
@@ -363,31 +364,31 @@ nsWebShellWindow::SizeModeChanged(nsSizeMode sizeMode)
   // cases this will merge with the similar call in NS_SIZE and
   // write the attribute values only once.
   SetPersistenceTimer(PAD_MISC);
-  nsCOMPtr<nsPIDOMWindowOuter> ourWindow =
-    mDocShell ? mDocShell->GetWindow() : nullptr;
-  if (ourWindow) {
-    MOZ_ASSERT(ourWindow->IsOuterWindow());
 
+  if (mDocShell) {
+    nsDocShell* docShell = nsDocShell::Cast(mDocShell);
     // Ensure that the fullscreen state is synchronized between
     // the widget and the outer window object.
     if (sizeMode == nsSizeMode_Fullscreen) {
-      ourWindow->SetFullScreen(true);
+      docShell->SetFullScreen(true);
     }
     else if (sizeMode != nsSizeMode_Minimized) {
-      if (ourWindow->GetFullScreen()) {
+      if (docShell->FullScreen()) {
         // The first SetFullscreenInternal call below ensures that we do
         // not trigger any fullscreen transition even if the window was
         // put in fullscreen only for the Fullscreen API. The second
         // SetFullScreen call ensures that the window really exit from
         // fullscreen even if it entered fullscreen for both Fullscreen
         // Mode and Fullscreen API.
-        ourWindow->SetFullscreenInternal(FullscreenReason::ForForceExitFullscreen, false);
-        ourWindow->SetFullScreen(false);
+        docShell->SetFullscreenInternal(FullscreenReason::ForForceExitFullscreen, false);
+        docShell->SetFullScreen(false);
       }
     }
 
     // And always fire a user-defined sizemodechange event on the window
-    ourWindow->DispatchCustomEvent(NS_LITERAL_STRING("sizemodechange"));
+    if (nsPIDOMWindowOuter* ourWindow = docShell->GetWindow()) {
+      ourWindow->DispatchCustomEvent(NS_LITERAL_STRING("sizemodechange"));
+    }
   }
 
   nsIPresShell* presShell;
@@ -417,9 +418,7 @@ void
 nsWebShellWindow::FullscreenWillChange(bool aInFullscreen)
 {
   if (mDocShell) {
-    if (nsCOMPtr<nsPIDOMWindowOuter> ourWindow = mDocShell->GetWindow()) {
-      ourWindow->FullscreenWillChange(aInFullscreen);
-    }
+    nsDocShell::Cast(mDocShell)->FullscreenWillChange(aInFullscreen);
   }
 }
 
@@ -427,9 +426,7 @@ void
 nsWebShellWindow::FullscreenChanged(bool aInFullscreen)
 {
   if (mDocShell) {
-    if (nsCOMPtr<nsPIDOMWindowOuter> ourWindow = mDocShell->GetWindow()) {
-      ourWindow->FinishFullscreenChange(aInFullscreen);
-    }
+    nsDocShell::Cast(mDocShell)->FinishFullscreenChange(aInFullscreen);
   }
 }
 
