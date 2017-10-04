@@ -18,6 +18,10 @@ UNIFIED_SOURCES += [
     'StartupTimeline.cpp',
 ]
 
+LOCAL_INCLUDES += [
+    '/docshell/base',
+]
+
 if CONFIG['OS_ARCH'] == 'WINNT':
     # This file cannot be built in unified mode because of name clashes with Windows headers.
     SOURCES += [

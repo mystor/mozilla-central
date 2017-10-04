@@ -28,6 +28,7 @@
 #include "nsString.h"
 #include "mozilla/Preferences.h"
 #include "GeckoProfiler.h"
+#include "nsDocShell.h"
 
 #include "prprf.h"
 #include "nsIInterfaceRequestorUtils.h"
@@ -379,8 +380,10 @@ nsAppStartup::Quit(uint32_t aMode)
           nsCOMPtr<nsPIDOMWindowOuter> domWindow(do_QueryInterface(window));
           if (domWindow) {
             MOZ_ASSERT(domWindow->IsOuterWindow());
-            if (!domWindow->CanClose())
+            nsIDocShell* docShell = domWindow->GetDocShell();
+            if (docShell && !nsDocShell::Cast(docShell)->CanClose()) {
               return NS_OK;
+            }
           }
           windowEnumerator->HasMoreElements(&more);
         }
@@ -517,7 +520,10 @@ nsAppStartup::CloseAllWindows()
     NS_ASSERTION(window, "not an nsPIDOMWindow");
     if (window) {
       MOZ_ASSERT(window->IsOuterWindow());
-      window->ForceClose();
+      nsIDocShell* docShell = window->GetDocShell();
+      if (docShell) {
+        nsDocShell::Cast(docShell)->ForceClose();
+      }
     }
   }
 }
