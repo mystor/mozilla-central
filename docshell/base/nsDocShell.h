@@ -72,6 +72,7 @@ namespace dom {
 class EventTarget;
 class PendingGlobalHistoryEntry;
 typedef uint32_t ScreenOrientationInternal;
+class WakeLock;
 } // namespace dom
 } // namespace mozilla
 
@@ -163,6 +164,7 @@ class nsDocShell final
 {
   friend class nsDSURIContentListener;
   friend class FramingChecker;
+  friend class FullscreenTransitionTask;
   using Encoding = mozilla::Encoding;
 
 public:
@@ -867,6 +869,40 @@ public:
     RefPtr<nsDocShell> mDocShell;
   };
 
+  // Helper method for accessing the current inner window. Mostly used within
+  // docshell code.
+  nsPIDOMWindowInner* GetCurrentInnerWindow();
+  already_AddRefed<nsIBaseWindow> GetTreeOwnerAsWindow();
+  nsIWidget* GetNearestWidget();
+
+  // Fullscreen logic
+
+  nsresult SetFullScreen(bool aFullScreen)
+  {
+    return SetFullscreenInternal(FullscreenReason::ForFullscreenMode, aFullScreen);
+  }
+
+  /**
+   * Moves the top-level window into fullscreen mode if aIsFullScreen is true,
+   * otherwise exits fullscreen.
+   */
+  nsresult SetFullscreenInternal(FullscreenReason aReason, bool aIsFullscreen);
+
+  void FullscreenWillChange(bool aIsFullscreen);
+
+  /**
+   * This function should be called when the fullscreen state is flipped.
+   * If no widget is involved the fullscreen change, this method is called
+   * by SetFullscreenInternal, otherwise, it is called when the widget
+   * finishes its change to or from fullscreen.
+   *
+   * @param aIsFullscreen indicates whether the widget is in fullscreen.
+   */
+  void FinishFullscreenChange(bool aIsFullscreen);
+  bool SetWidgetFullscreen(FullscreenReason aReason, bool aIsFullscreen,
+                           nsIWidget* aWidget, nsIScreen* aScreen);
+  bool FullScreen();
+
 protected:
   bool JustStartedNetworkLoad();
 
@@ -1096,6 +1132,9 @@ protected:
   // in MaybeInitTiming()
   bool mBlankTiming : 1;
 
+  bool mFullScreen : 1;
+  bool mFullscreenMode : 1;
+
   // The following two fields cannot be declared as bit fields
   // because of uses with AutoRestore.
   bool mCreatingDocument; // (should be) debugging only
@@ -1160,6 +1199,13 @@ private:
   nsTArray<nsCOMPtr<nsIPrincipal>> mAncestorPrincipals;
   // Our list of ancestor outerWindowIDs.
   nsTArray<uint64_t> mAncestorOuterWindowIDs;
+
+  // A weak pointer to the nsPresShell that we are doing fullscreen for.
+  // The pointer being set indicates we've set the IsInFullscreenChange
+  // flag on this pres shell.
+  nsWeakPtr mFullscreenPresShell;
+
+  RefPtr<mozilla::dom::WakeLock> mWakeLock;
 
   // Separate function to do the actual name (i.e. not _top, _self etc.)
   // searching for FindItemWithName.

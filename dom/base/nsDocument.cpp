@@ -11377,8 +11377,9 @@ AskWindowToExitFullscreen(nsIDocument* aDoc)
       /* Bubbles */ true, /* Cancelable */ false,
       /* DefaultAction */ nullptr);
   } else {
-    if (nsPIDOMWindowOuter* win = aDoc->GetWindow()) {
-      win->SetFullscreenInternal(FullscreenReason::ForFullscreenAPI, false);
+    if (nsIDocShell* docShell = aDoc->GetDocShell()) {
+      nsDocShell::Cast(docShell)->SetFullscreenInternal(
+        FullscreenReason::ForFullscreenAPI, false);
     }
   }
 }
@@ -11486,8 +11487,9 @@ public:
       NS_LITERAL_STRING("MozDOMFullscreen:Exited"),
       /* Bubbles */ true, /* Cancelable */ false, /* DefaultAction */ nullptr);
     // Ensure the window exits fullscreen.
-    if (nsPIDOMWindowOuter* win = mDocuments[0]->GetWindow()) {
-      win->SetFullscreenInternal(FullscreenReason::ForForceExitFullscreen, false);
+    if (nsIDocShell* docShell = mDocuments[0]->GetDocShell()) {
+      nsDocShell::Cast(docShell)->SetFullscreenInternal(
+        FullscreenReason::ForForceExitFullscreen, false);
     }
     return NS_OK;
   }
@@ -12183,7 +12185,8 @@ nsDocument::RequestFullScreen(UniquePtr<FullscreenRequest>&& aRequest)
       /* Bubbles */ true, /* Cancelable */ false, /* DefaultAction */ nullptr);
   } else {
     // Make the window fullscreen.
-    rootWin->SetFullscreenInternal(FullscreenReason::ForFullscreenAPI, true);
+    nsDocShell::Cast(rootWin->GetDocShell())->
+      SetFullscreenInternal(FullscreenReason::ForFullscreenAPI, true);
   }
 }
 

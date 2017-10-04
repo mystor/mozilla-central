@@ -125,6 +125,8 @@ template<class T>
 class nsPIDOMWindow : public T
 {
 public:
+  friend class nsDocShell;
+
   nsPIDOMWindowInner* AsInner();
   const nsPIDOMWindowInner* AsInner() const;
   nsPIDOMWindowOuter* AsOuter();
@@ -378,28 +380,6 @@ public:
   {
     return mMayHaveSelectionChangeEventListener;
   }
-
-  /**
-   * Moves the top-level window into fullscreen mode if aIsFullScreen is true,
-   * otherwise exits fullscreen.
-   *
-   * Outer windows only.
-   */
-  virtual nsresult SetFullscreenInternal(
-    FullscreenReason aReason, bool aIsFullscreen) = 0;
-
-  virtual void FullscreenWillChange(bool aIsFullscreen) = 0;
-  /**
-   * This function should be called when the fullscreen state is flipped.
-   * If no widget is involved the fullscreen change, this method is called
-   * by SetFullscreenInternal, otherwise, it is called when the widget
-   * finishes its change to or from fullscreen.
-   *
-   * @param aIsFullscreen indicates whether the widget is in fullscreen.
-   *
-   * Outer windows only.
-   */
-  virtual void FinishFullscreenChange(bool aIsFullscreen) = 0;
 
   virtual JSObject* GetCachedXBLPrototypeHandler(nsXBLPrototypeHandler* aKey) = 0;
   virtual void CacheXBLPrototypeHandler(nsXBLPrototypeHandler* aKey,
