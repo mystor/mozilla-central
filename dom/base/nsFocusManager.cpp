@@ -1519,7 +1519,7 @@ nsFocusManager::AdjustWindowFocus(nsPIDOMWindowOuter* aWindow,
     }
 
     window = parentDsti->GetWindow();
-    if (window) {
+    if (window && !window->Closed()) {
       // if the parent window is visible but aWindow was not, then we have
       // likely moved up and out from a hidden tab to the browser window, or a
       // similar such arrangement. Stop adjusting the current nodes.
