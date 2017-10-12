@@ -16054,7 +16054,7 @@ nsDocShell::ReallyCloseWindow()
       bool isTab;
       if (rootShell == this ||
           !bwin ||
-          (NS_SUCCEEDED(bwin->IsTabContentWindow(Cast(rootShell)->mScriptGlobal,
+          (NS_SUCCEEDED(bwin->IsTabContentWindow(mScriptGlobal,
                                                  &isTab)) && isTab)) {
         treeOwnerAsWin->Destroy();
       }
