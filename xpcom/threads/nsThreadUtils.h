@@ -21,6 +21,7 @@
 #include "nsStringGlue.h"
 #include "nsCOMPtr.h"
 #include "nsAutoPtr.h"
+#include "nsISupportsImpl.h"
 #include "mozilla/Atomics.h"
 #include "mozilla/IndexSequence.h"
 #include "mozilla/Likely.h"
@@ -1789,5 +1790,32 @@ nsISerialEventTarget*
 GetMainThreadSerialEventTarget();
 
 } // namespace mozilla
+
+
+// Oh no....
+
+#undef NS_IMPL_ADDREF_INHERITED
+#undef NS_IMPL_RELEASE_INHERITED
+
+#define NS_IMPL_ADDREF_INHERITED(Class, Super)                                \
+NS_IMETHODIMP_(MozExternalRefCountType) Class::AddRef(void)                   \
+{                                                                             \
+  MOZ_ASSERT_TYPE_OK_FOR_REFCOUNTING(Class)                                   \
+  nsrefcnt r = Super::AddRef();                                               \
+  if (!mozilla::IsBaseOf<mozilla::Runnable, Class>::value) {                  \
+    NS_LOG_ADDREF(this, r, #Class, sizeof(*this));                            \
+  }                                                                           \
+  return r;                                                                   \
+}
+
+#define NS_IMPL_RELEASE_INHERITED(Class, Super)                               \
+NS_IMETHODIMP_(MozExternalRefCountType) Class::Release(void)                  \
+{                                                                             \
+  nsrefcnt r = Super::Release();                                              \
+  if (!mozilla::IsBaseOf<mozilla::Runnable, Class>::value) {                  \
+    NS_LOG_RELEASE(this, r, #Class);                                          \
+  }                                                                           \
+  return r;                                                                   \
+}
 
 #endif  // nsThreadUtils_h__

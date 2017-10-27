@@ -45,7 +45,41 @@ IdlePeriod::GetIdlePeriodHint(TimeStamp* aIdleDeadline)
   return NS_OK;
 }
 
-NS_IMPL_ISUPPORTS(Runnable, nsIRunnable, nsINamed)
+#define NS_IMPL_ADDREFX(_class)                                                \
+NS_IMETHODIMP_(MozExternalRefCountType) _class::AddRef(void)                  \
+{                                                                             \
+  MOZ_ASSERT_TYPE_OK_FOR_REFCOUNTING(_class)                                  \
+  MOZ_ASSERT(int32_t(mRefCnt) >= 0, "illegal refcnt");                        \
+  if (!mRefCnt.isThreadSafe)                                                  \
+    NS_ASSERT_OWNINGTHREAD(_class);                                           \
+  nsrefcnt count = ++mRefCnt;                                                 \
+  NS_LOG_ADDREF(this, count, mName, sizeof(*this));                         \
+  return count;                                                               \
+}
+
+#define NS_IMPL_RELEASE_WITH_DESTROYX(_class, _destroy)                        \
+NS_IMETHODIMP_(MozExternalRefCountType) _class::Release(void)                 \
+{                                                                             \
+  MOZ_ASSERT(int32_t(mRefCnt) > 0, "dup release");                            \
+  if (!mRefCnt.isThreadSafe)                                                  \
+    NS_ASSERT_OWNINGTHREAD(_class);                                           \
+  nsrefcnt count = --mRefCnt;                                                 \
+  NS_LOG_RELEASE(this, count, mName);                                       \
+  if (count == 0) {                                                           \
+    mRefCnt = 1; /* stabilize */                                              \
+    _destroy;                                                                 \
+    return 0;                                                                 \
+  }                                                                           \
+  return count;                                                               \
+}
+
+#define NS_IMPL_RELEASEX(_class) \
+  NS_IMPL_RELEASE_WITH_DESTROYX(_class, delete (this))
+
+
+NS_IMPL_ADDREFX(Runnable)
+NS_IMPL_RELEASEX(Runnable)
+NS_IMPL_QUERY_INTERFACE(Runnable, nsIRunnable, nsINamed)
 
 NS_IMETHODIMP
 Runnable::Run()
