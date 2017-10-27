@@ -164,7 +164,8 @@ VRManagerChild::Destroy()
   // The DeferredDestroyVRManager task takes ownership of
   // the VRManagerChild and will release it when it runs.
   MessageLoop::current()->PostTask(
-             NewRunnableFunction(DeferredDestroy, selfRef));
+             NewRunnableFunction("VRManagerChildDestroy",
+                                 DeferredDestroy, selfRef));
 }
 
 PVRLayerChild*
