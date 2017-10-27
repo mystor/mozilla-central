@@ -290,7 +290,7 @@ ServiceWorkerRegistrationInfo::Activate()
 
   nsMainThreadPtrHandle<ServiceWorkerRegistrationInfo> handle(
     new nsMainThreadPtrHolder<ServiceWorkerRegistrationInfo>(
-      "ServiceWorkerRegistrationInfo", this));
+      "ServiceWorkerRegistrationInfoProxy", this));
   RefPtr<LifeCycleEventCallback> callback = new ContinueActivateRunnable(handle);
 
   ServiceWorkerPrivate* workerPrivate = mActiveWorker->WorkerPrivate();

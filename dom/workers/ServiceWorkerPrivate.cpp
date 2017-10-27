@@ -1013,7 +1013,7 @@ ServiceWorkerPrivate::SendPushEvent(const nsAString& aMessageId,
 
   nsMainThreadPtrHandle<ServiceWorkerRegistrationInfo> regInfo(
     new nsMainThreadPtrHolder<ServiceWorkerRegistrationInfo>(
-      "ServiceWorkerRegistrationInfo", aRegistration, false));
+      "ServiceWorkerRegistrationInfoProxy", aRegistration, false));
 
   RefPtr<WorkerRunnable> r = new SendPushEventRunnable(mWorkerPrivate,
                                                        token,
@@ -1727,7 +1727,7 @@ ServiceWorkerPrivate::SendFetchEvent(nsIInterceptedChannel* aChannel,
 
   nsMainThreadPtrHandle<ServiceWorkerRegistrationInfo> regInfo(
     new nsMainThreadPtrHolder<ServiceWorkerRegistrationInfo>(
-      "ServiceWorkerRegistrationInfo", registration, false));
+      "ServiceWorkerRegistrationInfoProxy", registration, false));
 
   RefPtr<KeepAliveToken> token = CreateEventKeepAliveToken();
 
