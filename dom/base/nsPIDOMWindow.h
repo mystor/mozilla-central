@@ -616,7 +616,10 @@ protected:
   // These members are only used on outer windows.
   nsCOMPtr<mozilla::dom::Element> mFrameElement;
 
-  // This reference is used by nsGlobalWindow.
+  // XXX: We hold a strong reference back to our docshell. However, GetDocShell
+  // and related methods will return nullptr from us after DetachFromDocShell is
+  // called. If you want to fetch the strong version of this reference which
+  // remains valid after DetachFromDocShell is called, call DetachedDocShell().
   nsCOMPtr<nsIDocShell> mDocShell;
 
   // mPerformance is only used on inner windows.
@@ -727,6 +730,8 @@ protected:
 
   // The number of open WebSockets. Inner window only.
   uint32_t mNumOfOpenWebSockets;
+
+  bool mCleanedUp;
 };
 
 #define NS_PIDOMWINDOWINNER_IID \

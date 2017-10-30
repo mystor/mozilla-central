@@ -3383,8 +3383,8 @@ nsGlobalWindow::SetNewDocument(nsIDocument* aDocument,
     // situation when we're creating a temporary non-chrome-about-blank
     // document in a chrome docshell, don't notify just yet. Instead wait
     // until we have a real chrome doc.
-    if (!mDocShell ||
-        mDocShell->ItemType() != nsIDocShellTreeItem::typeChrome ||
+    if (!GetDocShell() ||
+        GetDocShell()->ItemType() != nsIDocShellTreeItem::typeChrome ||
         nsContentUtils::IsSystemPrincipal(mDoc->NodePrincipal())) {
       newInnerWindow->mHasNotifiedGlobalCreated = true;
       nsContentUtils::AddScriptRunner(
@@ -3537,7 +3537,7 @@ nsGlobalWindow::SetDocShell(nsIDocShell* aDocShell)
   // Get our enclosing chrome shell and retrieve its global window impl, so
   // that we can do some forwarding to the chrome document.
   nsCOMPtr<nsIDOMEventTarget> chromeEventHandler;
-  mDocShell->GetChromeEventHandler(getter_AddRefs(chromeEventHandler));
+  aDocShell->GetChromeEventHandler(getter_AddRefs(chromeEventHandler));
   mChromeEventHandler = do_QueryInterface(chromeEventHandler);
   if (!mChromeEventHandler) {
     // We have no chrome event handler. If we have a parent,
@@ -3557,7 +3557,7 @@ nsGlobalWindow::SetDocShell(nsIDocShell* aDocShell)
   }
 
   bool docShellActive;
-  mDocShell->GetIsActive(&docShellActive);
+  aDocShell->GetIsActive(&docShellActive);
   SetIsBackgroundInternal(!docShellActive);
 }
 
@@ -3818,9 +3818,9 @@ nsGlobalWindow::AreDialogsEnabled()
   }
 
   // Dialogs are blocked if the content viewer is hidden
-  if (mDocShell) {
+  if (GetDocShell()) {
     nsCOMPtr<nsIContentViewer> cv;
-    mDocShell->GetContentViewer(getter_AddRefs(cv));
+    GetDocShell()->GetContentViewer(getter_AddRefs(cv));
 
     bool isHidden;
     cv->GetIsHidden(&isHidden);
@@ -4787,12 +4787,12 @@ nsGlobalWindow::GetParentOuter()
     return nullptr;
   }
 
-  if (!mDocShell) {
+  if (!GetDocShell()) {
     return nullptr;
   }
 
   nsCOMPtr<nsPIDOMWindowOuter> parent;
-  if (mDocShell->GetIsMozBrowser()) {
+  if (GetDocShell()->GetIsMozBrowser()) {
     parent = AsOuter();
   } else {
     parent = GetParent();
@@ -4845,12 +4845,12 @@ nsGlobalWindow::GetParent()
 {
   MOZ_ASSERT(IsOuterWindow());
 
-  if (!mDocShell) {
+  if (!GetDocShell()) {
     return nullptr;
   }
 
   nsCOMPtr<nsIDocShell> parent;
-  mDocShell->GetSameTypeParentIgnoreBrowserBoundaries(getter_AddRefs(parent));
+  GetDocShell()->GetSameTypeParentIgnoreBrowserBoundaries(getter_AddRefs(parent));
 
   if (parent) {
     nsCOMPtr<nsPIDOMWindowOuter> win = parent->GetWindow();
@@ -4973,7 +4973,7 @@ nsGlobalWindow::GetContentInternal(ErrorResult& aError, CallerType aCallerType)
 
   // If we're contained in <iframe mozbrowser>, then GetContent is the same as
   // window.top.
-  if (mDocShell && mDocShell->GetIsInMozBrowser()) {
+  if (GetDocShell() && GetDocShell()->GetIsInMozBrowser()) {
     return GetTopOuter();
   }
 
@@ -4986,14 +4986,14 @@ nsGlobalWindow::GetContentInternal(ErrorResult& aError, CallerType aCallerType)
     // the primary content window if the calling tab is hidden. In
     // such a case we return the same-type root in the hidden tab,
     // which is "good enough", for now.
-    nsCOMPtr<nsIBaseWindow> baseWin(do_QueryInterface(mDocShell));
+    nsCOMPtr<nsIBaseWindow> baseWin(do_QueryInterface(GetDocShell()));
 
     if (baseWin) {
       bool visible = false;
       baseWin->GetVisibility(&visible);
 
       if (!visible) {
-        mDocShell->GetSameTypeRootTreeItem(getter_AddRefs(primaryContent));
+        GetDocShell()->GetSameTypeRootTreeItem(getter_AddRefs(primaryContent));
       }
     }
   }
@@ -5045,10 +5045,10 @@ nsGlobalWindow::GetPrompter(nsIPrompt** aPrompt)
     return outer->GetPrompter(aPrompt);
   }
 
-  if (!mDocShell)
+  if (!GetDocShell())
     return NS_ERROR_FAILURE;
 
-  nsCOMPtr<nsIPrompt> prompter(do_GetInterface(mDocShell));
+  nsCOMPtr<nsIPrompt> prompter(do_GetInterface(GetDocShell()));
   NS_ENSURE_TRUE(prompter, NS_ERROR_NO_INTERFACE);
 
   prompter.forget(aPrompt);
@@ -5130,7 +5130,7 @@ nsGlobalWindow::GetClosedOuter()
   MOZ_RELEASE_ASSERT(IsOuterWindow());
 
   // If someone called close(), or if we don't have a docshell, we're closed.
-  return mCleanedUp || nsDocShell::Cast(mDocShell)->mIsClosed;
+  return mCleanedUp || !GetDocShell() || nsDocShell::Cast(GetDocShell())->mIsClosed;
 }
 
 bool
@@ -5152,8 +5152,8 @@ nsGlobalWindow::GetWindowList()
 {
   MOZ_ASSERT(IsOuterWindow());
 
-  if (!mFrames && mDocShell) {
-    mFrames = new nsDOMWindowList(mDocShell);
+  if (!mFrames && GetDocShell()) {
+    mFrames = new nsDOMWindowList(GetDocShell());
   }
 
   return mFrames;
@@ -5653,8 +5653,8 @@ nsGlobalWindow::GetNameOuter(nsAString& aName)
 {
   MOZ_RELEASE_ASSERT(IsOuterWindow());
 
-  if (mDocShell) {
-    mDocShell->GetName(aName);
+  if (GetDocShell()) {
+    GetDocShell()->GetName(aName);
   }
 }
 
@@ -5669,8 +5669,8 @@ nsGlobalWindow::SetNameOuter(const nsAString& aName, mozilla::ErrorResult& aErro
 {
   MOZ_RELEASE_ASSERT(IsOuterWindow());
 
-  if (mDocShell) {
-    aError = mDocShell->SetName(aName);
+  if (GetDocShell()) {
+    aError = GetDocShell()->SetName(aName);
   }
 }
 
@@ -5684,11 +5684,11 @@ nsGlobalWindow::SetName(const nsAString& aName, mozilla::ErrorResult& aError)
 int32_t
 nsGlobalWindow::DevToCSSIntPixels(int32_t px)
 {
-  if (!mDocShell)
+  if (!GetDocShell())
     return px; // assume 1:1
 
   RefPtr<nsPresContext> presContext;
-  mDocShell->GetPresContext(getter_AddRefs(presContext));
+  GetDocShell()->GetPresContext(getter_AddRefs(presContext));
   if (!presContext)
     return px;
 
@@ -5698,11 +5698,11 @@ nsGlobalWindow::DevToCSSIntPixels(int32_t px)
 int32_t
 nsGlobalWindow::CSSToDevIntPixels(int32_t px)
 {
-  if (!mDocShell)
+  if (!GetDocShell())
     return px; // assume 1:1
 
   RefPtr<nsPresContext> presContext;
-  mDocShell->GetPresContext(getter_AddRefs(presContext));
+  GetDocShell()->GetPresContext(getter_AddRefs(presContext));
   if (!presContext)
     return px;
 
@@ -5712,11 +5712,11 @@ nsGlobalWindow::CSSToDevIntPixels(int32_t px)
 nsIntSize
 nsGlobalWindow::DevToCSSIntPixels(nsIntSize px)
 {
-  if (!mDocShell)
+  if (!GetDocShell())
     return px; // assume 1:1
 
   RefPtr<nsPresContext> presContext;
-  mDocShell->GetPresContext(getter_AddRefs(presContext));
+  GetDocShell()->GetPresContext(getter_AddRefs(presContext));
   if (!presContext)
     return px;
 
@@ -5728,11 +5728,11 @@ nsGlobalWindow::DevToCSSIntPixels(nsIntSize px)
 nsIntSize
 nsGlobalWindow::CSSToDevIntPixels(nsIntSize px)
 {
-  if (!mDocShell)
+  if (!GetDocShell())
     return px; // assume 1:1
 
   RefPtr<nsPresContext> presContext;
-  mDocShell->GetPresContext(getter_AddRefs(presContext));
+  GetDocShell()->GetPresContext(getter_AddRefs(presContext));
   if (!presContext)
     return px;
 
@@ -5748,11 +5748,11 @@ nsGlobalWindow::GetInnerSize(CSSIntSize& aSize)
 
   EnsureSizeAndPositionUpToDate();
 
-  NS_ENSURE_STATE(mDocShell);
+  NS_ENSURE_STATE(GetDocShell());
 
   RefPtr<nsPresContext> presContext;
-  mDocShell->GetPresContext(getter_AddRefs(presContext));
-  RefPtr<nsIPresShell> presShell = mDocShell->GetPresShell();
+  GetDocShell()->GetPresContext(getter_AddRefs(presContext));
+  RefPtr<nsIPresShell> presShell = GetDocShell()->GetPresShell();
 
   if (!presContext || !presShell) {
     aSize = CSSIntSize(0, 0);
@@ -5829,14 +5829,14 @@ nsGlobalWindow::SetInnerWidthOuter(int32_t aInnerWidth,
 {
   MOZ_RELEASE_ASSERT(IsOuterWindow());
 
-  if (!mDocShell) {
+  if (!GetDocShell()) {
     aError.Throw(NS_ERROR_UNEXPECTED);
     return;
   }
 
   CheckSecurityWidthAndHeight(&aInnerWidth, nullptr, aCallerType);
 
-  RefPtr<nsIPresShell> presShell = mDocShell->GetPresShell();
+  RefPtr<nsIPresShell> presShell = GetDocShell()->GetPresShell();
 
   if (presShell && presShell->GetIsViewportOverridden())
   {
@@ -5855,7 +5855,7 @@ nsGlobalWindow::SetInnerWidthOuter(int32_t aInnerWidth,
   int32_t height = 0;
   int32_t unused  = 0;
 
-  nsCOMPtr<nsIBaseWindow> docShellAsWin(do_QueryInterface(mDocShell));
+  nsCOMPtr<nsIBaseWindow> docShellAsWin(do_QueryInterface(GetDocShell()));
   docShellAsWin->GetSize(&unused, &height);
   aError = SetDocShellWidthAndHeight(CSSToDevIntPixels(aInnerWidth), height);
 }
@@ -5926,12 +5926,12 @@ nsGlobalWindow::SetInnerHeightOuter(int32_t aInnerHeight,
 {
   MOZ_RELEASE_ASSERT(IsOuterWindow());
 
-  if (!mDocShell) {
+  if (!GetDocShell()) {
     aError.Throw(NS_ERROR_UNEXPECTED);
     return;
   }
 
-  RefPtr<nsIPresShell> presShell = mDocShell->GetPresShell();
+  RefPtr<nsIPresShell> presShell = GetDocShell()->GetPresShell();
 
   if (presShell && presShell->GetIsViewportOverridden())
   {
@@ -5950,7 +5950,7 @@ nsGlobalWindow::SetInnerHeightOuter(int32_t aInnerHeight,
   int32_t height = 0;
   int32_t width  = 0;
 
-  nsCOMPtr<nsIBaseWindow> docShellAsWin(do_QueryInterface(mDocShell));
+  nsCOMPtr<nsIBaseWindow> docShellAsWin(do_QueryInterface(GetDocShell()));
   docShellAsWin->GetSize(&width, &height);
   CheckSecurityWidthAndHeight(nullptr, &aInnerHeight, aCallerType);
   aError = SetDocShellWidthAndHeight(width, CSSToDevIntPixels(aInnerHeight));
@@ -6156,7 +6156,7 @@ nsGlobalWindow::GetScreenXY(CallerType aCallerType, ErrorResult& aError)
   aError = treeOwnerAsWin->GetPosition(&x, &y); // LayoutDevice px values
 
   RefPtr<nsPresContext> presContext;
-  mDocShell->GetPresContext(getter_AddRefs(presContext));
+  GetDocShell()->GetPresContext(getter_AddRefs(presContext));
   if (!presContext) {
     return CSSIntPoint(x, y);
   }
@@ -6213,17 +6213,17 @@ nsGlobalWindow::GetInnerScreenRect()
 {
   MOZ_ASSERT(IsOuterWindow());
 
-  if (!mDocShell) {
+  if (!GetDocShell()) {
     return nsRect();
   }
 
   EnsureSizeAndPositionUpToDate();
 
-  if (!mDocShell) {
+  if (!GetDocShell()) {
     return nsRect();
   }
 
-  nsCOMPtr<nsIPresShell> presShell = mDocShell->GetPresShell();
+  nsCOMPtr<nsIPresShell> presShell = GetDocShell()->GetPresShell();
   if (!presShell) {
     return nsRect();
   }
@@ -6280,12 +6280,12 @@ nsGlobalWindow::GetDevicePixelRatioOuter(CallerType aCallerType)
 {
   MOZ_RELEASE_ASSERT(IsOuterWindow());
 
-  if (!mDocShell) {
+  if (!GetDocShell()) {
     return 1.0;
   }
 
   RefPtr<nsPresContext> presContext;
-  mDocShell->GetPresContext(getter_AddRefs(presContext));
+  GetDocShell()->GetPresContext(getter_AddRefs(presContext));
   if (!presContext) {
     return 1.0;
   }
@@ -6321,11 +6321,11 @@ nsGlobalWindow::GetMozPaintCountOuter()
 {
   MOZ_RELEASE_ASSERT(IsOuterWindow());
 
-  if (!mDocShell) {
+  if (!GetDocShell()) {
     return 0;
   }
 
-  nsCOMPtr<nsIPresShell> presShell = mDocShell->GetPresShell();
+  nsCOMPtr<nsIPresShell> presShell = GetDocShell()->GetPresShell();
   return presShell ? presShell->GetPaintCount() : 0;
 }
 
@@ -6540,13 +6540,13 @@ nsGlobalWindow::SetDocShellWidthAndHeight(int32_t aInnerWidth, int32_t aInnerHei
 {
   MOZ_ASSERT(IsOuterWindow());
 
-  NS_ENSURE_TRUE(mDocShell, NS_ERROR_FAILURE);
+  NS_ENSURE_TRUE(GetDocShell(), NS_ERROR_FAILURE);
 
   nsCOMPtr<nsIDocShellTreeOwner> treeOwner;
-  mDocShell->GetTreeOwner(getter_AddRefs(treeOwner));
+  GetDocShell()->GetTreeOwner(getter_AddRefs(treeOwner));
   NS_ENSURE_TRUE(treeOwner, NS_ERROR_FAILURE);
 
-  NS_ENSURE_SUCCESS(treeOwner->SizeShellTo(mDocShell, aInnerWidth, aInnerHeight),
+  NS_ENSURE_SUCCESS(treeOwner->SizeShellTo(GetDocShell(), aInnerWidth, aInnerHeight),
                     NS_ERROR_FAILURE);
 
   return NS_OK;
@@ -6559,7 +6559,7 @@ nsGlobalWindow::SetCSSViewportWidthAndHeight(nscoord aInnerWidth, nscoord aInner
   MOZ_ASSERT(IsOuterWindow());
 
   RefPtr<nsPresContext> presContext;
-  mDocShell->GetPresContext(getter_AddRefs(presContext));
+  GetDOcShell()->GetPresContext(getter_AddRefs(presContext));
 
   nsRect shellArea = presContext->GetVisibleArea();
   shellArea.SetHeight(aInnerHeight);
@@ -6866,7 +6866,7 @@ nsGlobalWindow::WindowExists(const nsAString& aName,
                              bool aLookForCallerOnJSStack)
 {
   NS_PRECONDITION(IsOuterWindow(), "Must be outer window");
-  NS_PRECONDITION(mDocShell, "Must have docshell");
+  NS_PRECONDITION(GetDocShell(), "Must have docshell");
 
   if (aForceNoOpener) {
     return aName.LowerCaseEqualsLiteral("_self") ||
@@ -6880,13 +6880,13 @@ nsGlobalWindow::WindowExists(const nsAString& aName,
   }
 
   if (!caller) {
-    caller = mDocShell;
+    caller = GetDocShell();
   }
 
   nsCOMPtr<nsIDocShellTreeItem> namedItem;
-  mDocShell->FindItemWithName(aName, nullptr, caller,
-                              /* aSkipTabGroup = */ false,
-                              getter_AddRefs(namedItem));
+  GetDocShell()->FindItemWithName(aName, nullptr, caller,
+                                  /* aSkipTabGroup = */ false,
+                                  getter_AddRefs(namedItem));
   return namedItem != nullptr;
 }
 
@@ -6923,12 +6923,12 @@ nsGlobalWindow::SetFullScreenOuter(bool aFullScreen, mozilla::ErrorResult& aErro
 {
   MOZ_RELEASE_ASSERT(IsOuterWindow());
 
-  if (!mDocShell) {
+  if (!GetDocShell()) {
     aError.Throw(NS_ERROR_FAILURE);
     return;
   }
 
-  aError = nsDocShell::Cast(mDocShell)->
+  aError = nsDocShell::Cast(GetDocShell())->
     SetFullscreenInternal(FullscreenReason::ForFullscreenMode, aFullScreen);
 }
 
@@ -6943,11 +6943,11 @@ nsGlobalWindow::SetFullScreen(bool aFullScreen)
 {
   FORWARD_TO_OUTER(SetFullScreen, (aFullScreen), NS_ERROR_NOT_INITIALIZED);
 
-  if (!mDocShell) {
+  if (!GetDocShell()) {
     return NS_ERROR_FAILURE;
   }
 
-  return nsDocShell::Cast(mDocShell)->
+  return nsDocShell::Cast(GetDocShell())->
     SetFullscreenInternal(FullscreenReason::ForFullscreenMode, aFullScreen);
 }
 
@@ -6955,6 +6955,7 @@ bool
 nsGlobalWindow::FullScreen() const
 {
   MOZ_ASSERT(IsOuterWindow());
+  // XXX: Move over to GetDetachedDocShell
   NS_ENSURE_TRUE(mDocShell, false);
   return nsDocShell::Cast(mDocShell)->FullScreen();
 }
@@ -7021,13 +7022,13 @@ void
 nsGlobalWindow::EnsureReflowFlushAndPaint()
 {
   MOZ_ASSERT(IsOuterWindow());
-  NS_ASSERTION(mDocShell, "EnsureReflowFlushAndPaint() called with no "
+  NS_ASSERTION(GetDocShell(), "EnsureReflowFlushAndPaint() called with no "
                "docshell!");
 
-  if (!mDocShell)
+  if (!GetDocShell())
     return;
 
-  nsCOMPtr<nsIPresShell> presShell = mDocShell->GetPresShell();
+  nsCOMPtr<nsIPresShell> presShell = GetDocShell()->GetPresShell();
 
   if (!presShell)
     return;
@@ -7140,9 +7141,9 @@ nsGlobalWindow::CanMoveResizeWindows(CallerType aCallerType)
     }
   }
 
-  if (mDocShell) {
+  if (GetDocShell()) {
     bool allow;
-    nsresult rv = mDocShell->GetAllowWindowControl(&allow);
+    nsresult rv = GetDocShell()->GetAllowWindowControl(&allow);
     if (NS_SUCCEEDED(rv) && !allow)
       return false;
   }
@@ -7402,7 +7403,7 @@ nsGlobalWindow::FocusOuter(ErrorResult& aError)
     return;
   }
 
-  nsCOMPtr<nsIBaseWindow> baseWin = do_QueryInterface(mDocShell);
+  nsCOMPtr<nsIBaseWindow> baseWin = do_QueryInterface(GetDocShell());
 
   bool isVisible = false;
   if (baseWin) {
@@ -7429,7 +7430,7 @@ nsGlobalWindow::FocusOuter(ErrorResult& aError)
   fm->GetActiveWindow(getter_AddRefs(activeDOMWindow));
 
   nsCOMPtr<nsIDocShellTreeItem> rootItem;
-  mDocShell->GetRootTreeItem(getter_AddRefs(rootItem));
+  GetDocShell()->GetRootTreeItem(getter_AddRefs(rootItem));
   nsCOMPtr<nsPIDOMWindowOuter> rootWin = rootItem ? rootItem->GetWindow() : nullptr;
   auto* activeWindow = nsPIDOMWindowOuter::From(activeDOMWindow);
   bool isActive = (rootWin == activeWindow);
@@ -7448,7 +7449,7 @@ nsGlobalWindow::FocusOuter(ErrorResult& aError)
       embeddingWin->SetFocus();
   }
 
-  if (!mDocShell) {
+  if (!GetDocShell()) {
     return;
   }
 
@@ -7457,7 +7458,7 @@ nsGlobalWindow::FocusOuter(ErrorResult& aError)
   // about:blank loaded.  We don't want to focus our widget in that case.
   // XXXbz should we really be checking for IsInitialDocument() instead?
   bool lookForPresShell = true;
-  if (mDocShell->ItemType() == nsIDocShellTreeItem::typeChrome &&
+  if (GetDocShell()->ItemType() == nsIDocShellTreeItem::typeChrome &&
       GetPrivateRoot() == AsOuter() && mDoc) {
     nsIURI* ourURI = mDoc->GetDocumentURI();
     if (ourURI) {
@@ -7466,11 +7467,11 @@ nsGlobalWindow::FocusOuter(ErrorResult& aError)
   }
 
   if (lookForPresShell) {
-    mDocShell->GetEldestPresShell(getter_AddRefs(presShell));
+    GetDocShell()->GetEldestPresShell(getter_AddRefs(presShell));
   }
 
   nsCOMPtr<nsIDocShellTreeItem> parentDsti;
-  mDocShell->GetParent(getter_AddRefs(parentDsti));
+  GetDocShell()->GetParent(getter_AddRefs(parentDsti));
 
   // set the parent's current focus to the frame containing this window.
   nsCOMPtr<nsPIDOMWindowOuter> parent =
@@ -7534,7 +7535,7 @@ nsGlobalWindow::BlurOuter()
   nsCOMPtr<nsIDocShellTreeOwner> treeOwner = GetTreeOwner();
   nsCOMPtr<nsIEmbeddingSiteWindow> siteWindow(do_GetInterface(treeOwner));
   if (siteWindow) {
-    // This method call may cause mDocShell to become nullptr.
+    // This method call may cause GetDocShell() to become nullptr.
     siteWindow->Blur();
 
     // if the root is focused, clear the focus
@@ -7561,7 +7562,7 @@ nsGlobalWindow::BackOuter(ErrorResult& aError)
 {
   MOZ_RELEASE_ASSERT(IsOuterWindow());
 
-  nsCOMPtr<nsIWebNavigation> webNav(do_QueryInterface(mDocShell));
+  nsCOMPtr<nsIWebNavigation> webNav(do_QueryInterface(GetDocShell()));
   if (!webNav) {
     aError.Throw(NS_ERROR_FAILURE);
     return;
@@ -7581,7 +7582,7 @@ nsGlobalWindow::ForwardOuter(ErrorResult& aError)
 {
   MOZ_RELEASE_ASSERT(IsOuterWindow());
 
-  nsCOMPtr<nsIWebNavigation> webNav(do_QueryInterface(mDocShell));
+  nsCOMPtr<nsIWebNavigation> webNav(do_QueryInterface(GetDocShell()));
   if (!webNav) {
     aError.Throw(NS_ERROR_FAILURE);
     return;
@@ -7601,7 +7602,7 @@ nsGlobalWindow::HomeOuter(nsIPrincipal& aSubjectPrincipal, ErrorResult& aError)
 {
   MOZ_RELEASE_ASSERT(IsOuterWindow());
 
-  if (!mDocShell) {
+  if (!GetDocShell()) {
     return;
   }
 
@@ -7635,7 +7636,7 @@ nsGlobalWindow::HomeOuter(nsIPrincipal& aSubjectPrincipal, ErrorResult& aError)
   }
 #endif
 
-  nsCOMPtr<nsIWebNavigation> webNav(do_QueryInterface(mDocShell));
+  nsCOMPtr<nsIWebNavigation> webNav(do_QueryInterface(GetDocShell()));
   if (!webNav) {
     aError.Throw(NS_ERROR_FAILURE);
     return;
@@ -7660,7 +7661,7 @@ nsGlobalWindow::StopOuter(ErrorResult& aError)
 {
   MOZ_RELEASE_ASSERT(IsOuterWindow());
 
-  nsCOMPtr<nsIWebNavigation> webNav(do_QueryInterface(mDocShell));
+  nsCOMPtr<nsIWebNavigation> webNav(do_QueryInterface(GetDocShell()));
   if (webNav) {
     aError = webNav->Stop(nsIWebNavigation::STOP_ALL);
   }
@@ -7913,7 +7914,7 @@ nsGlobalWindow::ResizeToOuter(int32_t aWidth, int32_t aHeight,
    * If caller is a browser-element then dispatch a resize event to
    * the embedder.
    */
-  if (mDocShell && mDocShell->GetIsMozBrowser()) {
+  if (GetDocShell() && GetDocShell()->GetIsMozBrowser()) {
     CSSIntSize size(aWidth, aHeight);
     if (!DispatchResizeEvent(size)) {
       // The embedder chose to prevent the default action for this
@@ -7965,7 +7966,7 @@ nsGlobalWindow::ResizeByOuter(int32_t aWidthDif, int32_t aHeightDif,
    * If caller is a browser-element then dispatch a resize event to
    * parent.
    */
-  if (mDocShell && mDocShell->GetIsMozBrowser()) {
+  if (GetDocShell() && GetDocShell()->GetIsMozBrowser()) {
     CSSIntSize size;
     if (NS_FAILED(GetInnerSize(size))) {
       return;
@@ -8034,7 +8035,7 @@ nsGlobalWindow::SizeToContentOuter(CallerType aCallerType, ErrorResult& aError)
 {
   MOZ_RELEASE_ASSERT(IsOuterWindow());
 
-  if (!mDocShell) {
+  if (!GetDocShell()) {
     return;
   }
 
@@ -8050,7 +8051,7 @@ nsGlobalWindow::SizeToContentOuter(CallerType aCallerType, ErrorResult& aError)
   // The content viewer does a check to make sure that it's a content
   // viewer for a toplevel docshell.
   nsCOMPtr<nsIContentViewer> cv;
-  mDocShell->GetContentViewer(getter_AddRefs(cv));
+  GetDocShell()->GetContentViewer(getter_AddRefs(cv));
   if (!cv) {
     aError.Throw(NS_ERROR_FAILURE);
     return;
@@ -8075,7 +8076,7 @@ nsGlobalWindow::SizeToContentOuter(CallerType aCallerType, ErrorResult& aError)
 
   nsIntSize newDevSize(CSSToDevIntPixels(cssSize));
 
-  aError = treeOwner->SizeShellTo(mDocShell, newDevSize.width,
+  aError = treeOwner->SizeShellTo(GetDocShell(), newDevSize.width,
                                   newDevSize.height);
 }
 
@@ -8410,9 +8411,9 @@ nsGlobalWindow::RevisePopupAbuseLevel(PopupControlState aControl)
 {
   MOZ_ASSERT(IsOuterWindow());
 
-  NS_ASSERTION(mDocShell, "Must have docshell");
+  NS_ASSERTION(GetDocShell(), "Must have docshell");
 
-  if (mDocShell->ItemType() != nsIDocShellTreeItem::typeContent) {
+  if (GetDocShell()->ItemType() != nsIDocShellTreeItem::typeContent) {
     return openAllowed;
   }
 
@@ -9196,7 +9197,7 @@ nsGlobalWindow::GetFrameElementOuter(nsIPrincipal& aSubjectPrincipal)
 {
   MOZ_RELEASE_ASSERT(IsOuterWindow());
 
-  if (!mDocShell || mDocShell->GetIsMozBrowser()) {
+  if (!GetDocShell() || GetDocShell()->GetIsMozBrowser()) {
     return nullptr;
   }
 
@@ -9226,14 +9227,14 @@ nsGlobalWindow::GetRealFrameElementOuter()
 {
   MOZ_RELEASE_ASSERT(IsOuterWindow());
 
-  if (!mDocShell) {
+  if (!GetDocShell()) {
     return nullptr;
   }
 
   nsCOMPtr<nsIDocShell> parent;
-  mDocShell->GetSameTypeParentIgnoreBrowserBoundaries(getter_AddRefs(parent));
+  GetDocShell()->GetSameTypeParentIgnoreBrowserBoundaries(getter_AddRefs(parent));
 
-  if (!parent || parent == mDocShell) {
+  if (!parent || parent == GetDocShell()) {
     // We're at a chrome boundary, don't expose the chrome iframe
     // element to content code.
     return nullptr;
@@ -9483,11 +9484,11 @@ nsGlobalWindow::GetSelectionOuter()
 {
   MOZ_RELEASE_ASSERT(IsOuterWindow());
 
-  if (!mDocShell) {
+  if (!GetDocShell()) {
     return nullptr;
   }
 
-  nsCOMPtr<nsIPresShell> presShell = mDocShell->GetPresShell();
+  nsCOMPtr<nsIPresShell> presShell = GetDocShell()->GetPresShell();
   if (!presShell) {
     return nullptr;
   }
@@ -9524,7 +9525,7 @@ nsGlobalWindow::FindOuter(const nsAString& aString, bool aCaseSensitive,
     return false;
   }
 
-  nsCOMPtr<nsIWebBrowserFind> finder(do_GetInterface(mDocShell));
+  nsCOMPtr<nsIWebBrowserFind> finder(do_GetInterface(GetDocShell()));
   if (!finder) {
     aError.Throw(NS_ERROR_NOT_AVAILABLE);
     return false;
@@ -10484,11 +10485,11 @@ nsGlobalWindow::GetComputedStyleHelperOuter(Element& aElt,
 {
   MOZ_RELEASE_ASSERT(IsOuterWindow());
 
-  if (!mDocShell) {
+  if (!GetDocShell()) {
     return nullptr;
   }
 
-  nsCOMPtr<nsIPresShell> presShell = mDocShell->GetPresShell();
+  nsCOMPtr<nsIPresShell> presShell = GetDocShell()->GetPresShell();
 
   if (!presShell) {
     // Try flushing frames on our parent in case there's a pending
@@ -10500,12 +10501,12 @@ nsGlobalWindow::GetComputedStyleHelperOuter(Element& aElt,
 
     parent->FlushPendingNotifications(FlushType::Frames);
 
-    // Might have killed mDocShell
-    if (!mDocShell) {
+    // Might have killed DocShell
+    if (!GetDocShell()) {
       return nullptr;
     }
 
-    presShell = mDocShell->GetPresShell();
+    presShell = GetDocShell()->GetPresShell();
     if (!presShell) {
       return nullptr;
     }
@@ -10689,21 +10690,21 @@ nsGlobalWindow::GetInterface(const nsIID & aIID, void **aSink)
     NS_ENSURE_TRUE(outer, NS_ERROR_NOT_INITIALIZED);
 
     NS_WARNING("Using deprecated nsIDocCharset: use nsIDocShell.GetCharset() instead ");
-    nsCOMPtr<nsIDocCharset> docCharset(do_QueryInterface(outer->mDocShell));
+    nsCOMPtr<nsIDocCharset> docCharset(do_QueryInterface(outer->GetDocShell()));
     docCharset.forget(aSink);
   }
   else if (aIID.Equals(NS_GET_IID(nsIWebNavigation))) {
     nsGlobalWindow* outer = GetOuterWindowInternal();
     NS_ENSURE_TRUE(outer, NS_ERROR_NOT_INITIALIZED);
 
-    nsCOMPtr<nsIWebNavigation> webNav(do_QueryInterface(outer->mDocShell));
+    nsCOMPtr<nsIWebNavigation> webNav(do_QueryInterface(outer->GetDocShell()));
     webNav.forget(aSink);
   }
   else if (aIID.Equals(NS_GET_IID(nsIDocShell))) {
     nsGlobalWindow* outer = GetOuterWindowInternal();
     NS_ENSURE_TRUE(outer, NS_ERROR_NOT_INITIALIZED);
 
-    nsCOMPtr<nsIDocShell> docShell = outer->mDocShell;
+    nsCOMPtr<nsIDocShell> docShell = outer->GetDocShell();
     docShell.forget(aSink);
   }
 #ifdef NS_PRINTING
@@ -10711,9 +10712,9 @@ nsGlobalWindow::GetInterface(const nsIID & aIID, void **aSink)
     nsGlobalWindow* outer = GetOuterWindowInternal();
     NS_ENSURE_TRUE(outer, NS_ERROR_NOT_INITIALIZED);
 
-    if (outer->mDocShell) {
+    if (outer->GetDocShell()) {
       nsCOMPtr<nsIContentViewer> viewer;
-      outer->mDocShell->GetContentViewer(getter_AddRefs(viewer));
+      outer->GetDocShell()->GetContentViewer(getter_AddRefs(viewer));
       if (viewer) {
         nsCOMPtr<nsIWebBrowserPrint> webBrowserPrint(do_QueryInterface(viewer));
         webBrowserPrint.forget(aSink);
@@ -10736,7 +10737,7 @@ nsGlobalWindow::GetInterface(const nsIID & aIID, void **aSink)
     nsGlobalWindow* outer = GetOuterWindowInternal();
     NS_ENSURE_TRUE(outer, NS_ERROR_NOT_INITIALIZED);
 
-    nsCOMPtr<nsILoadContext> loadContext(do_QueryInterface(outer->mDocShell));
+    nsCOMPtr<nsILoadContext> loadContext(do_QueryInterface(outer->GetDocShell()));
     loadContext.forget(aSink);
   }
   else {
@@ -12101,7 +12102,7 @@ nsGlobalWindow::OpenInternal(const nsAString& aUrl, const nsAString& aName,
     return NS_ERROR_NOT_AVAILABLE;
   }
 
-  NS_ASSERTION(mDocShell, "Must have docshell here");
+  NS_ASSERTION(GetDocShell(), "Must have docshell here");
 
   bool forceNoOpener = aForceNoOpener;
   if (!forceNoOpener) {
@@ -12568,12 +12569,12 @@ nsGlobalWindow::GetTreeOwner()
   // If there's no docShellAsItem, this window must have been closed,
   // in that case there is no tree owner.
 
-  if (!mDocShell) {
+  if (!GetDocShell()) {
     return nullptr;
   }
 
   nsCOMPtr<nsIDocShellTreeOwner> treeOwner;
-  mDocShell->GetTreeOwner(getter_AddRefs(treeOwner));
+  GetDocShell()->GetTreeOwner(getter_AddRefs(treeOwner));
   return treeOwner.forget();
 }
 
@@ -12584,11 +12585,11 @@ nsGlobalWindow::GetTreeOwnerWindow()
 
   nsCOMPtr<nsIDocShellTreeOwner> treeOwner;
 
-  // If there's no mDocShell, this window must have been closed,
+  // If there's no DocShell, this window must have been closed,
   // in that case there is no tree owner.
 
-  if (mDocShell) {
-    mDocShell->GetTreeOwner(getter_AddRefs(treeOwner));
+  if (GetDocShell()) {
+    GetDocShell()->GetTreeOwner(getter_AddRefs(treeOwner));
   }
 
   nsCOMPtr<nsIBaseWindow> baseWindow = do_QueryInterface(treeOwner);
@@ -12609,11 +12610,11 @@ nsGlobalWindow::GetScrollFrame()
 {
   FORWARD_TO_OUTER(GetScrollFrame, (), nullptr);
 
-  if (!mDocShell) {
+  if (!GetDocShell()) {
     return nullptr;
   }
 
-  nsCOMPtr<nsIPresShell> presShell = mDocShell->GetPresShell();
+  nsCOMPtr<nsIPresShell> presShell = GetDocShell()->GetPresShell();
   if (presShell) {
     return presShell->GetRootScrollFrameAsScrollable();
   }
@@ -12814,7 +12815,7 @@ void
 nsGlobalWindow::EnableOrientationChangeListener()
 {
   MOZ_ASSERT(IsInnerWindow());
-  if (!nsContentUtils::ShouldResistFingerprinting(mDocShell) &&
+  if (!nsContentUtils::ShouldResistFingerprinting(GetDocShell()) &&
       !mOrientationChangeObserver) {
     mOrientationChangeObserver =
       MakeUnique<WindowOrientationObserver>(this);
@@ -13464,13 +13465,13 @@ nsGlobalWindow::SetCursorOuter(const nsAString& aCursor, ErrorResult& aError)
   }
 
   RefPtr<nsPresContext> presContext;
-  if (mDocShell) {
-    mDocShell->GetPresContext(getter_AddRefs(presContext));
+  if (GetDocShell()) {
+    GetDocShell()->GetPresContext(getter_AddRefs(presContext));
   }
 
   if (presContext) {
     // Need root widget.
-    nsCOMPtr<nsIPresShell> presShell = mDocShell->GetPresShell();
+    nsCOMPtr<nsIPresShell> presShell = GetDocShell()->GetPresShell();
     if (!presShell) {
       aError.Throw(NS_ERROR_FAILURE);
       return;
@@ -14072,9 +14073,9 @@ nsGlobalWindow::CreateImageBitmap(JSContext* aCx,
 void
 nsGlobalWindow::CheckForDPIChange()
 {
-  if (mDocShell) {
+  if (GetDocShell()) {
     RefPtr<nsPresContext> presContext;
-    mDocShell->GetPresContext(getter_AddRefs(presContext));
+    GetDocShell()->GetPresContext(getter_AddRefs(presContext));
     if (presContext) {
       if (presContext->DeviceContext()->CheckDPIChange()) {
         presContext->UIResolutionChanged();
@@ -14326,7 +14327,7 @@ nsGlobalWindow::IsClosedOrClosing()
   }
 
   // XXX(nika): Add a helper to nsDocShell
-  nsDocShell* docShell = nsDocShell::Cast(mDocShell);
+  nsDocShell* docShell = nsDocShell::Cast(GetDocShell());
   return (mCleanedUp ||
           !docShell ||
           docShell->mIsClosed ||

@@ -115,6 +115,12 @@ nsPIDOMWindow<T>::GetDocShell() const
     return mOuterWindow->GetDocShell();
   }
 
+  // NOTE: For legacy reasons, if we've been cleaned up we should pretend we
+  // don't have a docshell anymore.
+  if (mCleanedUp) {
+    return nullptr;
+  }
+
   return mDocShell;
 }
 
