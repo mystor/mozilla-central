@@ -1058,7 +1058,8 @@ nsPIDOMWindow<T>::nsPIDOMWindow(nsPIDOMWindowOuter *aOuterWindow)
   mLargeAllocStatus(LargeAllocStatus::NONE),
   mHasTriedToCacheTopInnerWindow(false),
   mNumOfIndexedDBDatabases(0),
-  mNumOfOpenWebSockets(0)
+  mNumOfOpenWebSockets(0),
+  mCleanedUp(false)
 {
   if (aOuterWindow) {
     mTimeoutManager =
@@ -1611,7 +1612,6 @@ nsGlobalWindow::nsGlobalWindow(nsGlobalWindow *aOuterWindow)
 #ifdef DEBUG
     mSetOpenerWindowCalled(false),
 #endif
-    mCleanedUp(false),
     mDialogAbuseCount(0),
     mAreDialogsEnabled(true),
 #ifdef DEBUG
@@ -6559,7 +6559,7 @@ nsGlobalWindow::SetCSSViewportWidthAndHeight(nscoord aInnerWidth, nscoord aInner
   MOZ_ASSERT(IsOuterWindow());
 
   RefPtr<nsPresContext> presContext;
-  GetDOcShell()->GetPresContext(getter_AddRefs(presContext));
+  GetDocShell()->GetPresContext(getter_AddRefs(presContext));
 
   nsRect shellArea = presContext->GetVisibleArea();
   shellArea.SetHeight(aInnerHeight);
