@@ -1275,6 +1275,17 @@ private:
   nsresult DispatchToTabGroup(mozilla::TaskCategory aCategory,
                               already_AddRefed<nsIRunnable>&& aRunnable);
 
+  // If the mScriptGlobal for this docshell is present, and not dead, return it.
+  // Otherwise, return nullptr.
+  nsGlobalWindow* GetWindowInternal() {
+    return mScriptGlobalDead ? nullptr : mScriptGlobal.get();
+  }
+
+  // Get the script global for this docshell, even if it is dead.
+  nsGlobalWindow* ZombieWindowInternal() {
+    return mScriptGlobal;
+  }
+
 #ifdef DEBUG
   // We're counting the number of |nsDocShells| to help find leaks
   static unsigned long gNumberOfDocShells;

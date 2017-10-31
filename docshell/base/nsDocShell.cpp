@@ -1286,8 +1286,9 @@ nsDocShell::GetInterface(const nsIID& aIID, void** aSink)
               aIID.Equals(NS_GET_IID(nsPIDOMWindowOuter)) ||
               aIID.Equals(NS_GET_IID(mozIDOMWindowProxy)) ||
               aIID.Equals(NS_GET_IID(nsIDOMWindow))) &&
-             NS_SUCCEEDED(EnsureScriptEnvironment())) {
-    return mScriptGlobal->QueryInterface(aIID, aSink);
+             NS_SUCCEEDED(EnsureScriptEnvironment()) &&
+             GetWindowInternal()) {
+    return GetWindowInternal()->QueryInterface(aIID, aSink);
   } else if (aIID.Equals(NS_GET_IID(nsIDOMDocument)) &&
              NS_SUCCEEDED(EnsureContentViewer())) {
     mContentViewer->GetDOMDocument((nsIDOMDocument**)aSink);
@@ -1331,7 +1332,7 @@ nsDocShell::GetInterface(const nsIID& aIID, void** aSink)
     // Get the an auth prompter for our window so that the parenting
     // of the dialogs works as it should when using tabs.
     nsIPrompt* prompt;
-    rv = wwatch->GetNewPrompter(mScriptGlobal->AsOuter(), &prompt);
+    rv = wwatch->GetNewPrompter(GetWindow(), &prompt);
     NS_ENSURE_SUCCESS(rv, rv);
 
     *aSink = prompt;
@@ -2113,9 +2114,9 @@ nsDocShell::MaybeInitTiming()
 
   bool canBeReset = false;
 
-  if (mScriptGlobal && mBlankTiming) {
+  if (GetWindowInternal() && mBlankTiming) {
     nsPIDOMWindowInner* innerWin =
-      mScriptGlobal->AsOuter()->GetCurrentInnerWindow();
+      GetWindow()->GetCurrentInnerWindow();
     if (innerWin && innerWin->GetPerformance()) {
       mTiming = innerWin->GetPerformance()->GetDOMTiming();
       mBlankTiming = false;
@@ -2284,8 +2285,8 @@ nsDocShell::SetChromeEventHandler(nsIDOMEventTarget* aChromeEventHandler)
   nsCOMPtr<EventTarget> handler = do_QueryInterface(aChromeEventHandler);
   mChromeEventHandler = handler.get();
 
-  if (mScriptGlobal) {
-    mScriptGlobal->SetChromeEventHandler(mChromeEventHandler);
+  if (GetWindowInternal()) {
+    GetWindowInternal()->SetChromeEventHandler(mChromeEventHandler);
   }
 
   return NS_OK;
@@ -2856,9 +2857,9 @@ nsDocShell::SetAllowMedia(bool aAllowMedia)
   mAllowMedia = aAllowMedia;
 
   // Mute or unmute audio contexts attached to the inner window.
-  if (mScriptGlobal) {
+  if (GetWindowInternal()) {
     if (nsPIDOMWindowInner* innerWin =
-        mScriptGlobal->AsOuter()->GetCurrentInnerWindow()) {
+        GetWindow()->GetCurrentInnerWindow()) {
       if (aAllowMedia) {
         innerWin->UnmuteAudioContexts();
       } else {
@@ -3559,8 +3560,8 @@ NS_IMETHODIMP
 nsDocShell::SetCustomUserAgent(const nsAString& aCustomUserAgent)
 {
   mCustomUserAgent = aCustomUserAgent;
-  RefPtr<nsGlobalWindow> win = mScriptGlobal ?
-    mScriptGlobal->GetCurrentInnerWindowInternal() : nullptr;
+  RefPtr<nsGlobalWindow> win = GetWindowInternal() ?
+    GetWindowInternal()->GetCurrentInnerWindowInternal() : nullptr;
   if (win) {
     Navigator* navigator = win->Navigator();
     if (navigator) {
@@ -3701,9 +3702,9 @@ nsDocShell::RecomputeCanExecuteScripts()
   // Inform our active DOM window.
   //
   // This will pass the outer, which will be in the scope of the active inner.
-  if (mScriptGlobal && mScriptGlobal->GetGlobalJSObject()) {
+  if (GetWindowInternal() && GetWindowInternal()->GetGlobalJSObject()) {
     xpc::Scriptability& scriptability =
-      xpc::Scriptability::Get(mScriptGlobal->GetGlobalJSObject());
+      xpc::Scriptability::Get(GetWindowInternal()->GetGlobalJSObject());
     scriptability.SetDocShellAllowsScript(mCanExecuteScripts);
   }
 
@@ -4930,7 +4931,7 @@ nsIScriptGlobalObject*
 nsDocShell::GetScriptGlobalObject()
 {
   NS_ENSURE_SUCCESS(EnsureScriptEnvironment(), nullptr);
-  return mScriptGlobal;
+  return GetWindowInternal();
 }
 
 nsIDocument*
@@ -4946,7 +4947,7 @@ nsDocShell::GetWindow()
   if (NS_FAILED(EnsureScriptEnvironment())) {
     return nullptr;
   }
-  return mScriptGlobal->AsOuter();
+  return GetWindowInternal()->AsOuter();
 }
 
 nsIDocShell*
@@ -5687,8 +5688,8 @@ nsDocShell::DisplayLoadError(nsresult aError, nsIURI* aURI,
     // The prompter reqires that our private window has a document (or it
     // asserts). Satisfy that assertion now since GetDoc will force
     // creation of one if it hasn't already been created.
-    if (mScriptGlobal) {
-      Unused << mScriptGlobal->GetDoc();
+    if (GetWindowInternal()) {
+      Unused << GetWindowInternal()->GetDoc();
     }
 
     // Display a message box
@@ -6651,9 +6652,9 @@ nsDocShell::SetIsActive(bool aIsActive)
   }
 
   // Tell the window about it
-  if (mScriptGlobal) {
-    mScriptGlobal->SetIsBackground(!aIsActive);
-    if (nsCOMPtr<nsIDocument> doc = mScriptGlobal->GetExtantDoc()) {
+  if (GetWindowInternal()) {
+    GetWindowInternal()->SetIsBackground(!aIsActive);
+    if (nsCOMPtr<nsIDocument> doc = GetWindowInternal()->GetExtantDoc()) {
       // Update orientation when the top-level browsing context becomes active.
       if (aIsActive) {
         nsCOMPtr<nsIDocShellTreeItem> parent;
@@ -8628,11 +8629,11 @@ nsDocShell::CanSavePresentation(uint32_t aLoadType,
   }
 
   // If the document is not done loading, don't cache it.
-  if (!mScriptGlobal || mScriptGlobal->IsLoading()) {
+  if (!GetWindowInternal() || GetWindowInternal()->IsLoading()) {
     return false;
   }
 
-  if (mScriptGlobal->WouldReuseInnerWindow(aNewDocument)) {
+  if (GetWindowInternal()->WouldReuseInnerWindow(aNewDocument)) {
     return false;
   }
 
@@ -8650,7 +8651,7 @@ nsDocShell::CanSavePresentation(uint32_t aLoadType,
   }
 
   // If the document does not want its presentation cached, then don't.
-  nsCOMPtr<nsIDocument> doc = mScriptGlobal->GetExtantDoc();
+  nsCOMPtr<nsIDocument> doc = GetWindowInternal()->GetExtantDoc();
   return doc && doc->CanSavePresentation(aNewRequest);
 }
 
@@ -8718,11 +8719,11 @@ nsDocShell::CaptureState()
     return NS_ERROR_FAILURE;
   }
 
-  if (!mScriptGlobal) {
+  if (!GetWindowInternal()) {
     return NS_ERROR_FAILURE;
   }
 
-  nsCOMPtr<nsISupports> windowState = mScriptGlobal->SaveWindowState();
+  nsCOMPtr<nsISupports> windowState = GetWindowInternal()->SaveWindowState();
   NS_ENSURE_TRUE(windowState, NS_ERROR_FAILURE);
 
 #ifdef DEBUG_PAGE_CACHE
@@ -10258,7 +10259,7 @@ nsDocShell::InternalLoad(nsIURI* aURI,
   uint32_t contentType;
   if (IsFrame() && !isTargetTopLevelDocShell) {
     nsCOMPtr<Element> requestingElement =
-      mScriptGlobal->AsOuter()->GetFrameElementInternal();
+      GetWindow()->GetFrameElementInternal();
     if (requestingElement) {
       contentType = requestingElement->IsHTMLElement(nsGkAtoms::iframe) ?
         nsIContentPolicy::TYPE_INTERNAL_IFRAME : nsIContentPolicy::TYPE_INTERNAL_FRAME;
@@ -10299,13 +10300,13 @@ nsDocShell::InternalLoad(nsIURI* aURI,
       // In e10s the child process doesn't have access to the element that
       // contains the browsing context (because that element is in the chrome
       // process). So we just pass mScriptGlobal.
-      requestingContext = ToSupports(mScriptGlobal);
+      requestingContext = ToSupports(GetWindow());
     } else {
       // This is for loading non-e10s tabs and toplevel windows of various
       // sorts.
       // For the toplevel window cases, requestingElement will be null.
       nsCOMPtr<Element> requestingElement =
-        mScriptGlobal->AsOuter()->GetFrameElementInternal();
+        GetWindow()->GetFrameElementInternal();
       requestingContext = requestingElement;
     }
 
@@ -10922,7 +10923,7 @@ nsDocShell::InternalLoad(nsIURI* aURI,
       // applies to aURI.
       CopyFavicon(currentURI, aURI, doc->NodePrincipal(), UsePrivateBrowsing());
 
-      RefPtr<nsGlobalWindow> scriptGlobal = mScriptGlobal;
+      RefPtr<nsGlobalWindow> scriptGlobal = GetWindowInternal();
       RefPtr<nsGlobalWindow> win = scriptGlobal ?
         scriptGlobal->GetCurrentInnerWindowInternal() : nullptr;
 
@@ -11400,7 +11401,7 @@ nsDocShell::DoURILoad(nsIURI* aURI,
   if (aContentPolicyType == nsIContentPolicy::TYPE_DOCUMENT) {
     loadingNode = nullptr;
     loadingPrincipal = nullptr;
-    loadingWindow = mScriptGlobal->AsOuter();
+    loadingWindow = GetWindow();
     if (XRE_IsContentProcess()) {
       // In e10s the child process doesn't have access to the element that
       // contains the browsing context (because that element is in the chrome
@@ -11417,7 +11418,7 @@ nsDocShell::DoURILoad(nsIURI* aURI,
     }
   } else {
     loadingWindow = nullptr;
-    loadingNode = mScriptGlobal->AsOuter()->GetFrameElementInternal();
+    loadingNode = GetWindow()->GetFrameElementInternal();
     if (loadingNode) {
       // If we have a loading node, then use that as our loadingPrincipal.
       loadingPrincipal = loadingNode->NodePrincipal();
@@ -14203,7 +14204,7 @@ nsDocShell::GetAuthPrompt(uint32_t aPromptReason, const nsIID& aIID,
   // Get the an auth prompter for our window so that the parenting
   // of the dialogs works as it should when using tabs.
 
-  return wwatch->GetPrompt(mScriptGlobal->AsOuter(), aIID,
+  return wwatch->GetPrompt(GetWindow(), aIID,
                            reinterpret_cast<void**>(aResult));
 }
 
@@ -14331,9 +14332,9 @@ nsDocShell::GetControllerForCommand(const char* aCommand,
   NS_ENSURE_ARG_POINTER(aResult);
   *aResult = nullptr;
 
-  NS_ENSURE_TRUE(mScriptGlobal, NS_ERROR_FAILURE);
+  NS_ENSURE_TRUE(GetWindowInternal(), NS_ERROR_FAILURE);
 
-  nsCOMPtr<nsPIWindowRoot> root = mScriptGlobal->GetTopWindowRoot();
+  nsCOMPtr<nsPIWindowRoot> root = GetWindowInternal()->GetTopWindowRoot();
   NS_ENSURE_TRUE(root, NS_ERROR_FAILURE);
 
   return root->GetControllerForCommand(aCommand, false /* for any window */,
@@ -14570,7 +14571,7 @@ OnLinkClickEvent::OnLinkClickEvent(nsDocShell* aHandler,
   , mPostDataStreamLength(aPostDataStreamLength)
   , mHeadersDataStream(aHeadersDataStream)
   , mContent(aContent)
-  , mPopupState(mHandler->mScriptGlobal->GetPopupControlState())
+  , mPopupState(mHandler->GetWindowInternal()->GetPopupControlState())
   , mNoOpenerImplied(aNoOpenerImplied)
   , mIsTrusted(aIsTrusted)
   , mTriggeringPrincipal(aTriggeringPrincipal)
@@ -14728,8 +14729,8 @@ nsDocShell::OnLinkClickSync(nsIContent* aContent,
   // follow this link.
   nsPIDOMWindowInner* refererInner = refererDoc->GetInnerWindow();
   NS_ENSURE_TRUE(refererInner, NS_ERROR_UNEXPECTED);
-  if (!mScriptGlobal ||
-      mScriptGlobal->AsOuter()->GetCurrentInnerWindow() != refererInner) {
+  if (!GetWindowInternal() ||
+      GetWindow()->GetCurrentInnerWindow() != refererInner) {
     // We're no longer the current inner window
     return NS_OK;
   }
@@ -15574,11 +15575,11 @@ nsDocShell::SetDisplayMode(uint32_t aDisplayMode)
 nsPIDOMWindowInner*
 nsDocShell::GetCurrentInnerWindow()
 {
-  if (NS_WARN_IF(!mScriptGlobal)) {
+  if (NS_WARN_IF(!GetWindowInternal())) {
     return nullptr;
   }
 
-  return mScriptGlobal->AsOuter()->GetCurrentInnerWindow();
+  return GetWindow()->GetCurrentInnerWindow();
 }
 
 nsIWidget*
@@ -15615,11 +15616,11 @@ nsDocShell::FinishFullscreenChange(bool aIsFullscreen)
   // of the document before dispatching the "fullscreen" event, so
   // that the chrome can distinguish between browser fullscreen mode
   // and DOM fullscreen.
-  FinishDOMFullscreenChange(mScriptGlobal->GetExtantDoc(), mFullScreen);
+  FinishDOMFullscreenChange(GetWindowInternal()->GetExtantDoc(), mFullScreen);
 
   // dispatch a "fullscreen" DOM event so that XUL apps can
   // respond visually if we are kicked into full screen mode
-  mScriptGlobal->DispatchCustomEvent(NS_LITERAL_STRING("fullscreen"));
+  GetWindowInternal()->DispatchCustomEvent(NS_LITERAL_STRING("fullscreen"));
 
   if (!NS_WARN_IF(mItemType != typeChrome)) {
     if (nsCOMPtr<nsIPresShell> shell = do_QueryReferent(mFullscreenPresShell)) {
@@ -15709,7 +15710,7 @@ nsDocShell::SetFullscreenInternal(FullscreenReason aReason,
     // the window fullscreen because of fullscreen mode, don't restore
     // the window. But we still need to exit the DOM fullscreen state.
     if (!aFullScreen && mFullscreenMode) {
-      FinishDOMFullscreenChange(mScriptGlobal->GetExtantDoc(), false);
+      FinishDOMFullscreenChange(GetWindowInternal()->GetExtantDoc(), false);
       return NS_OK;
     }
   }
@@ -15747,9 +15748,9 @@ nsDocShell::SetWidgetFullscreen(FullscreenReason aReason, bool aIsFullscreen,
                                 nsIWidget* aWidget, nsIScreen* aScreen)
 {
   // XXX(nika): Move these into nsDocShell
-  MOZ_ASSERT(mScriptGlobal == mScriptGlobal->GetTopInternal(),
+  MOZ_ASSERT(GetWindowInternal() == GetWindowInternal()->GetTopInternal(),
              "Only topmost docshell should call this");
-  MOZ_ASSERT(!mScriptGlobal->AsOuter()->GetFrameElementInternal(),
+  MOZ_ASSERT(!GetWindow()->GetFrameElementInternal(),
              "Content window should not call this");
   MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
 
@@ -15776,11 +15777,11 @@ nsDocShell::SetWidgetFullscreen(FullscreenReason aReason, bool aIsFullscreen,
 void
 nsDocShell::FullscreenWillChange(bool aIsFullscreen)
 {
-  MOZ_ASSERT(mScriptGlobal, "outer window should be present");
+  MOZ_ASSERT(GetWindowInternal(), "outer window should be present");
   if (aIsFullscreen) {
-    mScriptGlobal->DispatchCustomEvent(NS_LITERAL_STRING("willenterfullscreen"));
+    GetWindowInternal()->DispatchCustomEvent(NS_LITERAL_STRING("willenterfullscreen"));
   } else {
-    mScriptGlobal->DispatchCustomEvent(NS_LITERAL_STRING("willexitfullscreen"));
+    GetWindowInternal()->DispatchCustomEvent(NS_LITERAL_STRING("willexitfullscreen"));
   }
 }
 
@@ -15884,9 +15885,9 @@ nsDocShell::CanClose()
 void
 nsDocShell::Close(bool aTrustedCaller)
 {
-  if (!mScriptGlobal || mIsBeingDestroyed ||
-      mScriptGlobal->IsInModalState() ||
-      (mScriptGlobal->IsFrame() && !GetIsMozBrowser())) {
+  if (!GetWindowInternal() || mIsBeingDestroyed ||
+      GetWindowInternal()->IsInModalState() ||
+      (GetWindowInternal()->IsFrame() && !GetIsMozBrowser())) {
     // window.close() is called on a frame in a frameset, on a window
     // that's already closed, or on a window for which there's
     // currently a modal dialog open. Ignore such calls.
@@ -15900,7 +15901,7 @@ nsDocShell::Close(bool aTrustedCaller)
   }
 
   // XXX(nika): Move this onto nsDocShell?
-  if (mScriptGlobal->mBlockScriptedClosingFlag)
+  if (GetWindowInternal()->mBlockScriptedClosingFlag)
   {
     // A script's popup has been blocked and we don't want
     // the window to be closed directly after this event,
@@ -15911,11 +15912,11 @@ nsDocShell::Close(bool aTrustedCaller)
   // Don't allow scripts from content to close non-neterror windows that
   // were not opened by script.
   nsAutoString url;
-  nsresult rv = mScriptGlobal->GetExtantDoc()->GetURL(url);
+  nsresult rv = GetWindowInternal()->GetExtantDoc()->GetURL(url);
   NS_ENSURE_SUCCESS_VOID(rv);
 
   if (!StringBeginsWith(url, NS_LITERAL_STRING("about:neterror")) &&
-      !mScriptGlobal->mHadOriginalOpener && !aTrustedCaller) {
+      !GetWindowInternal()->mHadOriginalOpener && !aTrustedCaller) {
     bool allowClose = mAllowScriptsToClose ||
       Preferences::GetBool("dom.allow_scripts_to_close_windows", true);
     if (!allowClose) {
@@ -15924,7 +15925,7 @@ nsDocShell::Close(bool aTrustedCaller)
       nsContentUtils::ReportToConsole(
           nsIScriptError::warningFlag,
           NS_LITERAL_CSTRING("DOM Window"),  // Better name for the category?
-          mScriptGlobal->GetExtantDoc(),
+          GetWindowInternal()->GetExtantDoc(),
           nsContentUtils::eDOM_PROPERTIES,
           "WindowCloseBlockedWarning");
 
@@ -15946,7 +15947,7 @@ nsDocShell::Close(bool aTrustedCaller)
   bool wasInClose = mInClose;
   mInClose = true;
 
-  if (!mScriptGlobal->DispatchCustomEvent(NS_LITERAL_STRING("DOMWindowClose"))) {
+  if (!GetWindowInternal()->DispatchCustomEvent(NS_LITERAL_STRING("DOMWindowClose"))) {
     // Someone chose to prevent the default action for this event, if
     // so, let's not close this window after all...
 
@@ -15962,7 +15963,7 @@ nsDocShell::ForceClose()
 {
   MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
 
-  if (!mScriptGlobal || mScriptGlobal->IsFrame() || mIsBeingDestroyed) {
+  if (!GetWindowInternal() || GetWindowInternal()->IsFrame() || mIsBeingDestroyed) {
     // This may be a frame in a frameset, or a window that's already closed.
     // Ignore such calls.
     return;
@@ -15976,7 +15977,7 @@ nsDocShell::ForceClose()
 
   mInClose = true;
 
-  mScriptGlobal->DispatchCustomEvent(NS_LITERAL_STRING("DOMWindowClose"));
+  GetWindowInternal()->DispatchCustomEvent(NS_LITERAL_STRING("DOMWindowClose"));
 
   FinalClose();
 }
@@ -16055,14 +16056,14 @@ nsDocShell::ReallyCloseWindow()
       bool isTab;
       if (rootShell == this ||
           !bwin ||
-          (NS_SUCCEEDED(bwin->IsTabContentWindow(mScriptGlobal,
+          (NS_SUCCEEDED(bwin->IsTabContentWindow(GetWindowInternal(),
                                                  &isTab)) && isTab)) {
         treeOwnerAsWin->Destroy();
       }
     }
 
-    if (mScriptGlobal) {
-      mScriptGlobal->CleanUp();
+    if (GetWindowInternal()) {
+      GetWindowInternal()->CleanUp();
     }
   }
 }
