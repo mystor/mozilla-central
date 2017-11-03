@@ -78,6 +78,8 @@ typedef uint32_t ScreenOrientationInternal;
 class nsDocShell;
 class nsDOMNavigationTiming;
 class nsGlobalWindow;
+class nsGlobalWindowOuter;
+class nsGlobalWindowInner;
 class nsIController;
 class nsIScrollableFrame;
 class OnLinkClickEvent;
@@ -917,7 +919,7 @@ protected:
   nsCOMPtr<nsIURI> mCurrentURI;
   nsCOMPtr<nsIURI> mReferrerURI;
   uint32_t mReferrerPolicy;
-  RefPtr<nsGlobalWindow> mScriptGlobal;
+  RefPtr<nsGlobalWindowOuter> mScriptGlobal;
   nsCOMPtr<nsISHistory> mSessionHistory;
   nsCOMPtr<nsIGlobalHistory2> mGlobalHistory;
   nsCOMPtr<nsIWebBrowserFind> mFind;

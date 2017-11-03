@@ -712,7 +712,7 @@ _getwindowobject(NPP npp)
   NS_ENSURE_TRUE(outer, nullptr);
 
   JS::Rooted<JSObject*> global(dom::RootingCx(),
-                               nsGlobalWindow::Cast(outer)->GetGlobalJSObject());
+                               nsGlobalWindowOuter::Cast(outer)->GetGlobalJSObject());
   return nsJSObjWrapper::GetNewOrUsed(npp, global);
 }
 
@@ -988,7 +988,7 @@ _evaluate(NPP npp, NPObject* npobj, NPString *script, NPVariant *result)
   nsIDocument *doc = GetDocumentFromNPP(npp);
   NS_ENSURE_TRUE(doc, false);
 
-  nsGlobalWindow* win = nsGlobalWindow::Cast(doc->GetInnerWindow());
+  nsGlobalWindowInner* win = nsGlobalWindowInner::Cast(doc->GetInnerWindow());
   if (NS_WARN_IF(!win || !win->FastGetGlobalJSObject())) {
     return false;
   }

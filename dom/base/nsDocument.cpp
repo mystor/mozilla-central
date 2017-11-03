@@ -2489,7 +2489,7 @@ nsDocument::ResetToURI(nsIURI *aURI, nsILoadGroup *aLoadGroup,
 
   // Refresh the principal on the compartment.
   if (nsPIDOMWindowInner* win = GetInnerWindow()) {
-    nsGlobalWindow::Cast(win)->RefreshCompartmentPrincipal();
+    nsGlobalWindowInner::Cast(win)->RefreshCompartmentPrincipal();
   }
 }
 
@@ -7200,7 +7200,7 @@ nsIDocument::GetLocation() const
     return nullptr;
   }
 
-  nsGlobalWindow* window = nsGlobalWindow::Cast(w);
+  nsGlobalWindowInner* window = nsGlobalWindowInner::Cast(w);
   RefPtr<Location> loc = window->GetLocation();
   return loc.forget();
 }
@@ -8442,7 +8442,7 @@ nsDocument::GetEventTargetParent(EventChainPreVisitor& aVisitor)
 
   // Load events must not propagate to |window| object, see bug 335251.
   if (aVisitor.mEvent->mMessage != eLoad) {
-    nsGlobalWindow* window = nsGlobalWindow::Cast(GetWindow());
+    nsGlobalWindowOuter* window = nsGlobalWindowOuter::Cast(GetWindow());
     aVisitor.mParentTarget =
       window ? window->GetTargetForEventTargetChain() : nullptr;
   }
@@ -9130,7 +9130,7 @@ nsDocument::CanSavePresentation(nsIRequest *aNewRequest)
 
 
   if (win) {
-    auto* globalWindow = nsGlobalWindow::Cast(win);
+    auto* globalWindow = nsGlobalWindowInner::Cast(win);
 #ifdef MOZ_WEBSPEECH
     if (globalWindow->HasActiveSpeechSynthesis()) {
       return false;
@@ -14294,7 +14294,7 @@ nsIDocument::GetSelection(ErrorResult& aRv)
     return nullptr;
   }
 
-  return nsGlobalWindow::Cast(window)->GetSelection(aRv);
+  return nsGlobalWindowInner::Cast(window)->GetSelection(aRv);
 }
 
 void
