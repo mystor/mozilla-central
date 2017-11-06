@@ -2094,13 +2094,12 @@ void MediaManager::OnDeviceChange() {
       for (auto& id : self->mDeviceIDs) {
         if (!deviceIDs.Contains(id)) {
           // Stop the coresponding SourceListener
-          nsGlobalWindow::WindowByIdTable* windowsById = nsGlobalWindow::GetWindowsTable();
+          nsGlobalWindowInner::InnerWindowByIdTable* windowsById =
+            nsGlobalWindowInner::GetWindowsTable();
           if (windowsById) {
             for (auto iter = windowsById->Iter(); !iter.Done(); iter.Next()) {
               nsGlobalWindow* window = iter.Data();
-              if (window->IsInnerWindow()) {
-                self->IterateWindowListeners(window->AsInner(), StopRawIDCallback, &id);
-              }
+              self->IterateWindowListeners(window->AsInner(), StopRawIDCallback, &id);
             }
           }
         }
