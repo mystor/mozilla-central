@@ -521,7 +521,7 @@ JSObject2Win(JSObject *obj)
 }
 
 void
-PrintWinURI(nsGlobalWindow *win)
+PrintWinURI(nsGlobalWindowInner *win)
 {
   if (!win) {
     printf("No window passed in.\n");
@@ -544,7 +544,7 @@ PrintWinURI(nsGlobalWindow *win)
 }
 
 void
-PrintWinCodebase(nsGlobalWindow *win)
+PrintWinCodebase(nsGlobalWindowInner *win)
 {
   if (!win) {
     printf("No window passed in.\n");

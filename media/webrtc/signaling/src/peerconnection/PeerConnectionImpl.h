@@ -331,7 +331,7 @@ public:
 
   // Initialize PeerConnection from an RTCConfiguration object (JS entrypoint)
   void Initialize(PeerConnectionObserver& aObserver,
-                  nsGlobalWindow& aWindow,
+                  nsGlobalWindowInner& aWindow,
                   const RTCConfiguration& aConfiguration,
                   nsISupports* aThread,
                   ErrorResult &rv);
