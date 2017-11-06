@@ -284,6 +284,9 @@ public:
   { }
 #endif
 
+private:
+  // Prefer using nsGlobalWindow{Inner,Outer}::Cast when possible to get a more
+  // specific window type.
   static nsGlobalWindow* Cast(nsPIDOMWindowInner* aPIWin) {
     return static_cast<nsGlobalWindow*>(
                         reinterpret_cast<nsPIDOMWindow<nsISupports>*>(aPIWin));
@@ -307,6 +310,7 @@ public:
     return Cast(nsPIDOMWindowOuter::From(aWin));
   }
 
+public:
   nsGlobalWindowInner* AssertInner();
   nsGlobalWindowOuter* AssertOuter();
 
