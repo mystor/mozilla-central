@@ -562,8 +562,9 @@ public:
 
   static void Init();
   static void ShutDown();
-  static void CleanupCachedXBLHandlers(nsGlobalWindow* aWindow);
   static bool IsCallerChrome();
+
+  void CleanupCachedXBLHandlers();
 
   friend class WindowStateHolder;
 
