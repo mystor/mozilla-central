@@ -31,6 +31,19 @@ Interface members const/method/attribute conform to the following pattern:
 """
 
 
+# XXX(nika): Fix the IDL files which do this so we can remove this list?
+def rustBlacklistedForward(s):
+    """These types are foward declared as interfaces, but never actually defined
+    in IDL files. We don't want to generate references to them in rust for that
+    reason."""
+    blacklisted = [
+        "nsIFrame",
+        "nsIObjectFrame",
+        "nsSubDocumentFrame",
+    ]
+    return s in blacklisted
+
+
 def attlistToIDL(attlist):
     if len(attlist) == 0:
         return ''
