@@ -147,7 +147,8 @@ NS_IMPL_CYCLE_COLLECTION_WRAPPERCACHE(nsFrameLoader,
                                       mDocShell,
                                       mMessageManager,
                                       mChildMessageManager,
-                                      mOpener)
+                                      mOpener,
+                                      mParentSHistory)
 NS_IMPL_CYCLE_COLLECTING_ADDREF(nsFrameLoader)
 NS_IMPL_CYCLE_COLLECTING_RELEASE(nsFrameLoader)
 
@@ -2188,12 +2189,16 @@ nsFrameLoader::MaybeCreateDocShell()
     return NS_ERROR_FAILURE;
   }
 
+  // If we are an in-process browser, we want to set up our session history. We
+  // do this by creating both the child SHistory (which is in the nsDocShell),
+  // and creating the corresponding in-process ParentSHistory.
   if (mIsTopLevelContent &&
       mOwnerContent->IsXULElement(nsGkAtoms::browser) &&
       !mOwnerContent->HasAttr(kNameSpaceID_None, nsGkAtoms::disablehistory)) {
     // XXX(nika): Set this up more explicitly?
     nsresult rv = mDocShell->InitSessionHistory();
     NS_ENSURE_SUCCESS(rv, rv);
+    mParentSHistory = new ParentSHistory(this);
   }
 
   OriginAttributes attrs;
@@ -2799,6 +2804,14 @@ nsFrameLoader::TryRemoteBrowser()
     nsCOMPtr<nsIBrowserDOMWindow> browserDOMWin;
     rootChromeWin->GetBrowserDOMWindow(getter_AddRefs(browserDOMWin));
     mRemoteBrowser->SetBrowserDOMWindow(browserDOMWin);
+  }
+
+  // Set up a parent SHistory
+  if (XRE_IsParentProcess()) {
+    // XXX(nika): Once we get out of process iframes we won't want to
+    // unconditionally set this up. What do we do for iframes in a chrome loaded
+    // document for example?
+    mParentSHistory = new ParentSHistory(this);
   }
 
   // Send down the name of the browser through mRemoteBrowser if it is set.
@@ -3624,4 +3637,10 @@ nsFrameLoader::WrapObject(JSContext* cx, JS::Handle<JSObject*> aGivenProto)
   JS::RootedObject result(cx);
   FrameLoaderBinding::Wrap(cx, this, this, aGivenProto, &result);
   return result;
+}
+
+ParentSHistory*
+nsFrameLoader::GetParentSHistory()
+{
+  return mParentSHistory;
 }

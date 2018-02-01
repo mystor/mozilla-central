@@ -35,6 +35,12 @@ interface FrameLoader {
   readonly attribute LoadContext loadContext;
 
   /**
+   * Get the ParentSHistory for the nsFrameLoader. May return null if this
+   * frameloader is not for a toplevel frame.
+   */
+  readonly attribute ParentSHistory? parentSHistory;
+
+  /**
    * Start loading the frame. This method figures out what to load
    * from the owner content in the frame loader.
    */

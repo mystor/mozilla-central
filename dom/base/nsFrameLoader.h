@@ -463,6 +463,8 @@ private:
   // grouped history navigation
   nsTArray<RefPtr<mozilla::dom::Promise>>* mBrowserChangingProcessBlockers;
 
+  RefPtr<mozilla::dom::ParentSHistory> mParentSHistory;
+
   bool mDepthTooGreat : 1;
   bool mIsTopLevelContent : 1;
   bool mDestroyCalled : 1;

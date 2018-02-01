@@ -17,6 +17,12 @@ interface nsITabParent;
 interface nsILoadContext;
 interface nsIPrintSettings;
 interface nsIWebProgressListener;
+interface nsIParentSHistory;
+
+%{C++
+namespace mozilla { namespace dom { class ParentSHistory; } }
+%}
+[ptr] native ptr_ParentSHistory(mozilla::dom::ParentSHistory);
 
 [builtinclass, uuid(1645af04-1bc7-4363-8f2c-eb9679220ab1)]
 interface nsIFrameLoader : nsISupports
@@ -207,6 +213,12 @@ interface nsIFrameLoader : nsISupports
    * Is `true` if the frameloader is dead (destroy has been called on it)
    */
   [infallible] readonly attribute boolean isDead;
+
+  /**
+   * The parent process entry point for session history. This should be
+   * exposed to JS through WebIDL's FrameLoader.webidl.
+   */
+  [noscript, notxpcom] ptr_ParentSHistory GetParentSHistory();
 };
 
 %{C++
