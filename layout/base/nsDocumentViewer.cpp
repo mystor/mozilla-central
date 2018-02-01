@@ -2115,10 +2115,8 @@ nsDocumentViewer::Show(void)
       nsCOMPtr<nsIDocShellTreeItem> root;
       treeItem->GetSameTypeRootTreeItem(getter_AddRefs(root));
       nsCOMPtr<nsIWebNavigation> webNav = do_QueryInterface(root);
-      nsCOMPtr<nsISHistory> history;
-      webNav->GetSessionHistory(getter_AddRefs(history));
-      nsCOMPtr<nsISHistoryInternal> historyInt = do_QueryInterface(history);
-      if (historyInt) {
+      RefPtr<ChildSHistory> history = webNav->GetSessionHistory();
+      if (history) {
         int32_t prevIndex,loadedIndex;
         nsCOMPtr<nsIDocShell> docShell = do_QueryInterface(treeItem);
         docShell->GetPreviousTransIndex(&prevIndex);
@@ -2127,7 +2125,8 @@ nsDocumentViewer::Show(void)
         printf("About to evict content viewers: prev=%d, loaded=%d\n",
                prevIndex, loadedIndex);
 #endif
-        historyInt->EvictOutOfRangeContentViewers(loadedIndex);
+        history->LegacySHistoryInternal()->
+          EvictOutOfRangeContentViewers(loadedIndex);
       }
     }
   }

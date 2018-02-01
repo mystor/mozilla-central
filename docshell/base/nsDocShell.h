@@ -17,6 +17,7 @@
 
 #include "mozilla/dom/ProfileTimelineMarkerBinding.h"
 #include "mozilla/gfx/Matrix.h"
+#include "mozilla/dom/ChildSHistory.h"
 
 #include "nsIAuthPromptProvider.h"
 #include "nsIBaseWindow.h"
@@ -875,7 +876,6 @@ private: // member functions
   nsresult PersistLayoutHistoryState();
   nsresult LoadHistoryEntry(nsISHEntry* aEntry, uint32_t aLoadType);
   nsresult SetBaseUrlForWyciwyg(nsIContentViewer* aContentViewer);
-  nsresult GetRootSessionHistory(nsISHistory** aReturn);
   nsresult GetHttpChannel(nsIChannel* aChannel, nsIHttpChannel** aReturn);
   nsresult ConfirmRepost(bool* aRepost);
   nsresult GetPromptAndStringBundle(nsIPrompt** aPrompt,
@@ -883,6 +883,8 @@ private: // member functions
   nsresult GetCurScrollPos(int32_t aScrollOrientation, int32_t* aCurPos);
   nsresult SetCurScrollPosEx(int32_t aCurHorizontalPos,
                              int32_t aCurVerticalPos);
+
+  already_AddRefed<mozilla::dom::ChildSHistory> GetRootSessionHistory();
 
   inline bool UseErrorPages()
   {
@@ -923,7 +925,7 @@ private: // data members
   nsCOMPtr<nsIDOMStorageManager> mSessionStorageManager;
   nsCOMPtr<nsIContentViewer> mContentViewer;
   nsCOMPtr<nsIWidget> mParentWidget;
-  nsCOMPtr<nsISHistory> mSessionHistory;
+  RefPtr<mozilla::dom::ChildSHistory> mSessionHistory;
   nsCOMPtr<nsIGlobalHistory2> mGlobalHistory;
   nsCOMPtr<nsIWebBrowserFind> mFind;
   nsCOMPtr<nsICommandManager> mCommandManager;
