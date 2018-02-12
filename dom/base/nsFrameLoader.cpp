@@ -1672,10 +1672,10 @@ nsFrameLoader::SwapWithOtherLoader(nsFrameLoader* aOther,
 
   // Drop any cached content viewers in the two session histories.
   if (ourHistory) {
-    ourHistory->LegacySHistoryInternal()->EvictAllContentViewers();
+    ourHistory->EvictLocalContentViewers();
   }
   if (otherHistory) {
-    otherHistory->LegacySHistoryInternal()->EvictAllContentViewers();
+    otherHistory->EvictLocalContentViewers();
   }
 
   NS_ASSERTION(ourFrame == ourContent->GetPrimaryFrame() &&
