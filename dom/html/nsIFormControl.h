@@ -10,9 +10,9 @@
 #include "nsISupports.h"
 
 class nsIDOMHTMLFormElement;
-class nsPresState;
 
 namespace mozilla {
+class PresState;
 namespace dom {
 class Element;
 class HTMLFieldSetElement;
@@ -169,7 +169,7 @@ public:
    * @return true if the form control was a checkbox and its
    *         checked state was restored, false otherwise.
    */
-  virtual bool RestoreState(nsPresState* aState) = 0;
+  virtual bool RestoreState(mozilla::PresState* aState) = 0;
 
   virtual bool AllowDrop() = 0;
 

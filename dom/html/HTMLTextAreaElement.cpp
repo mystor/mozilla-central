@@ -35,7 +35,7 @@
 #include "nsMappedAttributes.h"
 #include "nsPIDOMWindow.h"
 #include "nsPresContext.h"
-#include "nsPresState.h"
+#include "mozilla/PresState.h"
 #include "nsReadableUtils.h"
 #include "nsStyleConsts.h"
 #include "nsTextEditorState.h"
@@ -833,7 +833,7 @@ HTMLTextAreaElement::SaveState()
   nsresult rv = NS_OK;
 
   // Only save if value != defaultValue (bug 62713)
-  nsPresState *state = nullptr;
+  PresState *state = nullptr;
   if (mValueChanged) {
     state = GetPrimaryPresState();
     if (state) {
@@ -850,13 +850,7 @@ HTMLTextAreaElement::SaveState()
         return rv;
       }
 
-      nsCOMPtr<nsISupportsString> pState =
-        do_CreateInstance(NS_SUPPORTS_STRING_CONTRACTID);
-      if (!pState) {
-        return NS_ERROR_OUT_OF_MEMORY;
-      }
-      pState->SetData(value);
-      state->SetStateProperty(pState);
+      state->contentData() = Move(value);
     }
   }
 
@@ -868,27 +862,25 @@ HTMLTextAreaElement::SaveState()
     if (state) {
       // We do not want to save the real disabled state but the disabled
       // attribute.
-      state->SetDisabled(HasAttr(kNameSpaceID_None, nsGkAtoms::disabled));
+      state->disabled() = HasAttr(kNameSpaceID_None, nsGkAtoms::disabled);
+      state->disabledSet() = true;
     }
   }
   return rv;
 }
 
 bool
-HTMLTextAreaElement::RestoreState(nsPresState* aState)
+HTMLTextAreaElement::RestoreState(PresState* aState)
 {
-  nsCOMPtr<nsISupportsString> state
-    (do_QueryInterface(aState->GetStateProperty()));
+  const PresContentData& state = aState->contentData();
 
-  if (state) {
-    nsAutoString data;
-    state->GetData(data);
+  if (state.type() == PresContentData::TnsString) {
     ErrorResult rv;
-    SetValue(data, rv);
+    SetValue(state.get_nsString(), rv);
     ENSURE_SUCCESS(rv, false);
   }
 
-  if (aState->IsDisabledSet() && !aState->GetDisabled()) {
+  if (aState->disabledSet() && !aState->disabled()) {
     SetDisabled(false, IgnoreErrors());
   }
 

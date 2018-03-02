@@ -52,7 +52,7 @@
 #include "nsContainerFrame.h"
 #include "nsStyleUtil.h"
 
-#include "nsPresState.h"
+#include "mozilla/PresState.h"
 #include "nsILayoutHistoryState.h"
 
 #include "nsHTMLParts.h"
@@ -2810,7 +2810,7 @@ nsGenericHTMLFormElementWithState::GenerateStateKey()
   return NS_OK;
 }
 
-nsPresState*
+PresState*
 nsGenericHTMLFormElementWithState::GetPrimaryPresState()
 {
   if (mStateKey.IsEmpty()) {
@@ -2824,10 +2824,11 @@ nsGenericHTMLFormElementWithState::GetPrimaryPresState()
   }
 
   // Get the pres state for this key, if it doesn't exist, create one.
-  nsPresState* result = history->GetState(mStateKey);
+  PresState* result = history->GetState(mStateKey);
   if (!result) {
-    result = new nsPresState();
-    history->AddState(mStateKey, result);
+    UniquePtr<PresState> newState = NewPresState();
+    result = newState.get();
+    history->AddState(mStateKey, Move(newState));
   }
 
   return result;
@@ -2869,9 +2870,8 @@ nsGenericHTMLFormElementWithState::RestoreFormControlState()
     return false;
   }
 
-  nsPresState *state;
   // Get the pres state for this key
-  state = history->GetState(mStateKey);
+  PresState* state = history->GetState(mStateKey);
   if (state) {
     bool result = RestoreState(state);
     history->RemoveState(mStateKey);
