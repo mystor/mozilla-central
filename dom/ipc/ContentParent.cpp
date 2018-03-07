@@ -3691,15 +3691,10 @@ ContentParent::HasNotificationPermission(const IPC::Principal& aPrincipal)
 }
 
 mozilla::ipc::IPCResult
-ContentParent::RecvShowAlert(const AlertNotificationType& aAlert)
+ContentParent::RecvShowAlert(nsIAlertNotification* aAlert)
 {
-  nsCOMPtr<nsIAlertNotification> alert(dont_AddRef(aAlert));
-  if (NS_WARN_IF(!alert)) {
-    return IPC_OK();
-  }
-
   nsCOMPtr<nsIPrincipal> principal;
-  nsresult rv = alert->GetPrincipal(getter_AddRefs(principal));
+  nsresult rv = aAlert->GetPrincipal(getter_AddRefs(principal));
   if (NS_WARN_IF(NS_FAILED(rv)) ||
       !HasNotificationPermission(IPC::Principal(principal))) {
 
@@ -3708,7 +3703,7 @@ ContentParent::RecvShowAlert(const AlertNotificationType& aAlert)
 
   nsCOMPtr<nsIAlertsService> sysAlerts(do_GetService(NS_ALERTSERVICE_CONTRACTID));
   if (sysAlerts) {
-      sysAlerts->ShowAlert(alert, this);
+      sysAlerts->ShowAlert(aAlert, this);
   }
   return IPC_OK();
 }

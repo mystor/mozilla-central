@@ -1012,7 +1012,7 @@ private:
 
   bool HasNotificationPermission(const IPC::Principal& aPrincipal);
 
-  virtual mozilla::ipc::IPCResult RecvShowAlert(const AlertNotificationType& aAlert) override;
+  virtual mozilla::ipc::IPCResult RecvShowAlert(nsIAlertNotification* aAlert) override;
 
   virtual mozilla::ipc::IPCResult RecvCloseAlert(const nsString& aName,
                                                  const IPC::Principal& aPrincipal) override;
