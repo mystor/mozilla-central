@@ -11,7 +11,6 @@
 #include "FrameMetrics.h"
 #include "ImageTypes.h"
 #include "RegionBuilder.h"
-#include "base/process_util.h"
 #include "chrome/common/ipc_message_utils.h"
 #include "gfxFeature.h"
 #include "gfxFallback.h"
