@@ -21,6 +21,9 @@
 #endif
 #include "chrome/common/ipc_message.h"
 
+template<typename T> class RefPtr;
+template<typename T> class nsCOMPtr;
+
 namespace IPC {
 
 //-----------------------------------------------------------------------------
@@ -105,25 +108,45 @@ class MessageIterator {
 
 template <class P> struct ParamTraits;
 
-template <class P>
-static inline void WriteParam(Message* m, const P& p) {
-  ParamTraits<P>::Write(m, p);
+// When WriteParam or ReadParam is passed a pointer type like RefPtr<T> or T*,
+// we want to invoke Write() on ParamTraits<T>, as the intype is often T*, while
+// the ReadParam type may be RefPtr<T>.
+namespace detail {
+template<typename T>
+struct StripPointers{ typedef T Type; };
+template<typename T>
+struct StripPointers<T*> { typedef T Type; };
+template<typename T>
+struct StripPointers<RefPtr<T>> { typedef T Type; };
+template<typename T>
+struct StripPointers<nsCOMPtr<T>> { typedef T Type; };
+} // namespace detail
+
+// NOTE: This helper is also used in IPDLParamTraits.h
+template<typename T>
+struct ParamTraitsSelector
+  : public detail::StripPointers<typename mozilla::Decay<T>::Type>
+{};
+
+template<typename P>
+static inline void
+WriteParam(Message* m, P&& p) {
+  ParamTraits<typename ParamTraitsSelector<P>::Type>
+    ::Write(m, mozilla::Forward<P>(p));
 }
 
-template <class P>
-static inline void WriteParam(Message* m, P& p) {
-  ParamTraits<P>::Write(m, p);
+template<typename P>
+static inline bool WARN_UNUSED_RESULT
+ReadParam(const Message* m, PickleIterator* iter,
+          P* p)
+{
+  return ParamTraits<typename ParamTraitsSelector<P>::Type>::Read(m, iter, p);
 }
 
-template <class P>
-static inline bool WARN_UNUSED_RESULT ReadParam(const Message* m, PickleIterator* iter,
-                                                P* p) {
-  return ParamTraits<P>::Read(m, iter, p);
-}
-
-template <class P>
-static inline void LogParam(const P& p, std::wstring* l) {
-  ParamTraits<P>::Log(p, l);
+template<typename P>
+static inline void
+LogParam(const P& p, std::wstring* l) {
+  ParamTraits<typename ParamTraitsSelector<P>::Type>::Log(p, l);
 }
 
 // Fundamental types.
