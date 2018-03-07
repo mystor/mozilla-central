@@ -66,7 +66,7 @@ include HangTypes;
 // XXX Remove this once bug 1069073 is fixed
 include "mozilla/dom/PContentBridgeParent.h";
 
-using GeoPosition from "nsGeoPositionIPCSerialiser.h";
+using refcounted class nsIDOMGeoPosition from "nsGeoPositionIPCSerialiser.h";
 using refcounted class nsIAlertNotification from "mozilla/AlertNotificationIPCSerializer.h";
 
 using struct ChromePackage from "mozilla/chrome/RegistryMessageUtils.h";
@@ -437,7 +437,7 @@ child:
 
     async NotifyAlertsObserver(nsCString topic, nsString data);
 
-    async GeolocationUpdate(GeoPosition somewhere);
+    async GeolocationUpdate(nsIDOMGeoPosition aPosition);
 
     async GeolocationError(uint16_t errorCode);
 
