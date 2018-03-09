@@ -13,6 +13,7 @@ use nsstring::{nsCString, nsACString};
 extern crate nserror;
 use nserror::*;
 
+#[macro_use]
 extern crate xpcom;
 use xpcom::{AtomicRefcnt, RefPtr, RefCounted};
 use xpcom::interfaces::nsrefcnt;
@@ -22,6 +23,8 @@ use std::ptr;
 use std::ops;
 use std::marker::PhantomData;
 use std::fmt::Write;
+
+mod iuri;
 
 /// Helper macro. If the expression $e is Ok(t) evaluates to t, otherwise,
 /// returns NS_ERROR_MALFORMED_URI.
@@ -76,24 +79,25 @@ impl<'a> From<&'a str> for SpecSlice<'a> {
   }
 }
 
+impl<'a> Deref for SpecSlice<'a> {
+  type Target = str;
+  fn deref(&self) -> &str {
+    unsafe { str::from_raw_parts(data, len) }
+  }
+}
+
 /// The MozURL reference-counted threadsafe URL type. This type intentionally
 /// implements no XPCOM interfaces, and all method calls are non-virtual.
-#[repr(C)]
-pub struct MozURL {
+#[derive(xpcom)]
+#[xpimplements(nsIURI)]
+#[refcnt = "atomic"]
+pub struct MozURLInit {
   pub url: Url,
-  refcnt: AtomicRefcnt,
 }
 
 impl MozURL {
   pub fn from_url(url: Url) -> RefPtr<MozURL> {
-    // Actually allocate the URL on the heap. This is the only place we actually
-    // create a MozURL, other than in clone().
-    unsafe {
-      RefPtr::from_raw(Box::into_raw(Box::new(MozURL {
-        url: url,
-        refcnt: AtomicRefcnt::new(),
-      }))).unwrap()
-    }
+    MozURL::allocate(MozURLInit { url })
   }
 }
 
@@ -112,26 +116,12 @@ impl ops::DerefMut for MozURL {
 // Memory Management for MozURL
 #[no_mangle]
 pub unsafe extern "C" fn mozurl_addref(url: &MozURL) -> nsrefcnt {
-  url.refcnt.inc()
+  url.AddRef()
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn mozurl_release(url: &MozURL) -> nsrefcnt {
-  let rc = url.refcnt.dec();
-  if rc == 0 {
-    Box::from_raw(url as *const MozURL as *mut MozURL);
-  }
-  rc
-}
-
-// xpcom::RefPtr support
-unsafe impl RefCounted for MozURL {
-  unsafe fn addref(&self) {
-    mozurl_addref(self);
-  }
-  unsafe fn release(&self) {
-    mozurl_release(self);
-  }
+  url.Release()
 }
 
 // Allocate a new MozURL object with a RefCnt of 1, and store a pointer to it
@@ -187,6 +177,11 @@ pub extern "C" fn mozurl_password(url: &MozURL) -> SpecSlice {
 }
 
 #[no_mangle]
+pub extern "C" fn mozurl_userpass(url: &MozURL) -> SpecSlice {
+  (&url[Location::BeforeUsername..Location::AfterPassword]).into()
+}
+
+#[no_mangle]
 pub extern "C" fn mozurl_host(url: &MozURL) -> SpecSlice {
   url.host_str().unwrap_or("").into()
 }
@@ -223,6 +218,11 @@ pub extern "C" fn mozurl_fragment(url: &MozURL) -> SpecSlice {
 }
 
 #[no_mangle]
+pub extern "C" fn mozurl_prepath(url: &MozURL) -> SpecSlice {
+  (&url[..Position::BeforePath]).into()
+}
+
+#[no_mangle]
 pub extern "C" fn mozurl_has_fragment(url: &MozURL) -> bool {
   url.fragment().is_some()
 }
@@ -233,6 +233,38 @@ pub extern "C" fn mozurl_origin(url: &MozURL, origin: &mut nsACString) {
   // ownership of the buffer to C++.
   let mut o = nsCString::from(url.origin().ascii_serialization());
   origin.take_from(&mut o);
+}
+
+#[no_mangle]
+pub extern "C" fn mozurl_display_host(url: &MozURL, host: &mut nsACString) {
+  let (s, _) = url::idna::domain_to_unicode(mozurl_host(self));
+  let mut cstr = nsCString::from(s);
+  host.take_from(cstr);
+}
+
+#[no_mangle]
+pub extern "C" fn mozurl_display_host_port(url: &MozURL, hostport: &mut nsACString) {
+  mozurl_display_host(url, hostport);
+  let port = mozurl_port(url);
+  if port != -1 {
+    let _ = write!(hostport, ":{}", port);
+  }
+}
+
+#[no_mangle]
+pub extern "C" fn mozurl_display_spec(url: &MozURL, spec: &mut nsACString) {
+  let (s, _) = url::idna::domain_to_unicode(mozurl_host(self));
+  spec.assign(&self[..Location::HostStart]);
+  spec.append(&s);
+  spec.append(&self[Location::HostEnd..]);
+}
+
+#[no_mangle]
+pub extern "C" fn mozurl_display_prepath(url: &MozURL, spec: &mut nsACString) {
+  let (s, _) = url::idna::domain_to_unicode(mozurl_host(self));
+  spec.assign(&self[..Location::HostStart]);
+  spec.append(&s);
+  spec.append(&self[Location::HostEnd..Location::PathStart]);
 }
 
 // Helper macro for debug asserting that we're the only reference to MozURL.
