@@ -17,11 +17,7 @@
 #include "base/message_pump.h"
 #include "base/observer_list.h"
 
-#if defined(OS_WIN)
-// We need this to declare base::MessagePumpWin::Dispatcher, which we should
-// really just eliminate.
-#include "base/message_pump_win.h"
-#elif defined(OS_POSIX)
+#if defined(OS_POSIX)
 #include "base/message_pump_libevent.h"
 #endif
 
@@ -292,10 +288,6 @@ public:
     // Used to record that Quit() was called, or that we should quit the pump
     // once it becomes idle.
     bool quit_received;
-
-#if defined(OS_WIN)
-    base::MessagePumpWin::Dispatcher* dispatcher;
-#endif
   };
 
   class AutoRunState : RunState {
@@ -348,11 +340,7 @@ public:
   typedef std::queue<PendingTask> TaskQueue;
   typedef std::priority_queue<PendingTask> DelayedTaskQueue;
 
-#if defined(OS_WIN)
-  base::MessagePumpWin* pump_win() {
-    return static_cast<base::MessagePumpWin*>(pump_.get());
-  }
-#elif defined(OS_POSIX)
+#if defined(OS_POSIX)
   base::MessagePumpLibevent* pump_libevent() {
     return static_cast<base::MessagePumpLibevent*>(pump_.get());
   }
@@ -493,25 +481,6 @@ class MessageLoopForUI : public MessageLoop {
            type == MessageLoop::TYPE_MOZILLA_CHILD);
     return static_cast<MessageLoopForUI*>(loop);
   }
-
-#if defined(OS_WIN)
-  typedef base::MessagePumpWin::Dispatcher Dispatcher;
-  typedef base::MessagePumpWin::Observer Observer;
-
-  // Please see MessagePumpWin for definitions of these methods.
-  void Run(Dispatcher* dispatcher);
-  void AddObserver(Observer* observer);
-  void RemoveObserver(Observer* observer);
-  void WillProcessMessage(const MSG& message);
-  void DidProcessMessage(const MSG& message);
-  void PumpOutPendingPaintMessages();
-
- protected:
-  // TODO(rvargas): Make this platform independent.
-  base::MessagePumpForUI* pump_ui() {
-    return static_cast<base::MessagePumpForUI*>(pump_.get());
-  }
-#endif  // defined(OS_WIN)
 };
 
 // Do not add any member variables to MessageLoopForUI!  This is important b/c

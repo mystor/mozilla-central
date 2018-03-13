@@ -590,9 +590,6 @@ MessageLoop::AutoRunState::AutoRunState(MessageLoop* loop) : loop_(loop) {
 
   // Initialize the other fields:
   quit_received = false;
-#if defined(OS_WIN)
-  dispatcher = NULL;
-#endif
 }
 
 MessageLoop::AutoRunState::~AutoRunState() {
@@ -627,37 +624,6 @@ bool MessageLoop::PendingTask::operator<(const PendingTask& other) const {
 nsISerialEventTarget* MessageLoop::SerialEventTarget() {
   return mEventTarget;
 }
-
-//------------------------------------------------------------------------------
-// MessageLoopForUI
-
-#if defined(OS_WIN)
-
-void MessageLoopForUI::Run(Dispatcher* dispatcher) {
-  AutoRunState save_state(this);
-  state_->dispatcher = dispatcher;
-  RunHandler();
-}
-
-void MessageLoopForUI::AddObserver(Observer* observer) {
-  pump_win()->AddObserver(observer);
-}
-
-void MessageLoopForUI::RemoveObserver(Observer* observer) {
-  pump_win()->RemoveObserver(observer);
-}
-
-void MessageLoopForUI::WillProcessMessage(const MSG& message) {
-  pump_win()->WillProcessMessage(message);
-}
-void MessageLoopForUI::DidProcessMessage(const MSG& message) {
-  pump_win()->DidProcessMessage(message);
-}
-void MessageLoopForUI::PumpOutPendingPaintMessages() {
-  pump_ui()->PumpOutPendingPaintMessages();
-}
-
-#endif  // defined(OS_WIN)
 
 //------------------------------------------------------------------------------
 // MessageLoopForIO
