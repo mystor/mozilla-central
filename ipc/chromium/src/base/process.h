@@ -11,7 +11,9 @@
 
 #include <sys/types.h>
 #ifdef OS_WIN
-#include <windows.h>
+// Forward declare these types to avoid including <windows.h>
+typedef void* HANDLE;
+typedef unsigned long DWORD;
 #endif
 
 namespace base {
