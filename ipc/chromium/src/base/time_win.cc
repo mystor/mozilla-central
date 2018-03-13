@@ -140,17 +140,6 @@ Time Time::NowFromSystemTime() {
 }
 
 // static
-Time Time::FromFileTime(FILETIME ft) {
-  return Time(FileTimeToMicroseconds(ft));
-}
-
-FILETIME Time::ToFileTime() const {
-  FILETIME utc_ft;
-  MicrosecondsToFileTime(us_, &utc_ft);
-  return utc_ft;
-}
-
-// static
 Time Time::FromExploded(bool is_local, const Exploded& exploded) {
   // Create the system struct representing our exploded time. It will either be
   // in local time or UTC.
