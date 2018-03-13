@@ -9,20 +9,31 @@
 namespace base {
 namespace internal {
 
-LockImpl::LockImpl() : native_handle_(SRWLOCK_INIT) {}
+static_assert(sizeof(SRWLOCK) == sizeof(LockImpl::NativeHandle),
+              "SRWLOCK isn't pointer sized?");
+static_assert(alignof(SRWLOCK) <= alignof(LockImpl::NativeHandle),
+              "SRWLOCK isn't pointer aligned?");
+
+static SRWLOCK& AsSRW(LockImpl::NativeHandle& handle) {
+  return reinterpret_cast<SRWLOCK&>(handle);
+}
+
+LockImpl::LockImpl()
+  : native_handle_(reinterpret_cast<SRWLOCK>(SRWLOCK_INIT))
+{}
 
 LockImpl::~LockImpl() = default;
 
 bool LockImpl::Try() {
-  return !!::TryAcquireSRWLockExclusive(&native_handle_);
+  return !!::TryAcquireSRWLockExclusive(&AsSRW(native_handle_));
 }
 
 void LockImpl::Lock() {
-  ::AcquireSRWLockExclusive(&native_handle_);
+  ::AcquireSRWLockExclusive(&AsSRW(native_handle_));
 }
 
 void LockImpl::Unlock() {
-  ::ReleaseSRWLockExclusive(&native_handle_);
+  ::ReleaseSRWLockExclusive(&AsSRW(native_handle_));
 }
 
 }  // namespace internal

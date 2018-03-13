@@ -10,9 +10,7 @@
 #include "base/basictypes.h"
 #include "build/build_config.h"
 
-#if defined(OS_WIN)
-#include <windows.h>
-#elif defined(OS_POSIX)
+#if defined(OS_POSIX)
 #include <pthread.h>
 #endif
 
@@ -25,7 +23,10 @@ namespace internal {
 class LockImpl {
  public:
 #if defined(OS_WIN)
-  using NativeHandle = SRWLOCK;
+  // SRWLOCK is pointer sized (this is static_assert-ed in lock_impl_win). We
+  // store it in the struct as a void* to avoid needing to include <windows.h>
+  // in this file.
+  using NativeHandle = void*; // SRWLOCK
 #elif defined(OS_POSIX)
   using NativeHandle =  pthread_mutex_t;
 #endif

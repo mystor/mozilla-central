@@ -11,7 +11,7 @@
 #include "base/time.h"
 
 ConditionVariable::ConditionVariable(Lock* user_lock)
-    : srwlock_(user_lock->lock_.native_handle())
+    : srwlock_(reinterpret_cast<SRWLOCK*>(user_lock->lock_.native_handle()))
 {
   DCHECK(user_lock);
   InitializeConditionVariable(&cv_);
