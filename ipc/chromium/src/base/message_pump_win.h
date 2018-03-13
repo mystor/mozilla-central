@@ -19,6 +19,109 @@
 
 namespace base {
 
+// NOTE: IOContext and IOHandler are defined directly inside the `base`
+// namespace so that they can be forward declared in message_loop.h.
+struct IOContext;
+
+// Clients interested in receiving OS notifications when asynchronous IO
+// operations complete should implement this interface and register themselves
+// with the message pump.
+//
+// Typical use #1:
+//   // Use only when there are no user's buffers involved on the actual IO,
+//   // so that all the cleanup can be done by the message pump.
+//   class MyFile : public IOHandler {
+//     MyFile() {
+//       ...
+//       context_ = new IOContext;
+//       context_->handler = this;
+//       message_pump->RegisterIOHandler(file_, this);
+//     }
+//     ~MyFile() {
+//       if (pending_) {
+//         // By setting the handler to NULL, we're asking for this context
+//         // to be deleted when received, without calling back to us.
+//         context_->handler = NULL;
+//       } else {
+//         delete context_;
+//      }
+//     }
+//     virtual void OnIOCompleted(IOContext* context, DWORD bytes_transfered,
+//                                DWORD error) {
+//         pending_ = false;
+//     }
+//     void DoSomeIo() {
+//       ...
+//       // The only buffer required for this operation is the overlapped
+//       // structure.
+//       ConnectNamedPipe(file_, &context_->overlapped);
+//       pending_ = true;
+//     }
+//     bool pending_;
+//     IOContext* context_;
+//     HANDLE file_;
+//   };
+//
+// Typical use #2:
+//   class MyFile : public IOHandler {
+//     MyFile() {
+//       ...
+//       message_pump->RegisterIOHandler(file_, this);
+//     }
+//     // Plus some code to make sure that this destructor is not called
+//     // while there are pending IO operations.
+//     ~MyFile() {
+//     }
+//     virtual void OnIOCompleted(IOContext* context, DWORD bytes_transfered,
+//                                DWORD error) {
+//       ...
+//       delete context;
+//     }
+//     void DoSomeIo() {
+//       ...
+//       IOContext* context = new IOContext;
+//       // This is not used for anything. It just prevents the context from
+//       // being considered "abandoned".
+//       context->handler = this;
+//       ReadFile(file_, buffer, num_bytes, &read, &context->overlapped);
+//     }
+//     HANDLE file_;
+//   };
+//
+// Typical use #3:
+// Same as the previous example, except that in order to deal with the
+// requirement stated for the destructor, the class calls WaitForIOCompletion
+// from the destructor to block until all IO finishes.
+//     ~MyFile() {
+//       while(pending_)
+//         message_pump->WaitForIOCompletion(INFINITE, this);
+//     }
+//
+class IOHandler {
+ public:
+  virtual ~IOHandler() {}
+  // This will be called once the pending IO operation associated with
+  // |context| completes. |error| is the Win32 error code of the IO operation
+  // (ERROR_SUCCESS if there was no error). |bytes_transfered| will be zero
+  // on error.
+  virtual void OnIOCompleted(IOContext* context, DWORD bytes_transfered,
+                             DWORD error) = 0;
+};
+
+// The extended context that should be used as the base structure on every
+// overlapped IO operation. |handler| must be set to the registered IOHandler
+// for the given file when the operation is started, and it can be set to NULL
+// before the operation completes to indicate that the handler should not be
+// called anymore, and instead, the IOContext should be deleted when the OS
+// notifies the completion of this operation. Please remember that any buffers
+// involved with an IO operation should be around until the callback is
+// received, so this technique can only be used for IO that do not involve
+// additional buffers (other than the overlapped structure itself).
+struct IOContext {
+  OVERLAPPED overlapped;
+  IOHandler* handler;
+};
+
 // MessagePumpWin serves as the base for specialized versions of the MessagePump
 // for Windows. It provides basic functionality like handling of observers and
 // controlling the lifetime of the message pump.
@@ -198,107 +301,6 @@ protected:
 //
 class MessagePumpForIO : public MessagePumpWin {
  public:
-  struct IOContext;
-
-  // Clients interested in receiving OS notifications when asynchronous IO
-  // operations complete should implement this interface and register themselves
-  // with the message pump.
-  //
-  // Typical use #1:
-  //   // Use only when there are no user's buffers involved on the actual IO,
-  //   // so that all the cleanup can be done by the message pump.
-  //   class MyFile : public IOHandler {
-  //     MyFile() {
-  //       ...
-  //       context_ = new IOContext;
-  //       context_->handler = this;
-  //       message_pump->RegisterIOHandler(file_, this);
-  //     }
-  //     ~MyFile() {
-  //       if (pending_) {
-  //         // By setting the handler to NULL, we're asking for this context
-  //         // to be deleted when received, without calling back to us.
-  //         context_->handler = NULL;
-  //       } else {
-  //         delete context_;
-  //      }
-  //     }
-  //     virtual void OnIOCompleted(IOContext* context, DWORD bytes_transfered,
-  //                                DWORD error) {
-  //         pending_ = false;
-  //     }
-  //     void DoSomeIo() {
-  //       ...
-  //       // The only buffer required for this operation is the overlapped
-  //       // structure.
-  //       ConnectNamedPipe(file_, &context_->overlapped);
-  //       pending_ = true;
-  //     }
-  //     bool pending_;
-  //     IOContext* context_;
-  //     HANDLE file_;
-  //   };
-  //
-  // Typical use #2:
-  //   class MyFile : public IOHandler {
-  //     MyFile() {
-  //       ...
-  //       message_pump->RegisterIOHandler(file_, this);
-  //     }
-  //     // Plus some code to make sure that this destructor is not called
-  //     // while there are pending IO operations.
-  //     ~MyFile() {
-  //     }
-  //     virtual void OnIOCompleted(IOContext* context, DWORD bytes_transfered,
-  //                                DWORD error) {
-  //       ...
-  //       delete context;
-  //     }
-  //     void DoSomeIo() {
-  //       ...
-  //       IOContext* context = new IOContext;
-  //       // This is not used for anything. It just prevents the context from
-  //       // being considered "abandoned".
-  //       context->handler = this;
-  //       ReadFile(file_, buffer, num_bytes, &read, &context->overlapped);
-  //     }
-  //     HANDLE file_;
-  //   };
-  //
-  // Typical use #3:
-  // Same as the previous example, except that in order to deal with the
-  // requirement stated for the destructor, the class calls WaitForIOCompletion
-  // from the destructor to block until all IO finishes.
-  //     ~MyFile() {
-  //       while(pending_)
-  //         message_pump->WaitForIOCompletion(INFINITE, this);
-  //     }
-  //
-  class IOHandler {
-   public:
-    virtual ~IOHandler() {}
-    // This will be called once the pending IO operation associated with
-    // |context| completes. |error| is the Win32 error code of the IO operation
-    // (ERROR_SUCCESS if there was no error). |bytes_transfered| will be zero
-    // on error.
-    virtual void OnIOCompleted(IOContext* context, DWORD bytes_transfered,
-                               DWORD error) = 0;
-  };
-
-  // The extended context that should be used as the base structure on every
-  // overlapped IO operation. |handler| must be set to the registered IOHandler
-  // for the given file when the operation is started, and it can be set to NULL
-  // before the operation completes to indicate that the handler should not be
-  // called anymore, and instead, the IOContext should be deleted when the OS
-  // notifies the completion of this operation. Please remember that any buffers
-  // involved with an IO operation should be around until the callback is
-  // received, so this technique can only be used for IO that do not involve
-  // additional buffers (other than the overlapped structure itself).
-  struct IOContext {
-    OVERLAPPED overlapped;
-    IOHandler* handler;
-  };
-
   MessagePumpForIO();
   virtual ~MessagePumpForIO() {}
 

@@ -41,6 +41,17 @@ class DoWorkRunnable;
 } /* namespace ipc */
 } /* namespace mozilla */
 
+#if defined(OS_WIN)
+namespace base {
+
+// Forward declare these types so we don't have to import
+// base/message_pump_win.h, which includes windows.h.
+struct IOContext;
+class IOHandler;
+
+} /* namespace base */
+#endif
+
 // A MessageLoop is used to process events for a particular thread.  There is
 // at most one MessageLoop instance per thread.
 //
@@ -529,8 +540,8 @@ class MessageLoopForIO : public MessageLoop {
   }
 
 #if defined(OS_WIN)
-  typedef base::MessagePumpForIO::IOHandler IOHandler;
-  typedef base::MessagePumpForIO::IOContext IOContext;
+  typedef base::IOHandler IOHandler;
+  typedef base::IOContext IOContext;
 
   // Please see MessagePumpWin for definitions of these methods.
   void RegisterIOHandler(HANDLE file_handle, IOHandler* handler);
@@ -538,9 +549,7 @@ class MessageLoopForIO : public MessageLoop {
 
  protected:
   // TODO(rvargas): Make this platform independent.
-  base::MessagePumpForIO* pump_io() {
-    return static_cast<base::MessagePumpForIO*>(pump_.get());
-  }
+  base::MessagePumpForIO* pump_io();
 
 #elif defined(OS_POSIX)
   typedef base::MessagePumpLibevent::Watcher Watcher;

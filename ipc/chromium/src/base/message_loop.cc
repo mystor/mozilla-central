@@ -672,6 +672,10 @@ bool MessageLoopForIO::WaitForIOCompletion(DWORD timeout, IOHandler* filter) {
   return pump_io()->WaitForIOCompletion(timeout, filter);
 }
 
+MessagePumpForIO* MessageLoopForIO::pump_io() {
+  return static_cast<MessagePumpForIO*>(pump_.get());
+}
+
 #elif defined(OS_POSIX)
 
 bool MessageLoopForIO::WatchFileDescriptor(int fd,
