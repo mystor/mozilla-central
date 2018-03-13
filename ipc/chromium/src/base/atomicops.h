@@ -30,6 +30,10 @@
 #ifndef BASE_ATOMICOPS_H_
 #define BASE_ATOMICOPS_H_
 
+#ifdef TEST_NO_WINDOWS_H
+#error "file would include windows.h"
+#endif
+
 #include "base/basictypes.h"
 #include "base/port.h"
 

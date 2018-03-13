@@ -67,6 +67,10 @@
 #ifndef BASE_CONDITION_VARIABLE_H_
 #define BASE_CONDITION_VARIABLE_H_
 
+#ifdef TEST_NO_WINDOWS_H
+#error "file would include windows.h"
+#endif
+
 #include "base/basictypes.h"
 #include "base/lock.h"
 #include "build/build_config.h"

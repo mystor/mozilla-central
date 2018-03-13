@@ -7,6 +7,10 @@
 #ifndef __IPC_GLUE_MESSAGEPUMP_H__
 #define __IPC_GLUE_MESSAGEPUMP_H__
 
+#ifdef TEST_NO_WINDOWS_H
+#error "file would include windows.h"
+#endif
+
 #include "base/message_pump_default.h"
 #if defined(XP_WIN)
 #include "base/message_pump_win.h"

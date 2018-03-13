@@ -7,6 +7,10 @@
 #ifndef BASE_PLATFORM_FILE_H_
 #define BASE_PLATFORM_FILE_H_
 
+#ifdef TEST_NO_WINDOWS_H
+#error "file would include windows.h"
+#endif
+
 #include "build/build_config.h"
 #if defined(OS_WIN)
 #include <windows.h>

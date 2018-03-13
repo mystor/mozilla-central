@@ -7,6 +7,10 @@
 #ifndef BASE_SCOPED_HANDLE_H_
 #define BASE_SCOPED_HANDLE_H_
 
+#ifdef TEST_NO_WINDOWS_H
+#error "file would include windows.h"
+#endif
+
 #include <stdio.h>
 
 #include "base/basictypes.h"

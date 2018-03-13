@@ -7,6 +7,10 @@
 #ifndef BASE_WAITABLE_EVENT_H_
 #define BASE_WAITABLE_EVENT_H_
 
+#ifdef TEST_NO_WINDOWS_H
+#error "file would include windows.h"
+#endif
+
 #include "base/basictypes.h"
 
 #if defined(OS_WIN)
