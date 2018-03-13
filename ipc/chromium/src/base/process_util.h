@@ -13,7 +13,8 @@
 #include "base/basictypes.h"
 
 #if defined(OS_WIN)
-#include <windows.h>
+// NOTE: We avoid importing <windows.h> here, as this file is included in places
+// which can't have that file imported.
 #include <tlhelp32.h>
 #include <io.h>
 #ifndef STDOUT_FILENO
@@ -113,7 +114,7 @@ struct LaunchOptions {
   // process's environment, replacing them where necessary.
   EnvironmentMap env_map;
 
-  std::vector<HANDLE> handles_to_inherit;
+  std::vector<ProcessHandle> handles_to_inherit;
 #endif
 #if defined(OS_POSIX)
   environment_map env_map;
