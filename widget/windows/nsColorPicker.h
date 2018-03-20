@@ -7,7 +7,7 @@
 #ifndef nsColorPicker_h__
 #define nsColorPicker_h__
 
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include <commdlg.h>
 
 #include "nsCOMPtr.h"

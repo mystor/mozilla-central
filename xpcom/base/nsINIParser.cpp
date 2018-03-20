@@ -17,7 +17,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #ifdef XP_WIN
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #endif
 
 using namespace mozilla;

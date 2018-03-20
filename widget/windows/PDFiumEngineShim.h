@@ -10,7 +10,7 @@
 #include "fpdfview.h"
 
 /* include windows.h for the HDC definitions that we need. */
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include "private/pprio.h"
 #include "mozilla/UniquePtr.h"
 

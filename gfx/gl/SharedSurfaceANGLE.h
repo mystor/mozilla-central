@@ -6,7 +6,7 @@
 #ifndef SHARED_SURFACE_ANGLE_H_
 #define SHARED_SURFACE_ANGLE_H_
 
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include "SharedSurface.h"
 
 struct IDXGIKeyedMutex;

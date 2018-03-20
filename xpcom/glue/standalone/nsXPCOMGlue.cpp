@@ -31,7 +31,7 @@ using namespace mozilla;
 typedef void (*NSFuncPtr)();
 
 #if defined(XP_WIN)
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include <mbstring.h>
 
 typedef HINSTANCE LibHandleType;

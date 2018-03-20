@@ -6,7 +6,7 @@
 
 #include "base/thread_local.h"
 
-#include <windows.h>
+#include "mozilla/MinWin.h"
 
 #include "base/logging.h"
 

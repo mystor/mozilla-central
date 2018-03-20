@@ -22,7 +22,7 @@
 #include "mozilla/TypeTraits.h"
 #include "mozilla/UniquePtr.h"
 
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include <softpub.h>
 #include <wincrypt.h>
 #include <wintrust.h>

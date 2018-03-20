@@ -11,7 +11,7 @@
 class nsIProfileUnlocker;
 
 #if defined (XP_WIN)
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #endif
 
 #if defined (XP_UNIX)

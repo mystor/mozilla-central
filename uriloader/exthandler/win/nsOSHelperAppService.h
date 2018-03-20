@@ -14,7 +14,7 @@
 #include "nsCExternalHandlerService.h"
 #include "nsMIMEInfoImpl.h"
 #include "nsCOMPtr.h"
-#include <windows.h>
+#include "mozilla/MinWin.h"
 
 #ifdef _WIN32_WINNT
 #undef _WIN32_WINNT

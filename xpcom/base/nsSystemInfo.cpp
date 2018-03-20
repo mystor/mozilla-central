@@ -19,7 +19,7 @@
 #ifndef __MINGW32__
 #include <iwscapi.h>
 #endif // __MINGW32__
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include <winioctl.h>
 #ifndef __MINGW32__
 #include <wscapi.h>

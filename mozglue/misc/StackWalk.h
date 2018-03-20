@@ -49,7 +49,7 @@ MozStackWalk(MozWalkStackCallback aCallback, uint32_t aSkipFrames,
 #if defined(_WIN32) && \
     (defined(_M_IX86) || defined(_M_AMD64) || defined(_M_IA64))
 
-#include <windows.h>
+#include "mozilla/MinWin.h"
 
 #define MOZ_STACKWALK_SUPPORTS_WINDOWS 1
 

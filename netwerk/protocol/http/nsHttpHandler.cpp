@@ -76,7 +76,7 @@
 #endif
 
 #if defined(XP_WIN)
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include "mozilla/WindowsVersion.h"
 #endif
 

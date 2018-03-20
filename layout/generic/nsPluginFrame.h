@@ -22,7 +22,7 @@
 #include "mozilla/webrender/WebRenderAPI.h"
 
 #ifdef XP_WIN
-#include <windows.h> // For HWND :(
+#include "mozilla/MinWin.h" // For HWND :(
 // Undo the windows.h damage
 #undef GetMessage
 #undef CreateEvent

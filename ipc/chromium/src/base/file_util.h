@@ -13,7 +13,7 @@
 #include "build/build_config.h"
 
 #if defined(OS_WIN)
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #elif defined(ANDROID)
 #include <sys/stat.h>
 #elif defined(OS_POSIX) 

@@ -7,7 +7,7 @@
 #include <cstdarg>
 
 #ifdef _WIN32
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #else
 #include <unistd.h>
 #endif

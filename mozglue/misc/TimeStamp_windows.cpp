@@ -13,7 +13,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <intrin.h>
-#include <windows.h>
+#include "mozilla/MinWin.h"
 
 // To enable logging define to your favorite logging API
 #define LOG(x)

@@ -7,7 +7,7 @@
 #ifndef mozilla_gfx_AutoHelpersWin_h
 #define mozilla_gfx_AutoHelpersWin_h
 
-#include <windows.h>
+#include "mozilla/MinWin.h"
 
 namespace mozilla {
 namespace gfx {

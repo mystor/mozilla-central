@@ -7,7 +7,7 @@
 #include "mozilla/RWLock.h"
 
 #ifdef XP_WIN
-#include <windows.h>
+#include "mozilla/MinWin.h"
 
 static_assert(sizeof(SRWLOCK) <= sizeof(void*), "SRWLOCK is too big!");
 

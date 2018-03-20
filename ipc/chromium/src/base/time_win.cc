@@ -39,7 +39,7 @@
 #include "base/time.h"
 
 #pragma comment(lib, "winmm.lib")
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include <mmsystem.h>
 
 #include "base/basictypes.h"

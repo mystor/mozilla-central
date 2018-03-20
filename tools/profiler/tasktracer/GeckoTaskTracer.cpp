@@ -23,7 +23,7 @@
 #include <stdarg.h>
 
 #if defined(GP_OS_windows)
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #define getpid GetCurrentProcessId
 #endif
 

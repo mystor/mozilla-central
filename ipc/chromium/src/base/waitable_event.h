@@ -10,7 +10,7 @@
 #include "base/basictypes.h"
 
 #if defined(OS_WIN)
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #endif
 
 #if defined(OS_POSIX)

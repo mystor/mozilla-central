@@ -17,7 +17,7 @@
 #endif
 
 #ifdef XP_WIN
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include <process.h>
 #else
 #include <pthread.h>

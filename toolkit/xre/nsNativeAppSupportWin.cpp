@@ -42,7 +42,7 @@
 #include "mozilla/Assertions.h"
 #include "mozilla/dom/Location.h"
 
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include <shellapi.h>
 #include <ddeml.h>
 #include <stdlib.h>

@@ -12,7 +12,7 @@
 #include "nsThreadUtils.h"
 
 // We need to include this header here for HANDLE definition.
-#include <windows.h>
+#include "mozilla/MinWin.h"
 
 namespace mozilla {
 

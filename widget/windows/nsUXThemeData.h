@@ -6,7 +6,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 #ifndef __UXThemeData_h__
 #define __UXThemeData_h__
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include <uxtheme.h>
 
 #include "nscore.h"

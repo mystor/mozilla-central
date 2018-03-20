@@ -4,7 +4,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <windows.h>
+#include "mozilla/MinWin.h"
 
 #include "registrycertificates.h"
 #include "pathhash.h"

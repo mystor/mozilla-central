@@ -33,7 +33,7 @@
 
 #if defined(XP_WIN)
 #include <processthreadsapi.h>
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #else
 #include <unistd.h>
 #endif // defined(XP_WIN)

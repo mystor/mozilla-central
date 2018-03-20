@@ -4,7 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "nsLookAndFeel.h"
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include <shellapi.h>
 #include "nsStyleConsts.h"
 #include "nsUXThemeData.h"

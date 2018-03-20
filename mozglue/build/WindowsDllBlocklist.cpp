@@ -14,7 +14,7 @@
 #include "malloc_decls.h"
 #endif
 
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include <winternl.h>
 #include <io.h>
 

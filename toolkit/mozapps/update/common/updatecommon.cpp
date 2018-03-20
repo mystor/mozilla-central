@@ -3,7 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #if defined(XP_WIN)
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #endif
 
 

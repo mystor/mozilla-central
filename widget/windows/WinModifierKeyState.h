@@ -9,7 +9,7 @@
 #include "mozilla/RefPtr.h"
 #include "mozilla/EventForwards.h"
 #include "nsStringFwd.h"
-#include <windows.h>
+#include "mozilla/MinWin.h"
 
 namespace mozilla {
 namespace widget {

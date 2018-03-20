@@ -152,7 +152,7 @@ TEST(AllocReplacementDeathTest, posix_memalign_check)
 #endif
 
 #if defined(XP_WIN)
-#include <windows.h>
+#include "mozilla/MinWin.h"
 
 #undef ASSERT_ALLOCATION_HAPPENED
 #define ASSERT_ALLOCATION_HAPPENED(lambda)      \

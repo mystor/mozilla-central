@@ -9,7 +9,7 @@
 #include "nscore.h"
 #include "nsWindowBase.h"
 #include "npapi.h"
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include <inputscope.h>
 
 #define NS_WM_IMEFIRST WM_IME_SETCONTEXT

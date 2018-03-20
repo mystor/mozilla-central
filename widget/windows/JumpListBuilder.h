@@ -6,7 +6,7 @@
 #ifndef __JumpListBuilder_h__
 #define __JumpListBuilder_h__
 
-#include <windows.h>
+#include "mozilla/MinWin.h"
 
 #undef NTDDI_VERSION
 #define NTDDI_VERSION NTDDI_WIN7

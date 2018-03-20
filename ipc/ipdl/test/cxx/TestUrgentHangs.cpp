@@ -8,7 +8,7 @@
 #if defined(OS_POSIX)
 #include <unistd.h>
 #else
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #endif
 
 namespace mozilla {

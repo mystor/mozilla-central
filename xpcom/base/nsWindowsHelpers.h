@@ -7,7 +7,7 @@
 #ifndef nsWindowsHelpers_h
 #define nsWindowsHelpers_h
 
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include "nsAutoRef.h"
 #include "nscore.h"
 #include "mozilla/Assertions.h"

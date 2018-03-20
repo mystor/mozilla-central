@@ -61,7 +61,7 @@ static inline pid_t gettid()
 #elif defined(GP_OS_android)
 #include <unistd.h>
 #elif defined(GP_OS_windows)
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include <process.h>
 #ifndef getpid
 #define getpid _getpid

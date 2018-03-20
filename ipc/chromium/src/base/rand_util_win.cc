@@ -5,7 +5,7 @@
 // found in the LICENSE file.
 
 #include "base/rand_util.h"
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include <stddef.h>
 #include <stdint.h>
 

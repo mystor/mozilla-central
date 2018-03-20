@@ -9,7 +9,7 @@
 #include "nsBaseClipboard.h"
 #include "nsIObserver.h"
 #include "nsIURI.h"
-#include <windows.h>
+#include "mozilla/MinWin.h"
 
 class nsITransferable;
 class nsIWidget;

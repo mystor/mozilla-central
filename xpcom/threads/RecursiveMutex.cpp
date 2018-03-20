@@ -7,7 +7,7 @@
 #include "mozilla/RecursiveMutex.h"
 
 #ifdef XP_WIN
-#include <windows.h>
+#include "mozilla/MinWin.h"
 
 #define NativeHandle(m) (reinterpret_cast<CRITICAL_SECTION*>(&m))
 #endif

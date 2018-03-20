@@ -6,7 +6,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "mozilla/Types.h"
-#include <windows.h>
+#include "mozilla/MinWin.h"
 
 #if defined(MOZ_MEMORY)
 // mozalloc.cpp is part of the same library as mozmemory, thus MOZ_MEMORY_IMPL

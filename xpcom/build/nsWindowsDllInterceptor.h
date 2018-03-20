@@ -13,7 +13,7 @@
 #include "nsWindowsHelpers.h"
 
 #include <wchar.h>
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include <winternl.h>
 
 /*

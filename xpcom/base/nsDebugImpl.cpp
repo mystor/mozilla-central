@@ -91,7 +91,7 @@ static void
 Break(const char* aMsg);
 
 #if defined(_WIN32)
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include <signal.h>
 #include <malloc.h> // for _alloca
 #elif defined(XP_UNIX)

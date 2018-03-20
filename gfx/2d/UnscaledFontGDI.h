@@ -8,7 +8,7 @@
 #define MOZILLA_GFX_UNSCALEDFONTGDI_H_
 
 #include "2D.h"
-#include <windows.h>
+#include "mozilla/MinWin.h"
 
 namespace mozilla {
 namespace gfx {

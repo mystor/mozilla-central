@@ -10,7 +10,7 @@
 #include "nsString.h"
 #include "nsIShellService.h"
 
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include <ole2.h>
 
 class nsWindowsShellService : public nsIShellService

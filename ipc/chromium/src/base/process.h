@@ -11,7 +11,7 @@
 
 #include <sys/types.h>
 #ifdef OS_WIN
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #endif
 
 namespace base {

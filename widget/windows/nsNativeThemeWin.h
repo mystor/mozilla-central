@@ -15,7 +15,7 @@
 #include "nsUXThemeConstants.h"
 #include "nsUXThemeData.h"
 #include "gfxTypes.h"
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include "mozilla/Maybe.h"
 #include "mozilla/TimeStamp.h"
 #include "nsSize.h"

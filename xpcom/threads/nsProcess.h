@@ -24,7 +24,7 @@
 #include "prproces.h"
 #endif
 #if defined(PROCESSMODEL_WINAPI)
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include <shellapi.h>
 #endif
 

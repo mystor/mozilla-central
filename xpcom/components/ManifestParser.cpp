@@ -14,7 +14,7 @@
 
 #include "prio.h"
 #if defined(XP_WIN)
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #elif defined(MOZ_WIDGET_COCOA)
 #include <CoreServices/CoreServices.h>
 #include "nsCocoaFeatures.h"

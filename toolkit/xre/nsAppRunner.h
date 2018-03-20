@@ -7,7 +7,7 @@
 #define nsAppRunner_h__
 
 #ifdef XP_WIN
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #else
 #include <limits.h>
 #endif

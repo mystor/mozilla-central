@@ -7,7 +7,7 @@
 #define nsAppShell_h__
 
 #include "nsBaseAppShell.h"
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include <vector>
 #include "mozilla/TimeStamp.h"
 #include "mozilla/Mutex.h"

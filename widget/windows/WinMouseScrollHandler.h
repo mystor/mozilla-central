@@ -13,7 +13,7 @@
 #include "mozilla/EventForwards.h"
 #include "mozilla/TimeStamp.h"
 #include "Units.h"
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include "nsPoint.h"
 
 class nsWindowBase;

@@ -23,7 +23,7 @@ using mozilla::plugins::PluginInstanceParent;
 
 #include "nsWindowGfx.h"
 #include "nsAppRunner.h"
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include "gfxEnv.h"
 #include "gfxImageSurface.h"
 #include "gfxUtils.h"

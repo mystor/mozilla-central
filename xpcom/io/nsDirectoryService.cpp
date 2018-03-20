@@ -20,7 +20,7 @@
 #include "nsIStringEnumerator.h"
 
 #if defined(XP_WIN)
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include <shlobj.h>
 #include <stdlib.h>
 #include <stdio.h>

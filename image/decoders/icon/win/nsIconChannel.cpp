@@ -31,7 +31,7 @@
 #include "nsNetUtil.h"
 
 // we need windows.h to read out registry information...
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include <shellapi.h>
 #include <shlobj.h>
 #include <objbase.h>

@@ -180,6 +180,11 @@ GENERATED_FILES["ErrorList.h"].script = "ErrorList.py:error_list_h"
 GENERATED_FILES["ErrorNamesInternal.h"].script = "ErrorList.py:error_names_internal_h"
 GENERATED_FILES["error_list.rs"].script = "ErrorList.py:error_list_rs"
 
+if CONFIG['OS_ARCH'] == 'WINNT':
+    GENERATED_FILES += ['MinWin.h']
+    GENERATED_FILES['MinWin.h'].script = 'MinWin.py:gen_minwin'
+    EXPORTS.mozilla += ['!MinWin.h']
+
 if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'cocoa':
     SOURCES += [
         'nsMacUtilsImpl.cpp',

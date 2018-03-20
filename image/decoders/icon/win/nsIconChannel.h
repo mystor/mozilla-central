@@ -21,7 +21,7 @@
 #include "nsIStreamListener.h"
 #include "nsIIconURI.h"
 
-#include <windows.h>
+#include "mozilla/MinWin.h"
 
 class nsIFile;
 

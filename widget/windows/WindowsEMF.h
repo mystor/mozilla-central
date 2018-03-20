@@ -7,7 +7,7 @@
 #define MOZILLA_WIDGET_WINDOWSEMF_H
 
 /* include windows.h for the HDC definitions that we need. */
-#include <windows.h>
+#include "mozilla/MinWin.h"
 
 namespace mozilla {
 namespace widget {

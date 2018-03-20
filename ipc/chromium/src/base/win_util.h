@@ -7,7 +7,7 @@
 #ifndef BASE_WIN_UTIL_H__
 #define BASE_WIN_UTIL_H__
 
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include <aclapi.h>
 
 #include <string>

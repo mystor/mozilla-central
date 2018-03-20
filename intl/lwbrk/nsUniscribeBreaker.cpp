@@ -5,7 +5,7 @@
 
 #include "nsComplexBreaker.h"
 
-#include <windows.h>
+#include "mozilla/MinWin.h"
 
 #include <usp10.h>
 

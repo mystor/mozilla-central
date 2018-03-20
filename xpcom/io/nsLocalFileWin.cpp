@@ -27,7 +27,7 @@
 #include "nsReadableUtils.h"
 
 #include <direct.h>
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include <shlwapi.h>
 #include <aclapi.h>
 

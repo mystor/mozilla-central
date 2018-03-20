@@ -8,7 +8,7 @@
 #include "plstr.h"
 #include <stdio.h>
 #include "nsString.h"
-#include <windows.h>
+#include "mozilla/MinWin.h"
 
 // mmsystem.h is needed to build with WIN32_LEAN_AND_MEAN
 #include <mmsystem.h>

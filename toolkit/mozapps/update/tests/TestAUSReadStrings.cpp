@@ -8,7 +8,7 @@
  * directory with a Unicode character to test bug 473417.
  */
 #ifdef XP_WIN
-  #include <windows.h>
+  #include "mozilla/MinWin.h"
   #define NS_main wmain
   #define NS_tstrrchr wcsrchr
   #define NS_T(str) L ## str

@@ -11,7 +11,7 @@
 #include <unistd.h>
 #else
 #include <time.h>
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #endif
 
 namespace mozilla {

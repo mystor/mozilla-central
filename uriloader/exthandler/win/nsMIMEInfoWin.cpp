@@ -9,7 +9,7 @@
 #include "nsLocalFile.h"
 #include "nsMIMEInfoWin.h"
 #include "nsNetUtil.h"
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include <shellapi.h>
 #include "nsAutoPtr.h"
 #include "nsIMutableArray.h"

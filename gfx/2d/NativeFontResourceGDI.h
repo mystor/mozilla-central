@@ -7,7 +7,7 @@
 #ifndef mozilla_gfx_NativeFontResourceGDI_h
 #define mozilla_gfx_NativeFontResourceGDI_h
 
-#include <windows.h>
+#include "mozilla/MinWin.h"
 
 #include "2D.h"
 #include "mozilla/AlreadyAddRefed.h"

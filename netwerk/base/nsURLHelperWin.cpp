@@ -8,7 +8,7 @@
 #include "nsURLHelper.h"
 #include "nsEscape.h"
 #include "nsIFile.h"
-#include <windows.h>
+#include "mozilla/MinWin.h"
 
 nsresult
 net_GetURLSpecFromActualFile(nsIFile *aFile, nsACString &result)

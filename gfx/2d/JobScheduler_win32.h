@@ -8,7 +8,7 @@
 #ifndef MOZILLA_GFX_TASKSCHEDULER_WIN32_H_
 #define MOZILLA_GFX_TASKSCHEDULER_WIN32_H_
 
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include <list>
 
 #include "mozilla/RefPtr.h"

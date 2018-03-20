@@ -7,7 +7,7 @@
 #ifndef GFX_READBACKMANAGERD3D11_H
 #define GFX_READBACKMANAGERD3D11_H
 
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include <d3d10_1.h>
 
 #include "nsTArray.h"

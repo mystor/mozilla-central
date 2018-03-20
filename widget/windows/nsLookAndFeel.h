@@ -6,7 +6,7 @@
 #ifndef __nsLookAndFeel
 #define __nsLookAndFeel
 
-#include <windows.h>
+#include "mozilla/MinWin.h"
 
 #include "nsXPLookAndFeel.h"
 #include "gfxFont.h"

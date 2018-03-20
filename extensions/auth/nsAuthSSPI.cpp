@@ -24,7 +24,7 @@
 #include "nsICryptoHash.h"
 #include "mozilla/Telemetry.h"
 
-#include <windows.h>
+#include "mozilla/MinWin.h"
 
 #define SEC_SUCCESS(Status) ((Status) >= 0)
 

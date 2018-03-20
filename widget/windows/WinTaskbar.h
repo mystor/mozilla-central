@@ -8,7 +8,7 @@
 #ifndef __WinTaskbar_h__
 #define __WinTaskbar_h__
 
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include <shobjidl.h>
 #undef LogSeverity // SetupAPI.h #defines this as DWORD
 #include "nsIWinTaskbar.h"

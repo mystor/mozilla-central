@@ -10,7 +10,7 @@
 #ifndef UNICODE
 #define UNICODE
 #endif
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include <hidsdi.h>
 #include <stdio.h>
 #include <xinput.h>

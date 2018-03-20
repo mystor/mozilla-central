@@ -9,7 +9,7 @@
 #include <float.h>
 #include <intrin.h>
 #include <stdlib.h>
-#include <windows.h>
+#include "mozilla/MinWin.h"
 
 #include "mozilla/PlatformConditionVariable.h"
 #include "mozilla/PlatformMutex.h"

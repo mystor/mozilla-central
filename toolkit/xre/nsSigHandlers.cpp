@@ -327,7 +327,7 @@ void InstallSignalHandlers(const char *aProgname)
 
 #elif XP_WIN
 
-#include <windows.h>
+#include "mozilla/MinWin.h"
 
 #ifdef _M_IX86
 /*

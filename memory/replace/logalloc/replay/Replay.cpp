@@ -8,7 +8,7 @@
 #include "mozmemory_wrap.h"
 
 #ifdef _WIN32
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include <io.h>
 typedef int ssize_t;
 #else

@@ -29,7 +29,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/stat.h>
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #else
 #define NS_SLASH "/"
 #endif

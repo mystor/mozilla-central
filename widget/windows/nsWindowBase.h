@@ -10,7 +10,7 @@
 #include "nsBaseWidget.h"
 #include "nsClassHashtable.h"
 
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include "touchinjection_sdk80.h"
 
 /*

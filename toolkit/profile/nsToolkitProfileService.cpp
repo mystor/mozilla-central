@@ -13,7 +13,7 @@
 #include "nsProfileLock.h"
 
 #ifdef XP_WIN
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include <shlobj.h>
 #endif
 #ifdef XP_UNIX

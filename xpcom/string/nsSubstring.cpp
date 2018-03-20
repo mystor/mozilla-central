@@ -28,7 +28,7 @@
 
 #include "mozilla/IntegerPrintfMacros.h"
 #ifdef XP_WIN
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include <process.h>
 #define getpid() _getpid()
 #define pthread_self() GetCurrentThreadId()

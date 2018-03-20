@@ -11,7 +11,7 @@
 #include "nsIPrinterEnumerator.h"
 #include "nsIPrintSettings.h"
 #include "nsISupportsPrimitives.h"
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include "mozilla/Attributes.h"
 #include "mozilla/RefPtr.h"
 

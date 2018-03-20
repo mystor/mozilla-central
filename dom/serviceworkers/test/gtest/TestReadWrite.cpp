@@ -65,7 +65,7 @@ GetFile()
 }
 
 bool
-CreateFile(const nsACString& aData)
+CreateFileHelper(const nsACString& aData)
 {
   nsCOMPtr<nsIFile> file = GetFile();
 
@@ -113,7 +113,7 @@ TEST(ServiceWorkerRegistrar, TestNoFile)
 
 TEST(ServiceWorkerRegistrar, TestEmptyFile)
 {
-  ASSERT_TRUE(CreateFile(EmptyCString())) << "CreateFile should not fail";
+  ASSERT_TRUE(CreateFileHelper(EmptyCString())) << "CreateFileHelper should not fail";
 
   RefPtr<ServiceWorkerRegistrarTest> swr = new ServiceWorkerRegistrarTest;
 
@@ -126,7 +126,7 @@ TEST(ServiceWorkerRegistrar, TestEmptyFile)
 
 TEST(ServiceWorkerRegistrar, TestRightVersionFile)
 {
-  ASSERT_TRUE(CreateFile(NS_LITERAL_CSTRING(SERVICEWORKERREGISTRAR_VERSION "\n"))) << "CreateFile should not fail";
+  ASSERT_TRUE(CreateFileHelper(NS_LITERAL_CSTRING(SERVICEWORKERREGISTRAR_VERSION "\n"))) << "CreateFileHelper should not fail";
 
   RefPtr<ServiceWorkerRegistrarTest> swr = new ServiceWorkerRegistrarTest;
 
@@ -139,7 +139,7 @@ TEST(ServiceWorkerRegistrar, TestRightVersionFile)
 
 TEST(ServiceWorkerRegistrar, TestWrongVersionFile)
 {
-  ASSERT_TRUE(CreateFile(NS_LITERAL_CSTRING(SERVICEWORKERREGISTRAR_VERSION "bla\n"))) << "CreateFile should not fail";
+  ASSERT_TRUE(CreateFileHelper(NS_LITERAL_CSTRING(SERVICEWORKERREGISTRAR_VERSION "bla\n"))) << "CreateFileHelper should not fail";
 
   RefPtr<ServiceWorkerRegistrarTest> swr = new ServiceWorkerRegistrarTest;
 
@@ -183,7 +183,7 @@ TEST(ServiceWorkerRegistrar, TestReadData)
   buffer.AppendLiteral("\n");
   buffer.Append(SERVICEWORKERREGISTRAR_TERMINATOR "\n");
 
-  ASSERT_TRUE(CreateFile(buffer)) << "CreateFile should not fail";
+  ASSERT_TRUE(CreateFileHelper(buffer)) << "CreateFileHelper should not fail";
 
   RefPtr<ServiceWorkerRegistrarTest> swr = new ServiceWorkerRegistrarTest;
 
@@ -234,7 +234,7 @@ TEST(ServiceWorkerRegistrar, TestReadData)
 
 TEST(ServiceWorkerRegistrar, TestDeleteData)
 {
-  ASSERT_TRUE(CreateFile(NS_LITERAL_CSTRING("Foobar"))) << "CreateFile should not fail";
+  ASSERT_TRUE(CreateFileHelper(NS_LITERAL_CSTRING("Foobar"))) << "CreateFileHelper should not fail";
 
   RefPtr<ServiceWorkerRegistrarTest> swr = new ServiceWorkerRegistrarTest;
 
@@ -341,7 +341,7 @@ TEST(ServiceWorkerRegistrar, TestVersion2Migration)
   buffer.AppendLiteral("spec 1\nhttps://scope_1.org\nscriptSpec 1\ncurrentWorkerURL 1\nactiveCache 1\nwaitingCache 1\n");
   buffer.AppendLiteral(SERVICEWORKERREGISTRAR_TERMINATOR "\n");
 
-  ASSERT_TRUE(CreateFile(buffer)) << "CreateFile should not fail";
+  ASSERT_TRUE(CreateFileHelper(buffer)) << "CreateFileHelper should not fail";
 
   RefPtr<ServiceWorkerRegistrarTest> swr = new ServiceWorkerRegistrarTest;
 
@@ -402,7 +402,7 @@ TEST(ServiceWorkerRegistrar, TestVersion3Migration)
   buffer.AppendLiteral("spec 1\nhttps://scope_1.org\ncurrentWorkerURL 1\ncacheName 1\n");
   buffer.AppendLiteral(SERVICEWORKERREGISTRAR_TERMINATOR "\n");
 
-  ASSERT_TRUE(CreateFile(buffer)) << "CreateFile should not fail";
+  ASSERT_TRUE(CreateFileHelper(buffer)) << "CreateFileHelper should not fail";
 
   RefPtr<ServiceWorkerRegistrarTest> swr = new ServiceWorkerRegistrarTest;
 
@@ -463,7 +463,7 @@ TEST(ServiceWorkerRegistrar, TestVersion4Migration)
   buffer.AppendLiteral("https://scope_1.org\ncurrentWorkerURL 1\ncacheName 1\n");
   buffer.AppendLiteral(SERVICEWORKERREGISTRAR_TERMINATOR "\n");
 
-  ASSERT_TRUE(CreateFile(buffer)) << "CreateFile should not fail";
+  ASSERT_TRUE(CreateFileHelper(buffer)) << "CreateFileHelper should not fail";
 
   RefPtr<ServiceWorkerRegistrarTest> swr = new ServiceWorkerRegistrarTest;
 
@@ -530,7 +530,7 @@ TEST(ServiceWorkerRegistrar, TestVersion5Migration)
   buffer.AppendLiteral("cacheName 1\n");
   buffer.AppendLiteral(SERVICEWORKERREGISTRAR_TERMINATOR "\n");
 
-  ASSERT_TRUE(CreateFile(buffer)) << "CreateFile should not fail";
+  ASSERT_TRUE(CreateFileHelper(buffer)) << "CreateFileHelper should not fail";
 
   RefPtr<ServiceWorkerRegistrarTest> swr = new ServiceWorkerRegistrarTest;
 
@@ -599,7 +599,7 @@ TEST(ServiceWorkerRegistrar, TestVersion6Migration)
   buffer.AppendLiteral("\n");
   buffer.AppendLiteral(SERVICEWORKERREGISTRAR_TERMINATOR "\n");
 
-  ASSERT_TRUE(CreateFile(buffer)) << "CreateFile should not fail";
+  ASSERT_TRUE(CreateFileHelper(buffer)) << "CreateFileHelper should not fail";
 
   RefPtr<ServiceWorkerRegistrarTest> swr = new ServiceWorkerRegistrarTest;
 
@@ -681,7 +681,7 @@ TEST(ServiceWorkerRegistrar, TestVersion7Migration)
   buffer.AppendLiteral("\n");
   buffer.AppendLiteral(SERVICEWORKERREGISTRAR_TERMINATOR "\n");
 
-  ASSERT_TRUE(CreateFile(buffer)) << "CreateFile should not fail";
+  ASSERT_TRUE(CreateFileHelper(buffer)) << "CreateFileHelper should not fail";
 
   RefPtr<ServiceWorkerRegistrarTest> swr = new ServiceWorkerRegistrarTest;
 
@@ -756,7 +756,7 @@ TEST(ServiceWorkerRegistrar, TestDedupeRead)
   buffer.AppendLiteral("spec 3\nhttps://scope_1.org\ncurrentWorkerURL 1\ncacheName 1\n");
   buffer.AppendLiteral(SERVICEWORKERREGISTRAR_TERMINATOR "\n");
 
-  ASSERT_TRUE(CreateFile(buffer)) << "CreateFile should not fail";
+  ASSERT_TRUE(CreateFileHelper(buffer)) << "CreateFileHelper should not fail";
 
   RefPtr<ServiceWorkerRegistrarTest> swr = new ServiceWorkerRegistrarTest;
 

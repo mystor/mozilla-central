@@ -7,7 +7,7 @@
 #ifndef BASE_OBJECT_WATCHER_H_
 #define BASE_OBJECT_WATCHER_H_
 
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #ifdef GetClassName
 #undef GetClassName
 #endif

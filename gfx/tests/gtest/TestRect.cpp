@@ -11,7 +11,7 @@
 #include "gfxRect.h"
 #include "mozilla/WritingModes.h"
 #ifdef XP_WIN
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #endif
 
 template <class RectType>

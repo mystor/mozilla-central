@@ -26,7 +26,7 @@
 #include "mozilla/Attributes.h"
 
 #ifdef XP_WIN
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #endif
 
 using namespace mozilla;

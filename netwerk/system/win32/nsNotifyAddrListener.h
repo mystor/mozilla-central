@@ -6,7 +6,7 @@
 #ifndef NSNOTIFYADDRLISTENER_H_
 #define NSNOTIFYADDRLISTENER_H_
 
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include <winsock2.h>
 #include <iptypes.h>
 #include "nsINetworkLinkService.h"

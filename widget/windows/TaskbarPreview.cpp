@@ -7,7 +7,7 @@
 
 #include "TaskbarPreview.h"
 #include <nsITaskbarPreviewController.h>
-#include <windows.h>
+#include "mozilla/MinWin.h"
 
 #include <nsError.h>
 #include <nsCOMPtr.h>

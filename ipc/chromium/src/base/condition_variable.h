@@ -76,7 +76,7 @@
 #endif
 
 #if defined(OS_WIN)
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #endif
 
 namespace base {

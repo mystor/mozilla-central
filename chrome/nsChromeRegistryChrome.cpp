@@ -11,7 +11,7 @@
 #include "nsChromeRegistryChrome.h"
 
 #if defined(XP_WIN)
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #elif defined(XP_MACOSX)
 #include <CoreServices/CoreServices.h>
 #endif

@@ -12,7 +12,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include <dbghelp.h>
 
 int wmain(int argc, wchar_t** argv)

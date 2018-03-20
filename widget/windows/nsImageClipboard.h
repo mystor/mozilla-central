@@ -14,7 +14,7 @@ Any other render format? HTML?
 */
 
 #include "nsError.h"
-#include <windows.h>
+#include "mozilla/MinWin.h"
 
 #include "nsCOMPtr.h"
 #include "imgIContainer.h"

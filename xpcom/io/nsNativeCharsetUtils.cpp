@@ -34,7 +34,7 @@ NS_CopyUnicodeToNative(const nsAString&  aInput, nsACString& aOutput)
 //-----------------------------------------------------------------------------
 #else
 
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include "nsString.h"
 #include "nsAString.h"
 #include "nsReadableUtils.h"

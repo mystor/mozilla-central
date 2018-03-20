@@ -23,7 +23,7 @@
 #include "GeckoProfiler.h"
 
 #ifdef XP_WIN
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #endif
 
 #if defined(MOZ_GECKO_PROFILER) && defined(MOZ_PROFILING) && defined(XP_WIN)

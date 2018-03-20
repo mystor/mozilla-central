@@ -7,7 +7,7 @@
 #ifndef __nsBidiKeyboard
 #define __nsBidiKeyboard
 #include "nsIBidiKeyboard.h"
-#include <windows.h>
+#include "mozilla/MinWin.h"
 
 class nsBidiKeyboard : public nsIBidiKeyboard
 {

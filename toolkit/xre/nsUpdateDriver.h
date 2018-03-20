@@ -17,7 +17,7 @@
 class nsIFile;
 
 #if defined(XP_WIN)
-#include <windows.h>
+#include "mozilla/MinWin.h"
   typedef HANDLE     ProcessType;
 #elif defined(XP_UNIX)
   typedef pid_t      ProcessType;

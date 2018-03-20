@@ -7,7 +7,7 @@
 #include "base/waitable_event.h"
 
 #include <math.h>
-#include <windows.h>
+#include "mozilla/MinWin.h"
 
 #include "base/logging.h"
 #include "base/time.h"

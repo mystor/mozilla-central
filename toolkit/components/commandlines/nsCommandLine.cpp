@@ -32,7 +32,7 @@
 #include <CoreFoundation/CoreFoundation.h>
 #include "nsILocalFileMac.h"
 #elif defined(XP_WIN)
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include <shlobj.h>
 #elif defined(XP_UNIX)
 #include <unistd.h>

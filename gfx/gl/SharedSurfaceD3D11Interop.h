@@ -6,7 +6,7 @@
 #ifndef SHARED_SURFACE_D3D11_INTEROP_H_
 #define SHARED_SURFACE_D3D11_INTEROP_H_
 
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include "SharedSurface.h"
 
 namespace mozilla {

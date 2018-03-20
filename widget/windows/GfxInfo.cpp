@@ -5,7 +5,7 @@
 
 #include "mozilla/ArrayUtils.h"
 
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include <setupapi.h>
 #include "gfxConfig.h"
 #include "gfxWindowsPlatform.h"

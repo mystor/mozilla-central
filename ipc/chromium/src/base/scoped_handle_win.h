@@ -7,7 +7,7 @@
 #ifndef BASE_SCOPED_HANDLE_WIN_H_
 #define BASE_SCOPED_HANDLE_WIN_H_
 
-#include <windows.h>
+#include "mozilla/MinWin.h"
 
 #include "base/basictypes.h"
 #include "base/logging.h"

@@ -18,7 +18,7 @@
 
 #ifdef XP_WIN
 #include <io.h>
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include "mozilla/UniquePtr.h"
 #endif
 

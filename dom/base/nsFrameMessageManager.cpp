@@ -57,7 +57,7 @@
 #include <android/log.h>
 #endif
 #ifdef XP_WIN
-#include <windows.h>
+#include "mozilla/MinWin.h"
 # if defined(SendMessage)
 #  undef SendMessage
 # endif

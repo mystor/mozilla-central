@@ -10,7 +10,7 @@
 
 #include "base/process_util.h"
 
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include <winternl.h>
 #include <psapi.h>
 

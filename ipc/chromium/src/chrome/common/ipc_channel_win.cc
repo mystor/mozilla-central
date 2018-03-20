@@ -6,7 +6,7 @@
 
 #include "chrome/common/ipc_channel_win.h"
 
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include <sstream>
 
 #include "base/compiler_specific.h"

@@ -8,7 +8,7 @@
 #define IPC_GLUE_WINDOWSMESSAGELOOP_H
 
 // This file is only meant to compile on windows
-#include <windows.h>
+#include "mozilla/MinWin.h"
 
 #include "nsISupportsImpl.h"
 

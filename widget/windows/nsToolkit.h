@@ -10,7 +10,7 @@
 
 #include "nsITimer.h"
 #include "nsCOMPtr.h"
-#include <windows.h>
+#include "mozilla/MinWin.h"
 
 // Avoid including windowsx.h to prevent macro pollution
 #ifndef GET_X_LPARAM

@@ -39,7 +39,7 @@
 class gfxContext;
 
 #ifdef XP_WIN
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #endif
 
 namespace mozilla {

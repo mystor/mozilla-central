@@ -8,7 +8,7 @@
 
 #if (defined(_MSC_VER) || defined(__MINGW32__))  && (defined(_M_IX86) || defined(_M_X64))
 
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include "mozilla/Attributes.h"
 #include "mozilla/Types.h"
 

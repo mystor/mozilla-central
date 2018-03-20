@@ -6,7 +6,7 @@
 #ifndef mozilla_widget_WinNativeEventData_h_
 #define mozilla_widget_WinNativeEventData_h_
 
-#include <windows.h>
+#include "mozilla/MinWin.h"
 
 #include "mozilla/EventForwards.h"
 #include "mozilla/widget/WinModifierKeyState.h"

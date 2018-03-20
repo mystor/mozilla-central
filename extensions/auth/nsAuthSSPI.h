@@ -10,7 +10,7 @@
 #include "nsIAuthModule.h"
 #include "nsString.h"
 
-#include <windows.h>
+#include "mozilla/MinWin.h"
 
 #define SECURITY_WIN32 1
 #include <ntsecapi.h>

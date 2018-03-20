@@ -13,7 +13,7 @@
 #include "mozilla/ipc/Shmem.h"
 
 /* include windows.h for the HDC definitions that we need. */
-#include <windows.h>
+#include "mozilla/MinWin.h"
 
 class nsIFile;
 class nsFileInputStream;

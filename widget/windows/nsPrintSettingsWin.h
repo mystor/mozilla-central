@@ -9,7 +9,7 @@
 
 #include "nsPrintSettingsImpl.h"  
 #include "nsIPrintSettingsWin.h"  
-#include <windows.h>  
+#include "mozilla/MinWin.h"  
 
 
 //*****************************************************************************

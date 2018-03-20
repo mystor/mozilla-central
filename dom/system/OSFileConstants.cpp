@@ -38,7 +38,7 @@
 #endif // defined(XP_MACOSX)
 
 #if defined(XP_WIN)
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include <accctrl.h>
 
 #ifndef PATH_MAX

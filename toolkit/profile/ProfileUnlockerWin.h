@@ -7,7 +7,7 @@
 #ifndef ProfileUnlockerWin_h
 #define ProfileUnlockerWin_h
 
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include <restartmanager.h>
 
 #include "nsIProfileUnlocker.h"

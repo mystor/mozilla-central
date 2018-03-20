@@ -8,7 +8,7 @@
 #if defined(XP_UNIX) || defined(XP_BEOS)
 #include <unistd.h>
 #elif defined(XP_WIN)
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include "nsILocalFileWin.h"
 #else
 // XXX add necessary include file for ftruncate (or equivalent)

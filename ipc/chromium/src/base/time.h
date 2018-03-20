@@ -31,7 +31,7 @@
 #if defined(OS_WIN)
 // For FILETIME in FromFileTime, until it moves to a new converter class.
 // See TODO(iyengar) below.
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #endif
 
 namespace base {

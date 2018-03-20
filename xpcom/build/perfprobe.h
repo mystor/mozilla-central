@@ -21,7 +21,7 @@
 #include "mozilla/Logging.h"
 #include "nsTArray.h"
 #include "nsAutoPtr.h"
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #undef GetStartupInfo //Prevent Windows from polluting global namespace
 #include <wmistr.h>
 #include <evntrace.h>

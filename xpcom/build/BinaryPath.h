@@ -9,7 +9,7 @@
 
 #include "nsXPCOMPrivate.h" // for MAXPATHLEN
 #ifdef XP_WIN
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #elif defined(XP_MACOSX)
 #include <CoreFoundation/CoreFoundation.h>
 #elif defined(XP_UNIX)

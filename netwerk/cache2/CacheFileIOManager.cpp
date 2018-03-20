@@ -35,7 +35,7 @@
 #if defined(XP_UNIX)
 #include <unistd.h>
 #elif defined(XP_WIN)
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #undef CreateFile
 #undef CREATE_NEW
 #else

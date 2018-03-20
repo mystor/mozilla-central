@@ -58,7 +58,7 @@ extern MOZ_EXPORT void* __libc_stack_end; // from ld-linux.so
 
 #if MOZ_STACKWALK_SUPPORTS_WINDOWS
 
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include <process.h>
 #include <stdio.h>
 #include <malloc.h>

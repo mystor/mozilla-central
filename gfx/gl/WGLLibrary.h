@@ -5,7 +5,7 @@
 
 #include "GLContextTypes.h"
 #include "mozilla/UniquePtr.h"
-#include <windows.h>
+#include "mozilla/MinWin.h"
 
 struct PRLibrary;
 

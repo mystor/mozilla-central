@@ -7,7 +7,7 @@
 #ifndef __mozilla_WindowHook_h__
 #define __mozilla_WindowHook_h__
 
-#include <windows.h>
+#include "mozilla/MinWin.h"
 
 #include <nsHashKeys.h>
 #include <nsClassHashtable.h>

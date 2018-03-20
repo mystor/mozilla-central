@@ -7,7 +7,7 @@
 #ifndef BASE_MESSAGE_PUMP_WIN_H_
 #define BASE_MESSAGE_PUMP_WIN_H_
 
-#include <windows.h>
+#include "mozilla/MinWin.h"
 
 #include <list>
 

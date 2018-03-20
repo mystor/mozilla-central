@@ -12,7 +12,7 @@
 
 #ifdef XP_WIN
 
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include "ProtocolUtils.h"
 #define INVALID_HANDLE INVALID_HANDLE_VALUE
 

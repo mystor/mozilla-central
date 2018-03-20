@@ -7,7 +7,7 @@
 #ifndef gfx_SharedDIBWin_h__
 #define gfx_SharedDIBWin_h__
 
-#include <windows.h>
+#include "mozilla/MinWin.h"
 
 #include "SharedDIB.h"
 

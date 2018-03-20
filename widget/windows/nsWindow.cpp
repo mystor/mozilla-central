@@ -71,7 +71,7 @@
 #include "nsWindow.h"
 
 #include <shellapi.h>
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include <wtsapi32.h>
 #include <process.h>
 #include <commctrl.h>

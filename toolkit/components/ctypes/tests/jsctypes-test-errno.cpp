@@ -6,7 +6,7 @@
 #include <stdio.h>
 #include <errno.h>
 #if defined(XP_WIN)
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #endif // defined(XP_WIN)
 
 #include "jsctypes-test-errno.h"

@@ -8,7 +8,7 @@
 #include "mozilla/intl/LocaleService.h"
 #include "nsReadableUtils.h"
 
-#include <windows.h>
+#include "mozilla/MinWin.h"
 
 using namespace mozilla::intl;
 

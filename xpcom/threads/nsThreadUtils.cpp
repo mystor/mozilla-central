@@ -22,7 +22,7 @@
 #endif
 
 #ifdef XP_WIN
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #elif defined(XP_MACOSX)
 #include <sys/resource.h>
 #endif

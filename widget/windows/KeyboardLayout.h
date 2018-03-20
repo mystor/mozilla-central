@@ -16,7 +16,7 @@
 #include "mozilla/TextEventDispatcher.h"
 #include "mozilla/widget/WinMessages.h"
 #include "mozilla/widget/WinModifierKeyState.h"
-#include <windows.h>
+#include "mozilla/MinWin.h"
 
 #define NS_NUM_OF_KEYS          70
 

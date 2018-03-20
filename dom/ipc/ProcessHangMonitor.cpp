@@ -35,7 +35,7 @@
 
 #ifdef XP_WIN
 // For IsDebuggerPresent()
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #endif
 
 using namespace mozilla;

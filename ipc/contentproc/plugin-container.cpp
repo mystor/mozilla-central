@@ -9,7 +9,7 @@
 #include "mozilla/Bootstrap.h"
 
 #ifdef XP_WIN
-#include <windows.h>
+#include "mozilla/MinWin.h"
 // we want a wmain entry point
 #include "nsWindowsWMain.cpp"
 #else

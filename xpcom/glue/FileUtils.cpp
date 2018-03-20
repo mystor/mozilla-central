@@ -32,7 +32,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #elif defined(XP_WIN)
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #endif
 
 // Functions that are not to be used in standalone glue must be implemented

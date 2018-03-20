@@ -11,7 +11,7 @@
 
 #if defined(XP_WIN)
 
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>

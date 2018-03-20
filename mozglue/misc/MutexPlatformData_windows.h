@@ -7,7 +7,7 @@
 #ifndef MutexPlatformData_windows_h
 #define MutexPlatformData_windows_h
 
-#include <windows.h>
+#include "mozilla/MinWin.h"
 
 #include "mozilla/PlatformMutex.h"
 

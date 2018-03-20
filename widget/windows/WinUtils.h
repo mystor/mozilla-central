@@ -7,7 +7,7 @@
 #define mozilla_widget_WinUtils_h__
 
 #include "nscore.h"
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include <shobjidl.h>
 #include <uxtheme.h>
 #include <dwmapi.h>

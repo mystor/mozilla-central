@@ -8,7 +8,7 @@
 #include "nsCOMPtr.h"
 #include "nsCNativeApp.h"
 #include "nsIEventLoop.h"
-#include <windows.h>
+#include "mozilla/MinWin.h"
 
 static NS_DEFINE_CID(kNativeAppCID, NS_NATIVE_APP_CID);
 

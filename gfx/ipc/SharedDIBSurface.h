@@ -10,7 +10,7 @@
 #include "gfxImageSurface.h"
 #include "SharedDIBWin.h"
 
-#include <windows.h>
+#include "mozilla/MinWin.h"
 
 namespace mozilla {
 namespace gfx {

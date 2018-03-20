@@ -7,7 +7,7 @@
 #ifndef mozilla_FileUtilsWin_h
 #define mozilla_FileUtilsWin_h
 
-#include <windows.h>
+#include "mozilla/MinWin.h"
 
 #include "mozilla/Scoped.h"
 #include "nsString.h"

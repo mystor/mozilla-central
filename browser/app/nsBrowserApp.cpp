@@ -8,7 +8,7 @@
 #include "application.ini.h"
 #include "mozilla/Bootstrap.h"
 #if defined(XP_WIN)
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include <stdlib.h>
 #elif defined(XP_UNIX)
 #include <sys/resource.h>

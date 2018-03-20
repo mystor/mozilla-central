@@ -6,7 +6,7 @@
 #ifndef __JumpListItem_h__
 #define __JumpListItem_h__
 
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include <shobjidl.h>
 #undef LogSeverity // SetupAPI.h #defines this as DWORD
 

@@ -9,7 +9,7 @@
 
 #include "build/build_config.h"
 #if defined(OS_WIN)
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #endif
 
 #include <string>

@@ -7,7 +7,7 @@
 #define nsDragService_h__
 
 #include "nsBaseDragService.h"
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include <shlobj.h>
 
 struct IDataObject;

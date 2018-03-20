@@ -13,7 +13,7 @@
 #include "base/basictypes.h"
 
 #if defined(OS_WIN)
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include <tlhelp32.h>
 #include <io.h>
 #ifndef STDOUT_FILENO

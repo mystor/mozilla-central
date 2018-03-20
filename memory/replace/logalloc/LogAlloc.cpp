@@ -9,7 +9,7 @@
 #include <fcntl.h>
 
 #ifdef _WIN32
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include <io.h>
 #include <process.h>
 #else

@@ -8,7 +8,7 @@
 #include "mozilla/DebugOnly.h"
 #include "mozilla/PlatformMutex.h"
 
-#include <windows.h>
+#include "mozilla/MinWin.h"
 
 #include "MutexPlatformData_windows.h"
 

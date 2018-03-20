@@ -17,7 +17,7 @@
 #include "nsThreadUtils.h"
 #include "nsQueryObject.h"
 #include "nsWindowsHelpers.h"
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include <rpc.h>
 #include <ws2spi.h>
 

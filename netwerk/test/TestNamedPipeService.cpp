@@ -6,7 +6,7 @@
 #include "TestCommon.h"
 #include "gtest/gtest.h"
 
-#include <windows.h>
+#include "mozilla/MinWin.h"
 
 #include "mozilla/Atomics.h"
 #include "mozilla/Monitor.h"
@@ -245,7 +245,7 @@ BOOL ConnectToNewClient(HANDLE aPipe, LPOVERLAPPED aOverlapped)
 }
 
 static nsresult
-CreateNamedPipe(LPHANDLE aServer, LPHANDLE aClient)
+CreateNamedPipeHelper(LPHANDLE aServer, LPHANDLE aClient)
 {
   OVERLAPPED overlapped;
   overlapped.hEvent = CreateEvent(NULL, TRUE, TRUE, NULL);
@@ -292,7 +292,7 @@ TEST(TestNamedPipeService,Test)
   ASSERT_TRUE(NS_SUCCEEDED(rv));
 
   HANDLE readPipe, writePipe;
-  rv = CreateNamedPipe(&readPipe, &writePipe);
+  rv = CreateNamedPipeHelper(&readPipe, &writePipe);
   ASSERT_TRUE(NS_SUCCEEDED(rv));
 
   RefPtr<nsNamedPipeDataObserver> readObserver =

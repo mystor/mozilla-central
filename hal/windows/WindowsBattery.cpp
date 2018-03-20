@@ -8,7 +8,7 @@
 #include "mozilla/Preferences.h"
 #include "mozilla/dom/battery/Constants.h"
 
-#include <windows.h>
+#include "mozilla/MinWin.h"
 
 using namespace mozilla::dom::battery;
 

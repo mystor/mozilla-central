@@ -1472,7 +1472,7 @@ nsSocketTransportService::GetSendBufferSize(int32_t *value)
 /// ugly OS specific includes are placed at the bottom of the src for clarity
 
 #if defined(XP_WIN)
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #elif defined(XP_UNIX) && !defined(AIX) && !defined(NEXTSTEP) && !defined(QNX)
 #include <sys/resource.h>
 #endif

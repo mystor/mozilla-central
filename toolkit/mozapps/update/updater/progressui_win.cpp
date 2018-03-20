@@ -5,7 +5,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include <stdio.h>
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include <commctrl.h>
 #include <process.h>
 #include <io.h>

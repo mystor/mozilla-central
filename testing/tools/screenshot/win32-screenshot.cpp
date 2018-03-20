@@ -37,7 +37,7 @@
  // VS2015: Platform SDK 8.1's GdiplusTypes.h uses the min macro
 #undef NOMINMAX
 #undef WIN32_LEAN_AND_MEAN
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include <gdiplus.h>
 
 // Link w/ subsystem windows so we don't get a console when executing

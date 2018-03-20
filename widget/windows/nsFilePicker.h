@@ -7,7 +7,7 @@
 #ifndef nsFilePicker_h__
 #define nsFilePicker_h__
 
-#include <windows.h>
+#include "mozilla/MinWin.h"
 
 #include "nsIFile.h"
 #include "nsITimer.h"

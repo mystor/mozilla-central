@@ -21,7 +21,7 @@ WIN_LIBS=                                       \
 ---------------------------------------------------------------------- */
 
 #include "plstr.h"
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include <tchar.h>
 
 #include <unknwn.h>
@@ -43,7 +43,7 @@ WIN_LIBS=                                       \
 #include "nsCRT.h"
 #include "prenv.h" /* for PR_GetEnv */
 
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include <winspool.h>
 
 // For Localization

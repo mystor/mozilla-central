@@ -34,7 +34,7 @@
 #include "mozilla/dom/ContentChild.h"
 #endif
 #ifdef XP_WIN
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #endif
 
 #ifdef MOZ_TASK_TRACER

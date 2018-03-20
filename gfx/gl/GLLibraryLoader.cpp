@@ -7,7 +7,7 @@
 #include "nsDebug.h"
 
 #ifdef WIN32
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #endif
 
 namespace mozilla {

@@ -7,7 +7,7 @@
 /*****************************
  Windows implementation of probes, using xperf
  *****************************/
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include <wmistr.h>
 #include <evntrace.h>
 

@@ -8,7 +8,7 @@
 #define Mutex_h
 
 #if defined(XP_WIN)
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #elif defined(XP_DARWIN)
 #include <libkern/OSAtomic.h>
 #else

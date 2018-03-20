@@ -20,7 +20,7 @@
 #include <semaphore.h>
 #include <sys/types.h>
 #elif defined(XP_WIN)
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #elif defined(XP_MACOSX)
 #include <mach/mach.h>
 #endif

@@ -20,7 +20,7 @@
 #include "nsRefreshDriver.h"
 
 #ifdef XP_WIN
-#include <windows.h>
+#include "mozilla/MinWin.h"
 // mmsystem isn't part of WIN32_LEAN_AND_MEAN, so we have
 // to manually include it
 #include <mmsystem.h>

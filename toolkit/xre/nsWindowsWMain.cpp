@@ -13,7 +13,7 @@
 #include "mozilla/Char16.h"
 #include "nsUTF8Utils.h"
 
-#include <windows.h>
+#include "mozilla/MinWin.h"
 
 #ifdef __MINGW32__
 

@@ -15,7 +15,7 @@
 #if defined(XP_UNIX)
 #include <unistd.h>
 #elif defined(XP_WIN)
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #else
 // XXX add necessary include file for ftruncate (or equivalent)
 #endif

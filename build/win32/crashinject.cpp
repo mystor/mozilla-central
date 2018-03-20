@@ -10,7 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <windows.h>
+#include "mozilla/MinWin.h"
 
 int main(int argc, char** argv)
 {

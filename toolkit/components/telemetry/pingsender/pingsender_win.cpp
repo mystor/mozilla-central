@@ -5,7 +5,7 @@
 
 #include <string>
 
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include <wininet.h>
 
 namespace PingSender {

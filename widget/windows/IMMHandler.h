@@ -7,7 +7,7 @@
 #define IMMHandler_h_
 
 #include "nscore.h"
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include "nsCOMPtr.h"
 #include "nsString.h"
 #include "nsTArray.h"

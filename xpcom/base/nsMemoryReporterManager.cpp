@@ -569,7 +569,7 @@ ResidentUniqueDistinguishedAmount(int64_t* aN)
 
 #elif defined(XP_WIN)
 
-#include <windows.h>
+#include "mozilla/MinWin.h"
 #include <psapi.h>
 #include <algorithm>
 
