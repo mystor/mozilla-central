@@ -2,6 +2,7 @@ import os
 import subprocess
 import re
 import sys
+import shlex
 from collections import OrderedDict, defaultdict
 
 import buildconfig
@@ -10,11 +11,15 @@ import mozpack.path as mozpath
 
 # Pull the system includes from the environment.
 # XXX: Should we also check /imsvc arguments?
-winsdkdirs = [mozpath.normpath(i) for i in os.environ['INCLUDE'].split(os.pathsep)]
+# try:
+#     winsdkdirs = [mozpath.normpath(i) for i in os.environ['INCLUDE'].split(os.pathsep)]
+# except:
+#     winsdkdirs = [''] # If we don't have a system path set,
 class FileInfo(object):
     def __init__(self, path):
         self.path = mozpath.normpath(path)
-        self.whitelisted = any(self.path.startswith(p) for p in winsdkdirs)
+        self.whitelisted = True
+        #self.whitelisted = any(self.path.startswith(p) for p in winsdkdirs)
 
 
 # This isn't perfect, but it's good enough.
@@ -216,13 +221,13 @@ def write_winmin(fd, defines):
 
 def gen_minwin(output):
     # Read the compiler command line from the build config.
-    cxx = buildconfig.substs['CXX']
-    cmd = [cxx] + buildconfig.substs['OS_CXXFLAGS'] + \
+    cxx = shlex.split(buildconfig.substs['CXX'])
+    cmd = cxx + buildconfig.substs['OS_CXXFLAGS'] + \
             buildconfig.substs['OS_COMPILE_CXXFLAGS']
 
     # Attempt to run "$CXX --version" to see if we're working with mingw.
     try:
-        ver = subprocess.check_output([cxx, '-v'], stderr=subprocess.STDOUT)
+        ver = subprocess.check_output([cxx, '--version'], stderr=subprocess.STDOUT)
         is_mingw = 'gcc' in ver
     except:
         is_mingw = False
