@@ -691,6 +691,8 @@ class InterfaceAttributes(object):
     function = False
     noscript = False
     main_process_scriptable_only = False
+    xptshim = None
+    xptshimfile = None
 
     def setuuid(self, value):
         self.uuid = value.lower()
@@ -710,6 +712,12 @@ class InterfaceAttributes(object):
     def setmain_process_scriptable_only(self):
         self.main_process_scriptable_only = True
 
+    def setxptshim(self, value):
+        self.xptshim = value
+
+    def setxptshimfile(self, value):
+        self.xptshimfile = value
+
     actions = {
         'uuid':       (True, setuuid),
         'scriptable': (False, setscriptable),
@@ -718,6 +726,8 @@ class InterfaceAttributes(object):
         'noscript':   (False, setnoscript),
         'object':     (False, lambda self: True),
         'main_process_scriptable_only': (False, setmain_process_scriptable_only),
+        'xptshim':    (True, setxptshim),
+        'xptshimfile': (True, setxptshimfile),
         }
 
     def __init__(self, attlist, location):
@@ -754,6 +764,10 @@ class InterfaceAttributes(object):
             l.append("\tfunction\n")
         if self.main_process_scriptable_only:
             l.append("\tmain_process_scriptable_only\n")
+        if self.xptshim:
+            l.append("\txptshim: %s\n" % self.xptshim)
+        if self.xptshimfile:
+            l.append("\txptshimfile: %s\n" % self.xptshimfile)
         return "".join(l)
 
 
