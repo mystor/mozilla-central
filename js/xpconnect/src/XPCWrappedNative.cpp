@@ -1136,7 +1136,7 @@ class MOZ_STACK_CLASS CallMethodHelper
 {
     XPCCallContext& mCallContext;
     nsresult mInvokeResult;
-    nsIInterfaceInfo* const mIFaceInfo;
+    const nsXPTInterfaceInfo* const mIFaceInfo;
     const nsXPTMethodInfo* mMethodInfo;
     nsISupports* const mCallee;
     const uint16_t mVTableIndex;
@@ -1400,8 +1400,11 @@ CallMethodHelper::GetOutParamSource(uint8_t paramIndex, MutableHandleValue srcp)
 {
     const nsXPTParamInfo& paramInfo = mMethodInfo->GetParam(paramIndex);
 
+    bool isRetval = mMethodInfo->HasRetval() &&
+        paramIndex == mMethodInfo->ParamCount() - 1;
+
     MOZ_ASSERT(!paramInfo.IsDipper(), "Dipper params are handled separately");
-    if (paramInfo.IsOut() && !paramInfo.IsRetval()) {
+    if (paramInfo.IsOut() && !isRetval) {
         MOZ_ASSERT(paramIndex < mArgc || paramInfo.IsOptional(),
                    "Expected either enough arguments or an optional argument");
         Value arg = paramIndex < mArgc ? mArgv[paramIndex] : JS::NullValue();
@@ -1488,7 +1491,8 @@ CallMethodHelper::GatherAndConvertResults()
             }
         }
 
-        if (paramInfo.IsRetval()) {
+        // last parameter is the retval.
+        if (i == paramCount - 1 && mMethodInfo->HasRetval()) {
             mCallContext.SetRetVal(v);
         } else if (i < mArgc) {
             // we actually assured this before doing the invoke
@@ -1564,7 +1568,7 @@ CallMethodHelper::InitializeDispatchParams()
     uint8_t hasRetval = 0;
 
     // XXX ASSUMES that retval is last arg. The xpidl compiler ensures this.
-    if (paramCount && mMethodInfo->GetParam(paramCount-1).IsRetval()) {
+    if (mMethodInfo->HasRetval()) {
         hasRetval = 1;
         requiredArgs--;
     }
@@ -2072,7 +2076,7 @@ static void DEBUG_CheckClassInfoClaims(XPCWrappedNative* wrapper)
     for (uint16_t i = 0; i < count; i++) {
         nsIClassInfo* clsInfo = wrapper->GetClassInfo();
         XPCNativeInterface* iface = set->GetInterfaceAt(i);
-        nsIInterfaceInfo* info = iface->GetInterfaceInfo();
+        const nsXPTInterfaceInfo* info = iface->GetInterfaceInfo();
         const nsIID* iid;
         nsISupports* ptr;
 

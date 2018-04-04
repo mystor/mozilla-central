@@ -113,8 +113,7 @@ nsXPCWrappedJSClass::GetNewOrUsed(JSContext* cx, REFNSIID aIID, bool allowNonScr
     RefPtr<nsXPCWrappedJSClass> clasp = map->Find(aIID);
 
     if (!clasp) {
-        nsCOMPtr<nsIInterfaceInfo> info;
-        nsXPConnect::XPConnect()->GetInfoForIID(&aIID, getter_AddRefs(info));
+        const nsXPTInterfaceInfo* info = nsXPTInterfaceInfo::ByIID(aIID);
         if (info) {
             bool canScript, isBuiltin;
             if (NS_SUCCEEDED(info->IsScriptable(&canScript)) && (canScript || allowNonScriptable) &&
@@ -131,7 +130,7 @@ nsXPCWrappedJSClass::GetNewOrUsed(JSContext* cx, REFNSIID aIID, bool allowNonScr
 }
 
 nsXPCWrappedJSClass::nsXPCWrappedJSClass(JSContext* cx, REFNSIID aIID,
-                                         nsIInterfaceInfo* aInfo)
+                                         const nsXPTInterfaceInfo* aInfo)
     : mRuntime(nsXPConnect::GetRuntimeInstance()),
       mInfo(aInfo),
       mName(nullptr),
@@ -225,14 +224,12 @@ nsXPCWrappedJSClass::CallQueryInterfaceOnJSObject(JSContext* cx,
     if (!aIID.Equals(NS_GET_IID(nsISupports))) {
         bool allowNonScriptable = mozilla::jsipc::IsWrappedCPOW(jsobj);
 
-        nsCOMPtr<nsIInterfaceInfo> info;
-        nsXPConnect::XPConnect()->GetInfoForIID(&aIID, getter_AddRefs(info));
-        if (!info)
+        const nsXPTInterfaceInfo* info = nsXPTInterfaceInfo::ByIID(aIID);
+        if (!info || info->IsBuiltinClass() ||
+            (!info->IsScriptable() && !allowNonScriptable))
+        {
             return nullptr;
-        bool canScript, isBuiltin;
-        if (NS_FAILED(info->IsScriptable(&canScript)) || (!canScript && !allowNonScriptable) ||
-            NS_FAILED(info->IsBuiltinClass(&isBuiltin)) || isBuiltin)
-            return nullptr;
+        }
     }
 
     id = xpc_NewIDObject(cx, jsobj, aIID);
@@ -587,10 +584,8 @@ nsXPCWrappedJSClass::DelegatedQueryInterface(nsXPCWrappedJS* self,
     // Check if the desired interface is a function interface. If so, we don't
     // want to QI, because the function almost certainly doesn't have a QueryInterface
     // property, and doesn't need one.
-    bool isFunc = false;
-    nsCOMPtr<nsIInterfaceInfo> info;
-    nsXPConnect::XPConnect()->GetInfoForIID(&aIID, getter_AddRefs(info));
-    if (info && NS_SUCCEEDED(info->IsFunction(&isFunc)) && isFunc) {
+    const nsXPTInterfaceInfo* info = nsXPTInterfaceInfo::ByIID(aIID);
+    if (info && info->IsFunction()) {
         RefPtr<nsXPCWrappedJS> wrapper;
         RootedObject obj(RootingCx(), self->GetJSObject());
         nsresult rv = nsXPCWrappedJS::GetNewOrUsed(obj, aIID, getter_AddRefs(wrapper));
@@ -1031,7 +1026,7 @@ nsXPCWrappedJSClass::CallMethod(nsXPCWrappedJS* wrapper, uint16_t methodIndex,
     // XXX ASSUMES that retval is last arg. The xpidl compiler ensures this.
     uint8_t paramCount = info->GetParamCount();
     uint8_t argc = paramCount;
-    if (paramCount > 0 && info->GetParam(paramCount - 1).IsRetval()) {
+    if (info->HasRetval()) {
         argc -= 1;
     }
 
@@ -1263,7 +1258,7 @@ pre_call_clean_up:
         else
             pv = (nsXPTCMiniVariant*) nativeParams[i].val.p;
 
-        if (param.IsRetval())
+        if (info->HasRetval() && i == paramCount - 1) // Last param is retval
             val = rval;
         else if (argv[i].isPrimitive())
             break;
@@ -1312,7 +1307,7 @@ pre_call_clean_up:
 
             pv = (nsXPTCMiniVariant*) nativeParams[i].val.p;
 
-            if (param.IsRetval())
+            if (info->HasRetval() && i == paramCount - 1)
                 val = rval;
             else {
                 RootedObject obj(cx, &argv[i].toObject());
@@ -1419,14 +1414,14 @@ nsXPCWrappedJSClass::DebugDump(int16_t depth)
         XPC_LOG_ALWAYS(("IID number is %s", iid ? iid : "invalid"));
         if (iid)
             free(iid);
-        XPC_LOG_ALWAYS(("InterfaceInfo @ %p", mInfo.get()));
+        XPC_LOG_ALWAYS(("InterfaceInfo @ %p", mInfo));
         uint16_t methodCount = 0;
         if (depth) {
             uint16_t i;
-            nsCOMPtr<nsIInterfaceInfo> parent;
+            const nsXPTInterfaceInfo* parent;
             XPC_LOG_INDENT();
-            mInfo->GetParent(getter_AddRefs(parent));
-            XPC_LOG_ALWAYS(("parent @ %p", parent.get()));
+            mInfo->GetParent(&parent);
+            XPC_LOG_ALWAYS(("parent @ %p", parent));
             mInfo->GetMethodCount(&methodCount);
             XPC_LOG_ALWAYS(("MethodCount = %d", methodCount));
             mInfo->GetConstantCount(&i);
