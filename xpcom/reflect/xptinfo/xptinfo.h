@@ -29,6 +29,7 @@ class nsXPTInterfaceInfo;
 class nsXPTType;
 class nsXPTParamInfo;
 class nsXPTMethodInfo;
+class nsXPTDOMObjectInfo;
 
 namespace xpt {
 namespace detail {
@@ -41,6 +42,7 @@ inline const nsXPTInterfaceInfo* GetInterface(uint16_t aIndex);
 inline const nsXPTType& GetType(uint16_t aIdx);
 inline const nsXPTParamInfo& GetParam(uint16_t aIdx);
 inline const nsXPTMethodInfo& GetMethod(uint16_t aIdx);
+inline const nsXPTDOMObjectInfo& GetDOMObjectInfo(uint16_t aIdx);
 inline const char* GetString(uint32_t aIdx);
 
 extern const uint16_t sInterfacesSize;
@@ -227,7 +229,8 @@ enum nsXPTTypeTag : uint8_t
   TD_UTF8STRING        = 23,
   TD_CSTRING           = 24,
   TD_ASTRING           = 25,
-  TD_JSVAL             = 26
+  TD_JSVAL             = 26,
+  TD_DOMOBJECT         = 27
 };
 
 
@@ -263,6 +266,12 @@ public:
     MOZ_ASSERT(Tag() == TD_INTERFACE_TYPE);
     uint16_t index = ((uint16_t)mData1 << 8) | mData2;
     return xpt::detail::GetInterface(index);
+  }
+
+  const nsXPTDOMObjectInfo& GetDOMObjectInfo() const {
+    MOZ_ASSERT(Tag() == TD_DOMOBJECT);
+    uint16_t index = ((uint16_t)mData1 << 8) | mData2;
+    return xpt::detail::GetDOMObjectInfo(index);
   }
 
   // 'Arithmetic' here roughly means that the value is self-contained and
@@ -345,7 +354,8 @@ public:
     T_UTF8STRING        = TD_UTF8STRING       ,
     T_CSTRING           = TD_CSTRING          ,
     T_ASTRING           = TD_ASTRING          ,
-    T_JSVAL             = TD_JSVAL
+    T_JSVAL             = TD_JSVAL            ,
+    T_DOMOBJECT         = TD_DOMOBJECT
   };
 
 private:
@@ -478,6 +488,36 @@ private:
 
 static_assert(sizeof(nsXPTMethodInfo) == 8, "wrong size");
 
+/**
+ * Object representing the information required to wrap and unwrap DOMObjects.
+ *
+ * This object will not live in rodata as it contains relocations.
+ */
+class nsXPTDOMObjectInfo
+{
+public:
+  nsresult Unwrap(JS::HandleValue aHandle, void** aObj) const {
+    return mUnwrap(aHandle, aObj);
+  }
+
+  bool Wrap(JSContext* aCx, void* aObj, JS::MutableHandleValue aHandle) const {
+    return mWrap(aCx, aObj, aHandle);
+  }
+
+  void Cleanup(void* aObj) const {
+    return mCleanup(aObj);
+  }
+
+private:
+  friend struct xpt::detail::XPTConstruct;
+  constexpr nsXPTDOMObjectInfo()
+    : mUnwrap{nullptr}, mWrap{nullptr}, mCleanup{nullptr} { }
+
+  nsresult (*mUnwrap) (JS::HandleValue aHandle, void** aObj);
+  bool (*mWrap) (JSContext* aCx, void* aObj, JS::MutableHandleValue aHandle);
+  void (*mCleanup) (void* aObj);
+};
+
 
 namespace xpt {
 namespace detail {
@@ -510,6 +550,7 @@ extern const nsXPTInterfaceInfo sInterfaces[];
 extern const nsXPTType sTypes[];
 extern const nsXPTParamInfo sParams[];
 extern const nsXPTMethodInfo sMethods[];
+extern const nsXPTDOMObjectInfo sDOMObjects[];
 
 extern const char sStrings[];
 extern const ConstInfo sConsts[];
@@ -553,6 +594,12 @@ inline const nsXPTMethodInfo&
 GetMethod(uint16_t aIdx)
 {
   return sMethods[aIdx];
+}
+
+inline const nsXPTDOMObjectInfo&
+GetDOMObjectInfo(uint16_t aIdx)
+{
+  return sDOMObjects[aIdx];
 }
 
 inline const char*

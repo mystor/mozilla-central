@@ -133,6 +133,7 @@ def link_to_cpp(interfaces, fd):
     methods = []
     consts = []
     prophooks = []
+    domobjects = OrderedDict()
     strings = OrderedDict()
     constructors = {}
 
@@ -144,6 +145,31 @@ def link_to_cpp(interfaces, fd):
 
     def lower_uuid(uuid):
         return "{0x%s, 0x%s, 0x%s, {0x%s, 0x%s, 0x%s, 0x%s, 0x%s, 0x%s, 0x%s, 0x%s}}" % split_iid(uuid)
+
+    def lower_domobject(do):
+        assert do['tag'] == 'TD_DOMOBJECT'
+        if do['name'] in domobjects:
+            return domobjects[do['name']]['idx']
+
+        # Make sure we include the native object in question's header.
+        includes.append(do['headerFile'])
+
+        idx = len(domobjects)
+        domobjects[do['name']] = {
+            'idx': idx,
+            'instance': struct(
+                "nsXPTDOMObjectInfo",
+                "%d = %s" % (idx, do['name']),
+                {
+                    # These methods are defined at the top of the generated file.
+                    'mUnwrap': "UnwrapDOMObject<dom::prototypes::id::%s, %s>" %
+                        (do['name'], do['native']),
+                    'mWrap': "WrapDOMObject<%s>" % do['native'],
+                    'mCleanup': "CleanupDOMObject<%s>" % do['native'],
+                }
+            ),
+        }
+        return idx
 
     def lower_string(s):
         if s in strings:
@@ -191,6 +217,11 @@ def link_to_cpp(interfaces, fd):
 
         elif tag == 'TD_INTERFACE_IS_TYPE':
             d1 = type['iid_is']
+
+        elif tag == 'TD_DOMOBJECT':
+            idx = lower_domobject(type)
+            d1 = idx >> 8
+            d2 = idx & 0xff
 
         elif tag.endswith('_SIZE_IS'):
             d1 = type['size_is']
@@ -362,12 +393,35 @@ def link_to_cpp(interfaces, fd):
     fd.write("""
 #include "xptinfo.h"
 #include "mozilla/TypeTraits.h"
+#include "mozilla/dom/BindingUtils.h"
 
 using namespace mozilla; // For mozilla::ArrayLength and mozilla::DeclVal.
 
 // This macro resolves to the type of the non-static data member `m` of `T`.
 // It's used by generated data type constructors.
 #define MTYPE(T, m) decltype(DeclVal<T>().m)
+
+// These template methods are specialized to be used in the sDOMObjects table.
+template<dom::prototypes::ID PrototypeID, typename T>
+static nsresult UnwrapDOMObject(JS::HandleValue aHandle, void** aObj)
+{
+  RefPtr<T> p;
+  nsresult rv = dom::UnwrapObject<PrototypeID, T>(aHandle, p);
+  p.forget(aObj);
+  return rv;
+}
+
+template<typename T>
+static bool WrapDOMObject(JSContext* aCx, void* aObj, JS::MutableHandleValue aHandle)
+{
+  return dom::GetOrCreateDOMReflector(aCx, reinterpret_cast<T*>(aObj), aHandle);
+}
+
+template<typename T>
+static void CleanupDOMObject(void* aObj)
+{
+  RefPtr<T> p = already_AddRefed<T>(reinterpret_cast<T*>(aObj));
+}
 
 namespace xpt {
 namespace detail {
@@ -398,6 +452,8 @@ namespace detail {
     array("nsXPTType", "sTypes", types)
     array("nsXPTParamInfo", "sParams", params)
     array("nsXPTMethodInfo", "sMethods", methods)
+    array("nsXPTDOMObjectInfo", "sDOMObjects",
+          (do['instance'] for do in domobjects.values()))
     array("ConstInfo", "sConsts", consts)
     array("mozilla::dom::NativePropertyHooks*", "sPropHooks", prophooks)
 
