@@ -7,13 +7,13 @@
 
 interface nsIContent;
 
-[xptshim(MessageSender), xptshimfile(MessageManager),
+[shim(MessageSender), shimfile(MessageManager),
  uuid(bb5d79e4-e73c-45e7-9651-4d718f4b994c)]
 interface nsIMessageSender : nsISupports
 {
 };
 
-[xptshim(ContentFrameMessageManager), xptshimfile(MessageManager),
+[shim(ContentFrameMessageManager), shimfile(MessageManager),
  uuid(694e367c-aa25-4446-8499-2c527c4bd838)]
 interface nsIContentFrameMessageManager : nsIMessageSender
 {

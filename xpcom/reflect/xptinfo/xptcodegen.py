@@ -5,7 +5,7 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-# NOTE: Once xptshims are removed, this code can be cleaned up, removing all
+# NOTE: Once shims are removed, this code can be cleaned up, removing all
 # reference to them.
 
 import json
@@ -303,14 +303,16 @@ def link_to_cpp(interfaces, fd):
         ))
 
     def lower_prop_hooks(iface): # XXX: Used by xpt shims
-        assert iface['xptshim'] is not None
+        assert iface['shim'] is not None
 
-        includes.append(
-            "mozilla/dom/%sBinding.h" %
-                (iface['xptshimfile'] or iface['xptshim']))
+        # Add an include for the Binding file for the shim.
+        includes.append("mozilla/dom/%sBinding.h" %
+            (iface['shimfile'] or iface['shim']))
+
+        # Add the property hook reference to the sPropHooks table.
         prophooks.append(
             "mozilla::dom::%sBinding::sNativePropertyHooks, // %d = %s(%s)" % \
-                (iface['xptshim'], len(prophooks), iface['name'], iface['xptshim']))
+                (iface['shim'], len(prophooks), iface['name'], iface['shim']))
 
     def collect_base_info(iface):
         methods = 0
@@ -331,7 +333,7 @@ def link_to_cpp(interfaces, fd):
     def lower_iface(iface):
         flags = Flags(iface)
 
-        isshim = iface['xptshim'] is not None
+        isshim = iface['shim'] is not None
         assert isshim or flags.scriptable
 
         method_off = len(methods)

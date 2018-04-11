@@ -213,14 +213,16 @@ def build_interface(iface):
         else:
             raise Exception("Unexpected interface member: %s" % member)
 
+    assert iface.attributes.shim is not None or iface.attributes.shimfile is None
+
     return {
         'name': iface.name,
         'uuid': iface.attributes.uuid,
         'methods': methods,
         'consts': consts,
         'parent': iface.base,
-        'xptshim': iface.attributes.xptshim,
-        'xptshimfile': iface.attributes.xptshimfile,
+        'shim': iface.attributes.shim,
+        'shimfile': iface.attributes.shimfile,
         'flags': flags(
             ('scriptable', iface.attributes.scriptable),
             ('function', iface.attributes.function),
@@ -240,7 +242,7 @@ def build_typelib(idl):
         if p.kind != 'interface':
             return False
         # Only export scriptable or shim interfaces
-        return p.attributes.scriptable or p.attributes.xptshim
+        return p.attributes.scriptable or p.attributes.shim
 
     return [build_interface(p) for p in idl.productions if exported(p)]
 

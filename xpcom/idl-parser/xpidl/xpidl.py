@@ -736,8 +736,8 @@ class InterfaceAttributes(object):
     function = False
     noscript = False
     main_process_scriptable_only = False
-    xptshim = None
-    xptshimfile = None
+    shim = None
+    shimfile = None
 
     def setuuid(self, value):
         self.uuid = value.lower()
@@ -757,11 +757,11 @@ class InterfaceAttributes(object):
     def setmain_process_scriptable_only(self):
         self.main_process_scriptable_only = True
 
-    def setxptshim(self, value):
-        self.xptshim = value
+    def setshim(self, value):
+        self.shim = value
 
-    def setxptshimfile(self, value):
-        self.xptshimfile = value
+    def setshimfile(self, value):
+        self.shimfile = value
 
     actions = {
         'uuid':       (True, setuuid),
@@ -771,8 +771,8 @@ class InterfaceAttributes(object):
         'noscript':   (False, setnoscript),
         'object':     (False, lambda self: True),
         'main_process_scriptable_only': (False, setmain_process_scriptable_only),
-        'xptshim':    (True, setxptshim),
-        'xptshimfile': (True, setxptshimfile),
+        'shim':    (True, setshim),
+        'shimfile': (True, setshimfile),
         }
 
     def __init__(self, attlist, location):
@@ -809,10 +809,10 @@ class InterfaceAttributes(object):
             l.append("\tfunction\n")
         if self.main_process_scriptable_only:
             l.append("\tmain_process_scriptable_only\n")
-        if self.xptshim:
-            l.append("\txptshim: %s\n" % self.xptshim)
-        if self.xptshimfile:
-            l.append("\txptshimfile: %s\n" % self.xptshimfile)
+        if self.shim:
+            l.append("\tshim: %s\n" % self.shim)
+        if self.shimfile:
+            l.append("\tshimfile: %s\n" % self.shimfile)
         return "".join(l)
 
 
