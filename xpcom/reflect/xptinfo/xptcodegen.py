@@ -9,7 +9,7 @@
 # reference to them.
 
 import json
-import phf
+from perfecthash import PerfectHash
 import time
 from collections import OrderedDict
 
@@ -17,6 +17,94 @@ from collections import OrderedDict
 # hashes to 256. This number is constant in xptinfo, allowing the compiler to
 # generate a more efficient modulo due to it being a power of 2.
 PHFSIZE = 256
+
+def indented(s):
+    return s.replace('\n', '\n  ')
+
+def cpp(v):
+    if type(v) == bool:
+        return "true" if v else "false"
+    return str(v)
+
+def mkstruct(*fields):
+    def mk(comment, **vals):
+        assert len(fields) == len(vals)
+        r = "{ // " + comment
+        r += indented(','.join(
+            "\n/* %s */ %s" % (k, cpp(vals[k])) for k in fields))
+        r += "\n}"
+        return r
+    return mk
+
+##########################################################
+# Ensure these fields are in the same order as xptinfo.h #
+##########################################################
+nsXPTInterfaceInfo = mkstruct(
+    "mIID",
+    "mName",
+    "mParent",
+    "mBuiltinClass",
+    "mMainProcessScriptableOnly",
+    "mMethods",
+    "mConsts",
+    "mIsShim",
+    "mFunction",
+    "mNumMethods",
+    "mNumConsts",
+)
+
+##########################################################
+# Ensure these fields are in the same order as xptinfo.h #
+##########################################################
+nsXPTType = mkstruct(
+    "mTag",
+    "mInParam",
+    "mOutParam",
+    "mOptionalParam",
+    "mData1",
+    "mData2",
+)
+
+##########################################################
+# Ensure these fields are in the same order as xptinfo.h #
+##########################################################
+nsXPTParamInfo = mkstruct(
+    "mType",
+)
+
+##########################################################
+# Ensure these fields are in the same order as xptinfo.h #
+##########################################################
+nsXPTMethodInfo = mkstruct(
+    "mName",
+    "mParams",
+    "mNumParams",
+    "mGetter",
+    "mSetter",
+    "mNotXPCOM",
+    "mHidden",
+    "mOptArgc",
+    "mContext",
+    "mHasRetval",
+)
+
+##########################################################
+# Ensure these fields are in the same order as xptinfo.h #
+##########################################################
+nsXPTDOMObjectInfo = mkstruct(
+    "mUnwrap",
+    "mWrap",
+    "mCleanup",
+)
+
+##########################################################
+# Ensure these fields are in the same order as xptinfo.h #
+##########################################################
+ConstInfo = mkstruct(
+    "mName",
+    "mSigned",
+    "mValue",
+)
 
 
 # Helper functions for dealing with IIDs
@@ -40,79 +128,22 @@ def iid_bytes(iid): # Get the byte representation of the IID for hashing.
         bs += b
     return bs
 
-
-# Convert the passed in argument to a string, and indent it by 1 level.
-def indented(s):
-    if isinstance(s, bool):
-        s = int(s) # Translate bools as integers
-    return str(s).replace('\n', '\n  ')
+# Split a 16-bit integer into its high and low 8 bits
+def splitint(i):
+    assert i < 2**16
+    return (i >> 8, i & 0xff)
 
 
-class Instance(object):
-    # Represents a single instance of an object constructed with Constructor.
-    def __init__(self, ctor, comment, fields):
-        self.ctor = ctor
-        self.comment = comment
-        self.fields = fields
-        assert len(self.fields) == len(self.ctor.fields)
-
-    def __str__(self):
-        r = "XPTConstruct::Mk_%s( // %s" % (self.ctor.name, self.comment)
-        r += indented(','.join("\n/* %s */ %s" % (k, indented(self.fields[k]))
-                               for k in self.ctor.fields))
-        r += ")"
-        return r
-
-
-class Constructor(object):
-    # Helper object for defining and using constexpr methods create xpt types.
-    # This is used for a few reasons:
-    #  1. Make the data members private.
-    #  2. Make the order of the data members irrelevant to this file.
-    #  3. Ensure that xptcodegen.py and xptinfo.h remain in sync.
-    def __init__(self, name, fields):
-        self.name = name
-        self.fields = list(sorted(fields))
-
-    def construct(self, comment, fields):
-        return Instance(self, comment, fields)
-
-    def decl(self):
-        pnames = ["a" + field[1:].replace('.', '_') for field in self.fields]
-
-        params = indented(',\n'.join(
-            "MTYPE(%s, %s) %s" % (self.name, field, pname)
-            for field, pname in zip(self.fields, pnames)))
-        fields = indented('\n'.join(
-            "obj.%s = %s;" % (field, pname)
-            for field, pname in zip(self.fields, pnames)))
-
-        return """
-static constexpr %(name)s Mk_%(name)s(
-  %(params)s)
-{
-  %(name)s obj;
-  %(fields)s
-  return obj;
-}""" % { 'params': params, 'fields': fields, 'name': self.name }
-
-
-class Flags(object):
-    def __init__(self, d):
-        self.flags = d['flags']
-
-    def __getattr__(self, name):
-        if name[-1] == '_': # XXX: Strip optional trailing _ for keywords (in)
-            name = name[:-1]
-        return name in self.flags
-
-
+# Core of the code generator. Takes a list of raw JSON XPT interfaces, and
+# writes out a file containing the necessary static declarations into fd.
 def link_to_cpp(interfaces, fd):
-    iid_phf = phf.PHF(PHFSIZE, [ # Perfect Hash from IID into the ifaces array.
+    # Perfect Hash from IID into the ifaces array.
+    iid_phf = PerfectHash(PHFSIZE, [
         (iid_bytes(iface['uuid']), iface)
         for iface in interfaces
     ])
-    name_phf = phf.PHF(PHFSIZE, [ # Perfect Hash from name to index in the ifaces array.
+    # Perfect Hash from name to index in the ifaces array.
+    name_phf = PerfectHash(PHFSIZE, [
         (bytearray(iface['name'], 'ascii'), idx)
         for idx, iface in enumerate(iid_phf.values)
     ])
@@ -126,49 +157,39 @@ def link_to_cpp(interfaces, fd):
 
     # NOTE: State used while linking. This is done with closures rather than a
     # class due to how this file's code evolved.
-    includes = []
+    includes = set()
     types = []
+    type_cache = {}
     ifaces = []
     params = []
+    param_cache = {}
     methods = []
     consts = []
     prophooks = []
-    domobjects = OrderedDict()
+    domobjects = []
+    domobject_cache = {}
     strings = OrderedDict()
-    constructors = {}
-
-    def struct(ty, comment, fields):
-        # Make sure we have generated a constructor for this type
-        if ty not in constructors:
-            constructors[ty] = Constructor(ty, fields.keys())
-        return constructors[ty].construct(comment, fields) # Construct it
 
     def lower_uuid(uuid):
         return "{0x%s, 0x%s, 0x%s, {0x%s, 0x%s, 0x%s, 0x%s, 0x%s, 0x%s, 0x%s, 0x%s}}" % split_iid(uuid)
 
     def lower_domobject(do):
         assert do['tag'] == 'TD_DOMOBJECT'
-        if do['name'] in domobjects:
-            return domobjects[do['name']]['idx']
 
-        # Make sure we include the native object in question's header.
-        includes.append(do['headerFile'])
+        idx = domobject_cache.get(do['name'])
+        if idx is None:
+            idx = domobject_cache[do['name']] = len(domobjects)
 
-        idx = len(domobjects)
-        domobjects[do['name']] = {
-            'idx': idx,
-            'instance': struct(
-                "nsXPTDOMObjectInfo",
+            includes.add(do['headerFile'])
+            domobjects.append(nsXPTDOMObjectInfo(
                 "%d = %s" % (idx, do['name']),
-                {
-                    # These methods are defined at the top of the generated file.
-                    'mUnwrap': "UnwrapDOMObject<dom::prototypes::id::%s, %s>" %
-                        (do['name'], do['native']),
-                    'mWrap': "WrapDOMObject<%s>" % do['native'],
-                    'mCleanup': "CleanupDOMObject<%s>" % do['native'],
-                }
-            ),
-        }
+                # These methods are defined at the top of the generated file.
+                mUnwrap="UnwrapDOMObject<mozilla::dom::prototypes::id::%s, %s>" %
+                    (do['name'], do['native']),
+                mWrap="WrapDOMObject<%s>" % do['native'],
+                mCleanup="CleanupDOMObject<%s>" % do['native'],
+            ))
+
         return idx
 
     def lower_string(s):
@@ -188,7 +209,7 @@ def link_to_cpp(interfaces, fd):
         if tag == 'array':
             return '%s[size_is=%d]' % (
                 describe_type(type['element']), type['size_is'])
-        elif tag == 'interface_type':
+        elif tag == 'interface_type' or tag == 'domobject':
             return type['name']
         elif tag == 'interface_is_type':
             return 'iid_is(%d)' % type['iid_is']
@@ -196,92 +217,87 @@ def link_to_cpp(interfaces, fd):
             return '%s(size_is=%d)' % (tag, type['size_is'])
         return tag
 
-    def lower_type(type):
+    def lower_type(type, in_=False, out=False, optional=False):
         tag = type['tag']
         d1 = d2 = 0
 
         if tag == 'TD_ARRAY':
             d1 = type['size_is']
-            # Add the type to the extra types list
-            elty = lower_type(type['element'])
-            try:
-                d2 = types.index(elty)
-            except:
-                d2 = len(types)
-                types.append(elty)
+
+            # index of element in extra types list
+            key = describe_type(type['element'])
+            d2 = type_cache.get(key)
+            if d2 is None:
+                d2 = type_cache[key] = len(types)
+                types.append(lower_type(type['element']))
 
         elif tag == 'TD_INTERFACE_TYPE':
-            idx = interface_idx(type['name'])
-            d1 = idx >> 8
-            d2 = idx & 0xff
+            d1, d2 = splitint(interface_idx(type['name']))
 
         elif tag == 'TD_INTERFACE_IS_TYPE':
             d1 = type['iid_is']
 
         elif tag == 'TD_DOMOBJECT':
-            idx = lower_domobject(type)
-            d1 = idx >> 8
-            d2 = idx & 0xff
+            d1, d2 = splitint(lower_domobject(type))
 
         elif tag.endswith('_SIZE_IS'):
             d1 = type['size_is']
 
         assert d1 < 256 and d2 < 256, "Data values too large"
-        return struct(
-            "nsXPTType",
+        return nsXPTType(
             describe_type(type),
-            {
-                'mTag': tag,
-                'mData1': d1,
-                'mData2': d2,
-            }
+            mTag=tag,
+            mData1=d1,
+            mData2=d2,
+            mInParam=in_,
+            mOutParam=out,
+            mOptionalParam=optional,
         )
 
     def lower_param(param, paramname):
-        flags = Flags(param)
-
-        params.append(struct(
-            "nsXPTParamInfo",
+        params.append(nsXPTParamInfo(
             "%d = %s" % (len(params), paramname),
-            {
-                'mType': lower_type(param['type']),
-                'mType.mInParam': flags.in_,
-                'mType.mOutParam': flags.out,
-                'mType.mOptionalParam': flags.optional,
-            },
+            mType=lower_type(param['type'],
+                             in_='in' in param['flags'],
+                             out='out' in param['flags'],
+                             optional='optional' in param['flags'])
         ))
-
 
     def lower_method(method, ifacename):
-        flags = Flags(method)
-
-        hideparams = flags.notxpcom or flags.hidden
         methodname = "%s::%s" % (ifacename, method['name'])
-        methods.append(struct(
-            "nsXPTMethodInfo",
+
+        if 'notxpcom' in method['flags'] or 'hidden' in method['flags']:
+            paramidx = name = numparams = 0 # hide parameters
+        else:
+            name = lower_string(method['name'])
+            numparams = len(method['params'])
+
+            # Check cache for parameters
+            cachekey = json.dumps(method['params'])
+            paramidx = param_cache.get(cachekey)
+            if paramidx is None:
+                paramidx = param_cache[cachekey] = len(params)
+                for idx, param in enumerate(method['params']):
+                    lower_param(param, "%s[%d]" % (methodname, idx))
+
+        methods.append(nsXPTMethodInfo(
             "%d = %s" % (len(methods), methodname),
-            {
-                'mName': lower_string(method['name']),
 
-                # If our method is hidden, we can save some memory by not
-                # generating parameter info about it.
-                'mParams': 0 if hideparams else len(params),
-                'mNumParams': 0 if hideparams else len(method['params']),
+            # If our method is hidden, we can save some memory by not
+            # generating parameter info about it.
+            mName=name,
+            mParams=paramidx,
+            mNumParams=numparams,
 
-                # Flags
-                'mGetter': flags.getter,
-                'mSetter': flags.setter,
-                'mNotXPCOM': flags.notxpcom,
-                'mHidden': flags.hidden,
-                'mOptArgc': flags.optargc,
-                'mContext': flags.jscontext,
-                'mHasRetval': flags.hasretval,
-            }
+            # Flags
+            mGetter='getter' in method['flags'],
+            mSetter='setter' in method['flags'],
+            mNotXPCOM='notxpcom' in method['flags'],
+            mHidden='hidden' in method['flags'],
+            mOptArgc='optargc' in method['flags'],
+            mContext='jscontext' in method['flags'],
+            mHasRetval='hasretval' in method['flags'],
         ))
-
-        if not hideparams:
-            for idx, param in enumerate(method['params']):
-                lower_param(param, "%s[%d]" % (methodname, idx))
 
     def lower_const(const, ifacename):
         assert const['type']['tag'] in \
@@ -292,21 +308,19 @@ def link_to_cpp(interfaces, fd):
         # which we will only need to convert to JS values. To save on space,
         # don't bother storing the type, and instead just store a 32-bit
         # unsigned integer, and stash whether to interpret it as signed.
-        consts.append(struct(
-            "ConstInfo",
+        consts.append(ConstInfo(
             "%d = %s::%s" % (len(consts), ifacename, const['name']),
-            {
-                'mName': lower_string(const['name']),
-                'mSigned': is_signed,
-                'mValue': "(uint32_t)%d" % const['value'],
-            }
+
+            mName=lower_string(const['name']),
+            mSigned=is_signed,
+            mValue="(uint32_t)%d" % const['value'],
         ))
 
     def lower_prop_hooks(iface): # XXX: Used by xpt shims
         assert iface['shim'] is not None
 
         # Add an include for the Binding file for the shim.
-        includes.append("mozilla/dom/%sBinding.h" %
+        includes.add("mozilla/dom/%sBinding.h" %
             (iface['shimfile'] or iface['shim']))
 
         # Add the property hook reference to the sPropHooks table.
@@ -317,24 +331,19 @@ def link_to_cpp(interfaces, fd):
     def collect_base_info(iface):
         methods = 0
         consts = 0
-        builtinclass = False
         while iface is not None:
             methods += len(iface['methods'])
             consts += len(iface['consts'])
-            # We're builtinclass if any of our bases are.
-            builtinclass = builtinclass or Flags(iface).builtinclass
             idx = interface_idx(iface['parent'])
             if idx == 0:
                 break
             iface = iid_phf.values[idx - 1]
 
-        return methods, consts, builtinclass
+        return methods, consts
 
     def lower_iface(iface):
-        flags = Flags(iface)
-
         isshim = iface['shim'] is not None
-        assert isshim or flags.scriptable
+        assert isshim or 'scriptable' in iface['flags']
 
         method_off = len(methods)
         consts_off = len(consts)
@@ -345,29 +354,35 @@ def link_to_cpp(interfaces, fd):
             # we use the constants offset field to store the index into the prop
             # hooks table.
             consts_off = len(prophooks)
-            builtinclass = True  # All shims are builtinclass
         else:
-            method_cnt, const_cnt, builtinclass = collect_base_info(iface)
+            method_cnt, const_cnt = collect_base_info(iface)
 
-        ifaces.append(struct(
-            "nsXPTInterfaceInfo",
+        # The number of maximum methods is not arbitrary. It is the same value
+        # as in xpcom/reflect/xptcall/genstubs.pl; do not change this value
+        # without changing that one or you WILL see problems.
+        #
+        # In addition, mNumMethods and mNumConsts are stored as a 8-bit int,
+        # meaning we cannot exceed 255 methods/consts on any interface.
+        assert method_cnt < 250, "%s has too many methods" % iface['name']
+        assert const_cnt < 256, "%s has too many constants" % iface['name']
+
+        ifaces.append(nsXPTInterfaceInfo(
             "%d = %s" % (len(ifaces), iface['name']),
-            {
-                'mIID': lower_uuid(iface['uuid']),
-                'mName': lower_string(iface['name']),
-                'mParent': interface_idx(iface['parent']),
 
-                'mMethods': method_off,
-                'mNumMethods': method_cnt,
-                'mConsts': consts_off,
-                'mNumConsts': const_cnt,
+            mIID=lower_uuid(iface['uuid']),
+            mName=lower_string(iface['name']),
+            mParent=interface_idx(iface['parent']),
 
-                # Flags
-                'mIsShim': isshim,
-                'mBuiltinClass': builtinclass,
-                'mMainProcessScriptableOnly': flags.main_process_only,
-                'mFunction': flags.function,
-            }
+            mMethods=method_off,
+            mNumMethods=method_cnt,
+            mConsts=consts_off,
+            mNumConsts=const_cnt,
+
+            # Flags
+            mIsShim=isshim,
+            mBuiltinClass='builtinclass' in iface['flags'],
+            mMainProcessScriptableOnly='main_process_only' in iface['flags'],
+            mFunction='function' in iface['flags'],
         ))
 
         if isshim:
@@ -391,24 +406,18 @@ def link_to_cpp(interfaces, fd):
     for include in includes:
         fd.write('#include "%s"\n' % include)
 
-    # Write our out header
+    # Write out our header
     fd.write("""
 #include "xptinfo.h"
 #include "mozilla/TypeTraits.h"
 #include "mozilla/dom/BindingUtils.h"
 
-using namespace mozilla; // For mozilla::ArrayLength and mozilla::DeclVal.
-
-// This macro resolves to the type of the non-static data member `m` of `T`.
-// It's used by generated data type constructors.
-#define MTYPE(T, m) decltype(DeclVal<T>().m)
-
 // These template methods are specialized to be used in the sDOMObjects table.
-template<dom::prototypes::ID PrototypeID, typename T>
+template<mozilla::dom::prototypes::ID PrototypeID, typename T>
 static nsresult UnwrapDOMObject(JS::HandleValue aHandle, void** aObj)
 {
   RefPtr<T> p;
-  nsresult rv = dom::UnwrapObject<PrototypeID, T>(aHandle, p);
+  nsresult rv = mozilla::dom::UnwrapObject<PrototypeID, T>(aHandle, p);
   p.forget(aObj);
   return rv;
 }
@@ -416,7 +425,7 @@ static nsresult UnwrapDOMObject(JS::HandleValue aHandle, void** aObj)
 template<typename T>
 static bool WrapDOMObject(JSContext* aCx, void* aObj, JS::MutableHandleValue aHandle)
 {
-  return dom::GetOrCreateDOMReflector(aCx, reinterpret_cast<T*>(aObj), aHandle);
+  return mozilla::dom::GetOrCreateDOMReflector(aCx, reinterpret_cast<T*>(aObj), aHandle);
 }
 
 template<typename T>
@@ -430,22 +439,6 @@ namespace detail {
 
 """)
 
-    # xptcodegen takes a slightly odd approach to generating values. We generate
-    # constructor methods for each of the structs we generate, and add them as
-    # static methods on the XPTConstruct struct.
-    #
-    # This is done for the following reasons:
-    #  1. Writing constructors this way means that xptcodegen.py is not
-    #     dependent on the order of fields in xptinfo.h
-    #  2. As a member of the XPTConstruct struct, we are `friend class` of the
-    #     data structures, allowing us to initialize private fields.
-    #  3. Stating the name of fields in this python code makes it more
-    #     self-documenting.
-    fd.write("struct XPTConstruct {")
-    for constructor in constructors.values():
-        fd.write(indented(constructor.decl()))
-    fd.write("\n};\n\n")
-
     # Static data arrays
     def array(ty, name, els):
         fd.write("const %s %s[] = {%s\n};\n\n" %
@@ -454,24 +447,24 @@ namespace detail {
     array("nsXPTType", "sTypes", types)
     array("nsXPTParamInfo", "sParams", params)
     array("nsXPTMethodInfo", "sMethods", methods)
-    array("nsXPTDOMObjectInfo", "sDOMObjects",
-          (do['instance'] for do in domobjects.values()))
+    array("nsXPTDOMObjectInfo", "sDOMObjects", domobjects)
     array("ConstInfo", "sConsts", consts)
     array("mozilla::dom::NativePropertyHooks*", "sPropHooks", prophooks)
 
-    # The strings array. We write out individual characters to avoid msvc restrictions.
+    # The strings array. We write out individual characters to avoid MSVC restrictions.
     fd.write("const char sStrings[] = {\n")
     for s, off in strings.iteritems():
         fd.write("  // %d = %s\n  '%s','\\0',\n" % (off, s, "','".join(s)))
     fd.write("};\n\n")
 
     # Record the information required for perfect hashing.
+    # NOTE: Intermediates stored as 32-bit for safety. Shouldn't need >16-bit.
     def phfarr(name, ty, it):
         fd.write("const %s %s[] = {" % (ty, name))
         for idx, v in enumerate(it):
             if idx % 8 == 0:
                 fd.write('\n ')
-            fd.write(" 0x%08x," % v)
+            fd.write(" 0x%04x," % v)
         fd.write("\n};\n\n")
     phfarr("sPHF_IIDs", "uint32_t", iid_phf.inter)
     phfarr("sPHF_Names", "uint32_t", name_phf.inter)
@@ -479,13 +472,13 @@ namespace detail {
 
     # The footer contains some checks re: the size of the generated arrays.
     fd.write("""\
-const uint16_t sInterfacesSize = ArrayLength(sInterfaces);
-static_assert(sInterfacesSize == ArrayLength(sPHF_NamesIdxs),
+const uint16_t sInterfacesSize = mozilla::ArrayLength(sInterfaces);
+static_assert(sInterfacesSize == mozilla::ArrayLength(sPHF_NamesIdxs),
               "sPHF_NamesIdxs must have same size as sInterfaces");
 
-static_assert(kPHFSize == ArrayLength(sPHF_Names),
+static_assert(kPHFSize == mozilla::ArrayLength(sPHF_Names),
               "sPHF_IIDs must have size kPHFSize");
-static_assert(kPHFSize == ArrayLength(sPHF_IIDs),
+static_assert(kPHFSize == mozilla::ArrayLength(sPHF_IIDs),
               "sPHF_Names must have size kPHFSize");
 
 } // namespace detail
@@ -502,7 +495,7 @@ def link_and_write(files, outfile):
     link_to_cpp(interfaces, outfile)
 
 
-if __name__ == '__main__':
+def main():
     from argparse import ArgumentParser
     import sys
 
@@ -513,3 +506,6 @@ if __name__ == '__main__':
     args = parser.parse_args(sys.argv[1:])
     with open(args.outfile, 'w') as fd:
         link_and_write(args.xpts, fd)
+
+if __name__ == '__main__':
+    main()

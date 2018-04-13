@@ -74,12 +74,18 @@ nsXPTInterfaceInfo::ByName(const char* aName)
 ////////////////////////////////////
 
 // XXX: Remove when shims are gone.
-// Looks for the ConstantSpec at aIndex, and puts that pointer into aSpec.
-// Returns either the index of the found constant, or the number of constants if
-// it was not found.
-static uint16_t
-GetWebIDLConst(uint16_t aHookIdx, uint16_t aIndex, const ConstantSpec** aSpec)
+// This method either looks for the ConstantSpec at aIndex, or counts the
+// number of constants for a given shim.
+// NOTE: Only one of the aSpec and aCount outparameters should be provided.
+// NOTE: If aSpec is not passed, aIndex is ignored.
+// NOTE: aIndex must be in range if aSpec is passed.
+static void
+GetWebIDLConst(uint16_t aHookIdx, uint16_t aIndex,
+               const ConstantSpec** aSpec, uint16_t* aCount)
 {
+  MOZ_ASSERT((aSpec && !aCount) || (aCount && !aSpec),
+             "Only one of aSpec and aCount should be provided");
+
   const NativePropertyHooks* propHooks = sPropHooks[aHookIdx];
 
   uint16_t idx = 0;
@@ -97,7 +103,7 @@ GetWebIDLConst(uint16_t aHookIdx, uint16_t aIndex, const ConstantSpec** aSpec)
           // extra constants on these shim interfaces.
           if (aSpec && idx == aIndex) {
             *aSpec = cs;
-            return idx;
+            return;
           }
           ++idx;
         }
@@ -105,7 +111,19 @@ GetWebIDLConst(uint16_t aHookIdx, uint16_t aIndex, const ConstantSpec** aSpec)
     }
   } while ((propHooks = propHooks->mProtoHooks));
 
-  return idx;
+  MOZ_ASSERT(aCount, "aIndex is out of bounds!");
+  *aCount = idx;
+}
+
+bool
+nsXPTInterfaceInfo::HasAncestor(const nsIID& aIID) const
+{
+  for (const auto* info = this; info; info = info->GetParent()) {
+    if (info->IID() == aIID) {
+      return true;
+    }
+  }
+  return false;
 }
 
 uint16_t
@@ -116,7 +134,9 @@ nsXPTInterfaceInfo::ConstantCount() const
   }
 
   // Get the number of WebIDL constants.
-  return GetWebIDLConst(mConsts, UINT16_MAX, nullptr);
+  uint16_t num = 0;
+  GetWebIDLConst(mConsts, 0, nullptr, &num);
+  return num;
 }
 
 const char*
@@ -145,35 +165,24 @@ nsXPTInterfaceInfo::Constant(uint16_t aIndex, JS::MutableHandleValue aValue) con
 
   // Get a single WebIDL constant.
   const ConstantSpec* spec;
-  GetWebIDLConst(mConsts, aIndex, &spec);
+  GetWebIDLConst(mConsts, aIndex, &spec, nullptr);
   aValue.set(spec->value);
   return spec->name;
 }
 
-const nsXPTMethodInfo*
-nsXPTInterfaceInfo::MethodByName(const char *aMethodName,
-                                 uint16_t* aIndex) const
+const nsXPTMethodInfo&
+nsXPTInterfaceInfo::Method(uint16_t aIndex) const
 {
-  const nsXPTInterfaceInfo* pi = GetParent();
-  if (aIndex) {
-    *aIndex = 0;
-  }
+  MOZ_ASSERT(aIndex < MethodCount());
 
-  // Check if we can find the method in this interface.
-  uint16_t localCount = MethodCount() - (pi ? pi->MethodCount() : 0);
-  for (uint16_t idx = 0; idx < localCount; ++idx) {
-    const nsXPTMethodInfo& method = xpt::detail::GetMethod(mMethods + idx);
-
-    if (!strcmp(aMethodName, method.Name())) {
-      if (aIndex) {
-        *aIndex = idx;
-      }
-      return &method;
+  if (const nsXPTInterfaceInfo* pi = GetParent()) {
+    if (aIndex < pi->MethodCount()) {
+      return pi->Method(aIndex);
     }
+    aIndex -= pi->MethodCount();
   }
 
-  // Check if our parent interface has this method.
-  return pi ? pi->MethodByName(aMethodName, aIndex) : nullptr;
+  return xpt::detail::GetMethod(mMethods + aIndex);
 }
 
 
@@ -185,13 +194,6 @@ nsresult
 nsXPTInterfaceInfo::GetName(char** aName) const
 {
   *aName = moz_xstrdup(Name());
-  return NS_OK;
-}
-
-nsresult
-nsXPTInterfaceInfo::GetInterfaceIID(nsIID** aIID) const
-{
-  *aIID = mIID.Clone();
   return NS_OK;
 }
 
@@ -238,14 +240,6 @@ nsXPTInterfaceInfo::GetMethodInfo(uint16_t aIndex, const nsXPTMethodInfo** aInfo
 }
 
 nsresult
-nsXPTInterfaceInfo::GetMethodInfoForName(const char* aMethodName, uint16_t* aIndex,
-                                         const nsXPTMethodInfo** aInfo) const
-{
-  *aInfo = MethodByName(aMethodName, aIndex);
-  return *aInfo ? NS_OK : NS_ERROR_FAILURE;
-}
-
-nsresult
 nsXPTInterfaceInfo::GetConstant(uint16_t aIndex,
                                 JS::MutableHandleValue aConstant,
                                 char** aName) const
@@ -257,36 +251,7 @@ nsXPTInterfaceInfo::GetConstant(uint16_t aIndex,
 }
 
 nsresult
-nsXPTInterfaceInfo::GetInfoForParam(uint16_t aMethodIndex,
-                                    const nsXPTParamInfo* aParam,
-                                    const nsXPTInterfaceInfo** aRetval) const
-{
-  const nsXPTType* type = &aParam->Type();
-  while (type->Tag() == TD_ARRAY) {
-    type = &type->ArrayElementType();
-  }
-
-  *aRetval = type->Tag() == TD_INTERFACE_TYPE ? type->GetInterface() : nullptr;
-  return *aRetval ? NS_OK : NS_ERROR_FAILURE;
-}
-
-nsresult
-nsXPTInterfaceInfo::GetIIDForParam(uint16_t aMethodIndex,
-                                   const nsXPTParamInfo* aParam,
-                                   nsIID** aRetval) const
-{
-  const nsXPTInterfaceInfo* info;
-  GetInfoForParam(aMethodIndex, aParam, &info);
-  *aRetval = nullptr;
-  if (info) {
-    *aRetval = info->IID().Clone();
-    return NS_OK;
-  }
-  return NS_ERROR_FAILURE;
-}
-
-nsresult
-nsXPTInterfaceInfo::GetTypeForParam(uint16_t aMethodIndex,
+nsXPTInterfaceInfo::GetTypeForParam(uint16_t /* UNUSED aMethodIndex */,
                                     const nsXPTParamInfo* aParam,
                                     uint16_t aDimension,
                                     nsXPTType* aRetval) const
@@ -305,7 +270,7 @@ nsXPTInterfaceInfo::GetTypeForParam(uint16_t aMethodIndex,
 }
 
 nsresult
-nsXPTInterfaceInfo::GetSizeIsArgNumberForParam(uint16_t aMethodIndex,
+nsXPTInterfaceInfo::GetSizeIsArgNumberForParam(uint16_t /* UNUSED aMethodIndex */,
                                                const nsXPTParamInfo* aParam,
                                                uint16_t aDimension,
                                                uint8_t* aRetval) const
@@ -331,7 +296,7 @@ nsXPTInterfaceInfo::GetSizeIsArgNumberForParam(uint16_t aMethodIndex,
 }
 
 nsresult
-nsXPTInterfaceInfo::GetInterfaceIsArgNumberForParam(uint16_t aMethodIndex,
+nsXPTInterfaceInfo::GetInterfaceIsArgNumberForParam(uint16_t /* UNUSED aMethodIndex */,
                                                     const nsXPTParamInfo* aParam,
                                                     uint8_t* aRetval) const
 {
@@ -389,13 +354,16 @@ nsXPTInterfaceInfo::GetIIDForParamNoAlloc(uint16_t aMethodIndex,
                                           const nsXPTParamInfo* aParam,
                                           nsIID* aIID) const
 {
-  const nsXPTInterfaceInfo* info;
-  nsresult rv = GetInfoForParam(aMethodIndex, aParam, &info);
-  if (NS_FAILED(rv)) {
-    return rv;
+  const nsXPTType* type = &aParam->Type();
+  while (type->Tag() == TD_ARRAY) {
+    type = &type->ArrayElementType();
   }
-  *aIID = info->IID();
-  return NS_OK;
+
+  if (type->Tag() == TD_INTERFACE_TYPE) {
+    *aIID = type->GetInterface()->IID();
+    return NS_OK;
+  }
+  return NS_ERROR_FAILURE;
 }
 
 nsresult

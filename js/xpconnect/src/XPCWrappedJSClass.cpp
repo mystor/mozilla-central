@@ -292,7 +292,7 @@ GetNamedPropertyAsVariantRaw(XPCCallContext& ccx,
                              nsIVariant** aResult,
                              nsresult* pErr)
 {
-    nsXPTType type = nsXPTType((uint8_t)TD_INTERFACE_TYPE);
+    nsXPTType type = { TD_INTERFACE_TYPE };
     RootedValue val(ccx);
 
     return JS_GetPropertyById(ccx, aJSObj, aName, &val) &&
@@ -487,7 +487,7 @@ GetFunctionName(JSContext* cx, HandleObject obj)
     if (funName) {
         nsCString* displayNamePtr = &displayName;
         RootedValue funNameVal(cx, StringValue(funName));
-        if (!XPCConvert::JSData2Native(&displayNamePtr, funNameVal, nsXPTType::T_UTF8STRING,
+        if (!XPCConvert::JSData2Native(&displayNamePtr, funNameVal, { nsXPTType::T_UTF8STRING },
                                        nullptr, nullptr))
         {
             JS_ClearPendingException(cx);
@@ -1258,7 +1258,7 @@ pre_call_clean_up:
         else
             pv = (nsXPTCMiniVariant*) nativeParams[i].val.p;
 
-        if (info->HasRetval() && i == paramCount - 1) // Last param is retval
+        if (&param == info->GetRetval())
             val = rval;
         else if (argv[i].isPrimitive())
             break;
@@ -1307,7 +1307,7 @@ pre_call_clean_up:
 
             pv = (nsXPTCMiniVariant*) nativeParams[i].val.p;
 
-            if (info->HasRetval() && i == paramCount - 1)
+            if (&param == info->GetRetval())
                 val = rval;
             else {
                 RootedObject obj(cx, &argv[i].toObject());

@@ -1545,7 +1545,7 @@ CallMethodHelper::QueryInterfaceFastPath()
     nsresult err;
     bool success =
         XPCConvert::NativeData2JS(&v, &qiresult,
-                                  nsXPTType::T_INTERFACE_IS,
+                                  { nsXPTType::T_INTERFACE_IS },
                                   iid, &err);
     NS_IF_RELEASE(qiresult);
 

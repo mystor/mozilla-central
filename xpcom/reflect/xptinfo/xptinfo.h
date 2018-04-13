@@ -25,25 +25,22 @@ struct NativePropertyHooks;
 } // namespace dom
 } // namespace mozilla
 
-class nsXPTInterfaceInfo;
-class nsXPTType;
-class nsXPTParamInfo;
-class nsXPTMethodInfo;
-class nsXPTDOMObjectInfo;
+struct nsXPTInterfaceInfo;
+struct nsXPTType;
+struct nsXPTParamInfo;
+struct nsXPTMethodInfo;
+struct nsXPTDOMObjectInfo;
 
+// Internal helper methods.
 namespace xpt {
 namespace detail {
 
-// xpt::detail::XPTConstruct is friend struct with each of the data classes, such
-// that the generated code can access private fields.
-struct XPTConstruct;
-
 inline const nsXPTInterfaceInfo* GetInterface(uint16_t aIndex);
-inline const nsXPTType& GetType(uint16_t aIdx);
-inline const nsXPTParamInfo& GetParam(uint16_t aIdx);
-inline const nsXPTMethodInfo& GetMethod(uint16_t aIdx);
-inline const nsXPTDOMObjectInfo& GetDOMObjectInfo(uint16_t aIdx);
-inline const char* GetString(uint32_t aIdx);
+inline const nsXPTType& GetType(uint16_t aIndex);
+inline const nsXPTParamInfo& GetParam(uint16_t aIndex);
+inline const nsXPTMethodInfo& GetMethod(uint16_t aIndex);
+inline const nsXPTDOMObjectInfo& GetDOMObjectInfo(uint16_t aIndex);
+inline const char* GetString(uint32_t aIndex);
 
 extern const uint16_t sInterfacesSize;
 
@@ -55,9 +52,8 @@ extern const uint16_t sInterfacesSize;
  * An Interface describes a single XPCOM interface, including all of its
  * methods. We don't record non-scriptable interfaces.
  */
-class nsXPTInterfaceInfo
+struct nsXPTInterfaceInfo
 {
-public:
   // High efficiency getters for Interfaces based on perfect hashes.
   static const nsXPTInterfaceInfo* ByIID(const nsIID& aIID);
   static const nsXPTInterfaceInfo* ByName(const char* aName);
@@ -71,7 +67,7 @@ public:
 
 
   // Interface flag getters
-  bool IsScriptable() const { return true; } /* Backcompat */
+  bool IsScriptable() const { return true; } // XXX remove (backcompat)
   bool IsFunction() const { return mFunction; }
   bool IsBuiltinClass() const { return mBuiltinClass; }
   bool IsMainProcessScriptableOnly() const { return mMainProcessScriptableOnly; }
@@ -85,39 +81,15 @@ public:
   }
 
   // Do we have an ancestor interface with the given IID?
-  bool HasAncestor(const nsIID& aIID) const {
-    for (const auto* info = this; info; info = info->GetParent()) {
-      if (info->IID() == aIID) {
-        return true;
-      }
-    }
-    return false;
-  }
+  bool HasAncestor(const nsIID& aIID) const;
 
-  // Constant Getters and Setters are declared out-of-line, as they need
-  // somewhat complex special handling for shim interfaces.
+  // Constant Getters and Setters.
   uint16_t ConstantCount() const;
   const char* Constant(uint16_t aIndex, JS::MutableHandleValue aConst) const;
 
   // Method Getters and Setters.
   uint16_t MethodCount() const { return mNumMethods; }
-  const nsXPTMethodInfo& Method(uint16_t aIndex) const {
-    MOZ_ASSERT(aIndex < MethodCount());
-
-    if (const nsXPTInterfaceInfo* pi = GetParent()) {
-      if (aIndex < pi->MethodCount()) {
-        return pi->Method(aIndex);
-      }
-      aIndex -= pi->MethodCount();
-    }
-
-    return xpt::detail::GetMethod(mMethods + aIndex);
-  }
-
-  // Look up a method by name. aIndex will be set to the index of that method,
-  // if the index is not null.
-  const nsXPTMethodInfo* MethodByName(const char* aMethodName,
-                                      uint16_t* aIndex) const;
+  const nsXPTMethodInfo& Method(uint16_t aIndex) const;
 
 
   //////////////////////////////////////////////
@@ -125,23 +97,15 @@ public:
   //////////////////////////////////////////////
 
   nsresult GetName(char** aName) const;
-  nsresult GetInterfaceIID(nsIID** aIID) const;
   nsresult IsScriptable(bool* aRes) const;
   nsresult IsBuiltinClass(bool* aRes) const;
   nsresult GetParent(const nsXPTInterfaceInfo** aParent) const;
   nsresult GetMethodCount(uint16_t* aMethodCount) const;
   nsresult GetConstantCount(uint16_t* aConstantCount) const;
   nsresult GetMethodInfo(uint16_t aIndex, const nsXPTMethodInfo** aInfo) const;
-  nsresult GetMethodInfoForName(const char* aMethodName, uint16_t* aIndex,
-                                const nsXPTMethodInfo** aInfo) const;
   nsresult GetConstant(uint16_t aIndex,
                        JS::MutableHandleValue constant,
                        char** aName) const;
-  nsresult GetInfoForParam(uint16_t aMethodIndex,
-                           const nsXPTParamInfo* aParam,
-                           const nsXPTInterfaceInfo** aRetval) const;
-  nsresult GetIIDForParam(uint16_t aMethodIndex, const nsXPTParamInfo* aParam,
-                          nsIID** aRetval) const;
   nsresult GetTypeForParam(uint16_t aMethodIndex, const nsXPTParamInfo* aParam,
                            uint16_t aDimension, nsXPTType* aRetval) const;
   nsresult GetSizeIsArgNumberForParam(uint16_t aMethodIndex,
@@ -161,37 +125,33 @@ public:
                                  nsIID* aIID) const;
   nsresult IsMainProcessScriptableOnly(bool* aRetval) const;
 
-  // XXX(nika): Remove?
+  // XXX: We can probably get away with removing this method. A shim interface
+  // _should_ never show up in code which calls EnsureResolved().
   bool EnsureResolved() const { return !mIsShim; }
 
-private:
-  friend struct xpt::detail::XPTConstruct;
-  constexpr nsXPTInterfaceInfo()
-    : mIID{0}, mName{0}, mParent{0}, mBuiltinClass{0}
-    , mMainProcessScriptableOnly{0}, mMethods{0}, mConsts{0}, mIsShim{0}
-    , mFunction{0}, mNumMethods{0}, mNumConsts{0} {}
+  ////////////////////////////////////////////////////////////////
+  // Ensure these fields are in the same order as xptcodegen.py //
+  ////////////////////////////////////////////////////////////////
 
-  /*
-   * This field ordering minimizes the size of this struct.
-   */
   nsID mIID;
-  uint32_t mName; // Index into XPTHeader::mStrings.
+  uint32_t mName; // Index into xpt::detail::sStrings
 
   uint16_t mParent : 14;
   uint16_t mBuiltinClass : 1;
   // XXX(nika): Do we need this if we don't have addons anymore?
   uint16_t mMainProcessScriptableOnly : 1;
 
-  uint16_t mMethods; // Index into XPT::sMethods.
+  uint16_t mMethods; // Index into xpt::detail::sMethods
 
-  uint16_t mConsts : 14; // Index into XPT::sConsts.
-  uint16_t mIsShim : 1; // Is this interface a ShimInterface?
+  uint16_t mConsts : 14; // Index into xpt::detail::sConsts
+  uint16_t mIsShim : 1; // Is this interface a WebIDL shim?
   uint16_t mFunction : 1;
 
   uint8_t mNumMethods; // NOTE(24/04/18): largest=nsIDocShell (193)
   uint8_t mNumConsts; // NOTE(24/04/18): largest=nsIAccessibleRole (175)
 };
 
+// The fields in nsXPTInterfaceInfo were carefully ordered to minimize size.
 static_assert(sizeof(nsXPTInterfaceInfo) == 28, "wrong size?");
 
 
@@ -235,15 +195,14 @@ enum nsXPTTypeTag : uint8_t
 
 
 /*
- * A TypeDescriptor is a union used to identify the type of a method
- * argument or return value.
+ * A nsXPTType is a union used to identify the type of a method argument or
+ * return value. The internal data is stored as an 5-bit tag, and two 8-bit
+ * integers, to keep alignment requirements low.
  *
- * The tag field in the prefix indicates which of the variant TypeDescriptor
- * records is being used, and hence which getters are valid.
+ * nsXPTType contains 3 extra bits, reserved for use by nsXPTParamInfo.
  */
-class nsXPTType
+struct nsXPTType
 {
-public:
   nsXPTTypeTag Tag() const { return static_cast<nsXPTTypeTag>(mTag); }
 
   uint8_t ArgNum() const {
@@ -287,7 +246,7 @@ public:
   // We've gotten rid of most of the cases, but there's still a fair amount
   // of refactoring to be done in XPCWrappedJSClass before we can safely stop
   // asking about this. In the mean time, we've got a temporary version of
-  // IsPointer() that should be equivalent to what's in the typelib.
+  // IsPointer() that should do the right thing.
   bool deprecated_IsPointer() const {
     return !IsArithmetic() && Tag() != TD_JSVAL;
   }
@@ -303,10 +262,6 @@ public:
            Tag() == TD_PSTRING_SIZE_IS || Tag() == TD_PWSTRING_SIZE_IS;
   }
 
-  bool IsSizedString() const {
-    return Tag() == TD_PSTRING_SIZE_IS || Tag() == TD_PWSTRING_SIZE_IS;
-  }
-
   bool IsStringClass() const {
     return Tag() == TD_DOMSTRING || Tag() == TD_ASTRING ||
            Tag() == TD_CSTRING || Tag() == TD_UTF8STRING;
@@ -316,13 +271,7 @@ public:
   // nsXPTType backwards compatibility //
   ///////////////////////////////////////
 
-  constexpr nsXPTType()
-    : mTag{0}, mInParam{0}, mOutParam{0}, mOptionalParam{0}, mData1{0}, mData2{0}
-  { }
-  MOZ_IMPLICIT nsXPTType(const uint8_t& aPrefix)
-    : mTag(aPrefix) { MOZ_ASSERT(aPrefix <= TD_JSVAL); }
-  nsXPTType& operator=(uint8_t aPrefix)
-    { return operator=(nsXPTType(aPrefix)); }
+  nsXPTType& operator=(uint8_t aPrefix) { mTag = aPrefix; return *this; }
   operator uint8_t() const { return TagPart(); };
   uint8_t TagPart() const { return mTag; };
 
@@ -358,9 +307,9 @@ public:
     T_DOMOBJECT         = TD_DOMOBJECT
   };
 
-private:
-  friend struct xpt::detail::XPTConstruct;
-  friend class nsXPTParamInfo;
+  ////////////////////////////////////////////////////////////////
+  // Ensure these fields are in the same order as xptcodegen.py //
+  ////////////////////////////////////////////////////////////////
 
   uint8_t mTag : 5;
 
@@ -377,16 +326,16 @@ private:
   uint8_t mData2;
 };
 
+// The fields in nsXPTType were carefully ordered to minimize size.
 static_assert(sizeof(nsXPTType) == 3, "wrong size");
 
 
 /*
- * A ParamDescriptor is used to describe either a single argument to a method or
+ * A nsXPTParamInfo is used to describe either a single argument to a method or
  * a method's result. It stores its flags in the type descriptor to save space.
  */
-class nsXPTParamInfo
+struct nsXPTParamInfo
 {
-public:
   bool IsIn() const { return mType.mInParam; }
   bool IsOut() const { return mType.mOutParam && !IsDipper(); }
   bool IsOptional() const { return mType.mOptionalParam; }
@@ -410,6 +359,8 @@ public:
   // the results after the call.
   //
   // Currently, the only dipper types are the string classes.
+  //
+  // XXX: Dipper types may be able to go away? (bug 677784)
   bool IsDipper() const { return mType.mOutParam && IsStringClass(); }
 
   // Whether this parameter is passed indirectly on the stack. This mainly
@@ -419,21 +370,21 @@ public:
 
   bool IsStringClass() const { return mType.IsStringClass(); }
 
-private:
-  friend struct xpt::detail::XPTConstruct;
-  constexpr nsXPTParamInfo() : mType{} { }
+  ////////////////////////////////////////////////////////////////
+  // Ensure these fields are in the same order as xptcodegen.py //
+  ////////////////////////////////////////////////////////////////
 
   nsXPTType mType;
 };
 
+// The fields in nsXPTParamInfo were carefully ordered to minimize size.
 static_assert(sizeof(nsXPTParamInfo) == 3, "wrong size");
 
 /*
- * A MethodInfo is used to describe a single interface method.
+ * A nsXPTMethodInfo is used to describe a single interface method.
  */
-class nsXPTMethodInfo
+struct nsXPTMethodInfo
 {
-public:
   bool IsGetter() const { return mGetter; }
   bool IsSetter() const { return mSetter; }
   bool IsNotXPCOM() const { return mNotXPCOM; }
@@ -465,15 +416,12 @@ public:
     return Param(aIndex);
   }
 
-private:
-  friend struct xpt::detail::XPTConstruct;
-  constexpr nsXPTMethodInfo()
-    : mName{0}, mParams{0}, mNumParams{0}, mGetter{0}, mSetter{0}, mNotXPCOM{0}
-    , mHidden{0}, mOptArgc{0}, mContext{0}, mHasRetval{0}
-  { }
+  ////////////////////////////////////////////////////////////////
+  // Ensure these fields are in the same order as xptcodegen.py //
+  ////////////////////////////////////////////////////////////////
 
-  uint32_t mName; // Index into XPTHeader::mStrings.
-  uint16_t mParams; // Index into XPTHeader::mParams.
+  uint32_t mName; // Index into xpt::detail::sStrings.
+  uint16_t mParams; // Index into xpt::detail::sParams.
   uint8_t mNumParams;
 
   uint8_t mGetter : 1;
@@ -486,6 +434,7 @@ private:
   // uint8_t unused : 1;
 };
 
+// The fields in nsXPTMethodInfo were carefully ordered to minimize size.
 static_assert(sizeof(nsXPTMethodInfo) == 8, "wrong size");
 
 /**
@@ -493,9 +442,8 @@ static_assert(sizeof(nsXPTMethodInfo) == 8, "wrong size");
  *
  * This object will not live in rodata as it contains relocations.
  */
-class nsXPTDOMObjectInfo
+struct nsXPTDOMObjectInfo
 {
-public:
   nsresult Unwrap(JS::HandleValue aHandle, void** aObj) const {
     return mUnwrap(aHandle, aObj);
   }
@@ -508,44 +456,44 @@ public:
     return mCleanup(aObj);
   }
 
-private:
-  friend struct xpt::detail::XPTConstruct;
-  constexpr nsXPTDOMObjectInfo()
-    : mUnwrap{nullptr}, mWrap{nullptr}, mCleanup{nullptr} { }
+  ////////////////////////////////////////////////////////////////
+  // Ensure these fields are in the same order as xptcodegen.py //
+  ////////////////////////////////////////////////////////////////
 
   nsresult (*mUnwrap) (JS::HandleValue aHandle, void** aObj);
   bool (*mWrap) (JSContext* aCx, void* aObj, JS::MutableHandleValue aHandle);
   void (*mCleanup) (void* aObj);
 };
 
-
 namespace xpt {
 namespace detail {
 
-// The compressed representation of constants from XPT. Not part of the public
-// interface, as we also need to support Shim interfaces.
-class ConstInfo
+/**
+ * The compressed representation of constants from XPT. Not part of the public
+ * interface, as we also need to support Shim interfaces.
+ */
+struct ConstInfo
 {
-private:
-  friend struct XPTConstruct;
-  friend class ::nsXPTInterfaceInfo;
+  ////////////////////////////////////////////////////////////////
+  // Ensure these fields are in the same order as xptcodegen.py //
+  ////////////////////////////////////////////////////////////////
 
-  constexpr ConstInfo() : mName{0}, mSigned{0}, mValue{0} { }
-
-  uint32_t mName : 31; // Index into XPTHeader::mStrings.
+  uint32_t mName : 31; // Index into xpt::detail::mStrings.
 
   // Whether the value should be interpreted as a int32_t or uint32_t.
   uint32_t mSigned: 1;
   uint32_t mValue; // The value stored as a u32
 };
+
+// The fields in ConstInfo were carefully ordered to minimize size.
 static_assert(sizeof(ConstInfo) == 8, "wrong size");
+
 
 //////////////////////////////////////////////
 // Raw typelib data stored in const statics //
 //////////////////////////////////////////////
 
 // XPIDL information
-extern const uint16_t sInterfacesSize;
 extern const nsXPTInterfaceInfo sInterfaces[];
 extern const nsXPTType sTypes[];
 extern const nsXPTParamInfo sParams[];
@@ -579,33 +527,33 @@ GetInterface(uint16_t aIndex)
 }
 
 inline const nsXPTType&
-GetType(uint16_t aIdx)
+GetType(uint16_t aIndex)
 {
-  return sTypes[aIdx];
+  return sTypes[aIndex];
 }
 
 inline const nsXPTParamInfo&
-GetParam(uint16_t aIdx)
+GetParam(uint16_t aIndex)
 {
-  return sParams[aIdx];
+  return sParams[aIndex];
 }
 
 inline const nsXPTMethodInfo&
-GetMethod(uint16_t aIdx)
+GetMethod(uint16_t aIndex)
 {
-  return sMethods[aIdx];
+  return sMethods[aIndex];
 }
 
 inline const nsXPTDOMObjectInfo&
-GetDOMObjectInfo(uint16_t aIdx)
+GetDOMObjectInfo(uint16_t aIndex)
 {
-  return sDOMObjects[aIdx];
+  return sDOMObjects[aIndex];
 }
 
 inline const char*
-GetString(uint32_t aIdx)
+GetString(uint32_t aIndex)
 {
-  return &sStrings[aIdx];
+  return &sStrings[aIndex];
 }
 
 } // namespace detail

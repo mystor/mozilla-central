@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# phf.py - Helper for generating perfect hash functions for xptcodegen.py
+# perfecthash.py - Helper for generating perfect hash functions for xptcodegen.py
 #
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -8,8 +8,8 @@
 FNV_OFFSET_BASIS = 0x811C9DC5
 FNV_PRIME = 16777619
 
-# We use uint32_ts for our arrays in PHF. 0x80000000 is the high bit which we
-# sometimes use as a flag.
+# We use uint32_ts for our arrays in PerfectHash. 0x80000000 is the high bit
+# which we sometimes use as a flag.
 U32_HIGH_BIT = 0x80000000
 
 # A basic FNV-based hash function. bytes is the bytearray to hash. 32-bit FNV is
@@ -24,7 +24,7 @@ def hash(bytes, h=FNV_OFFSET_BASIS):
         h &= 0xffffffff # clamp to 32-bits
     return h
 
-class PHF(object):
+class PerfectHash(object):
     """An object representing a perfect hash function"""
     def __init__(self, intsize, data):
         """Keys should be a list of (bytearray, value) pairs"""
