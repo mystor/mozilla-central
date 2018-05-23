@@ -37,3 +37,7 @@ interface nsIDOMEventListener;
 
 // HTML
 interface nsIDOMHTMLHeadElement;
+
+// Window and WindowProxy
+webidl Window;
+webidl WindowProxy;

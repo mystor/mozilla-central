@@ -11,6 +11,7 @@ include protocol PCompositorManager;
 include protocol PContentBridge;
 include protocol PContentPermissionRequest;
 include protocol PCycleCollectWithLogs;
+include protocol PDocument;
 include protocol PPSMContentDownloader;
 include protocol PExternalHelperApp;
 include protocol PHandlerService;
@@ -324,6 +325,7 @@ nested(upto inside_cpow) sync protocol PContent
     manages PURLClassifierLocal;
     manages PScriptCache;
     manages PLoginReputation;
+    manages PDocument;
 
 both:
     // Depending on exactly how the new browser is being created, it might be
@@ -1146,6 +1148,8 @@ both:
      */
     async NotifyPushSubscriptionModifiedObservers(nsCString scope,
                                                   Principal principal);
+
+    async PDocument();
 };
 
 }

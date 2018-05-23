@@ -223,12 +223,20 @@ def link_to_cpp(interfaces, fd):
         if idx is None:
             idx = domobject_cache[do['name']] = len(domobjects)
 
+            # We want to support the WindowProxy type, but it cannot be
+            # unwrapped using the same codepaths as other types, as it has no
+            # prototype ID.
+            if do['name'] == 'WindowProxy':
+                unwrapfn = "UnwrapWindowProxy"
+            else:
+                unwrapfn = "UnwrapDOMObject<mozilla::dom::prototypes::id::%s, %s>" % \
+                    (do['name'], do['native'])
+
             includes.add(do['headerFile'])
             domobjects.append(nsXPTDOMObjectInfo(
                 "%d = %s" % (idx, do['name']),
                 # These methods are defined at the top of the generated file.
-                mUnwrap="UnwrapDOMObject<mozilla::dom::prototypes::id::%s, %s>" %
-                    (do['name'], do['native']),
+                mUnwrap=unwrapfn,
                 mWrap="WrapDOMObject<%s>" % do['native'],
                 mCleanup="CleanupDOMObject<%s>" % do['native'],
             ))
@@ -457,11 +465,12 @@ def link_to_cpp(interfaces, fd):
     for include in includes:
         fd.write('#include "%s"\n' % include)
 
-    # Write out our header
+    # Write out the generated file
     fd.write("""
 #include "xptinfo.h"
 #include "mozilla/TypeTraits.h"
 #include "mozilla/dom/BindingUtils.h"
+#include "nsGlobalWindowOuter.h"
 
 // These template methods are specialized to be used in the sDOMObjects table.
 template<mozilla::dom::prototypes::ID PrototypeID, typename T>
@@ -470,6 +479,17 @@ static nsresult UnwrapDOMObject(JS::HandleValue aHandle, void** aObj)
   RefPtr<T> p;
   nsresult rv = mozilla::dom::UnwrapObject<PrototypeID, T>(aHandle, p);
   p.forget(aObj);
+  return rv;
+}
+
+static nsresult UnwrapWindowProxy(JS::HandleValue aHandle, void** aObj)
+{
+  RefPtr<nsGlobalWindowInner> inner;
+  nsresult rv = mozilla::dom::UnwrapObject<mozilla::dom::prototypes::id::Window,
+                                           nsGlobalWindowInner>(aHandle, inner);
+  if (NS_SUCCEEDED(rv) && inner) {
+    *aObj = do_AddRef(inner->GetOuterWindow()).take();
+  }
   return rv;
 }
 

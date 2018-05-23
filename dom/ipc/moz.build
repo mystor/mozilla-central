@@ -94,6 +94,7 @@ IPDL_SOURCES += [
     'PContentPermission.ipdlh',
     'PContentPermissionRequest.ipdl',
     'PCycleCollectWithLogs.ipdl',
+    'PDocument.ipdl',
     'PFilePicker.ipdl',
     'PLoginReputation.ipdl',
     'PPluginWidget.ipdl',
