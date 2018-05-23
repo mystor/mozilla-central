@@ -56,6 +56,7 @@ ProcessLink::ProcessLink(MessageChannel *aChan)
   , mIOLoop(nullptr)
   , mExistingListener(nullptr)
 {
+    MOZ_ASSERT(!mChan->mIsSameThreadChannel, "ProcessLink for same thread?");
 }
 
 ProcessLink::~ProcessLink()

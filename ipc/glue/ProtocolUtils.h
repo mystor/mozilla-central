@@ -492,6 +492,16 @@ public:
                           MessageLoop* aThread = nullptr,
                           mozilla::ipc::Side aSide = mozilla::ipc::UnknownSide);
 
+    // Open a toplevel actor such that both ends of the actor's channel are on
+    // the same thread. This method should be called on the thread to perform
+    // the link.
+    //
+    // WARNING: Only certain actors may be opened on the same thread. Namely, an
+    // actor which defines sync or intr messages may not be opened on the same
+    // thread to prevent deadlocks.
+    bool OpenOnSameThread(MessageChannel* aChannel,
+                          mozilla::ipc::Side aSide = mozilla::ipc::UnknownSide);
+
     void Close();
 
     void SetReplyTimeoutMs(int32_t aTimeoutMs);

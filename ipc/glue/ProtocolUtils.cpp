@@ -766,6 +766,13 @@ IToplevelProtocol::OpenWithAsyncPid(mozilla::ipc::Transport* aTransport,
   return GetIPCChannel()->Open(aTransport, aThread, aSide);
 }
 
+bool
+IToplevelProtocol::OpenOnSameThread(MessageChannel* aChannel, mozilla::ipc::Side aSide)
+{
+  SetOtherProcessId(base::GetCurrentProcId());
+  return GetIPCChannel()->OpenOnSameThread(aChannel, aSide);
+}
+
 void
 IToplevelProtocol::Close()
 {
