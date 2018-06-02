@@ -728,6 +728,14 @@ public:
   }
 #endif
 
+  virtual mozilla::ipc::IPCResult RecvAttachBrowsingContext(
+    const BrowsingContextId& aParentContextId,
+    const BrowsingContextId& aContextId,
+    const nsString& aName) override;
+
+  virtual mozilla::ipc::IPCResult RecvDetachBrowsingContext(
+    const BrowsingContextId& aContextId) override;
+
 private:
   static void ForceKillTimerCallback(nsITimer* aTimer, void* aClosure);
   void StartForceKillTimer();

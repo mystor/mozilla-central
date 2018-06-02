@@ -15,6 +15,7 @@
 #include "mozilla/UniquePtr.h"
 #include "mozilla/WeakPtr.h"
 
+#include "mozilla/docshell/BrowsingContext.h"
 #include "mozilla/dom/ProfileTimelineMarkerBinding.h"
 #include "mozilla/gfx/Matrix.h"
 #include "mozilla/dom/ChildSHistory.h"
@@ -376,6 +377,9 @@ public:
   {
     return static_cast<nsDocShell*>(aDocShell);
   }
+
+  already_AddRefed<mozilla::BrowsingContext>
+  GetBrowsingContext() const;
 
 private: // member functions
   friend class nsDSURIContentListener;
@@ -905,7 +909,6 @@ private: // data members
 #endif /* DEBUG */
 
   nsID mHistoryID;
-  nsString mName;
   nsString mTitle;
   nsString mCustomUserAgent;
   nsCString mOriginalUriString;
@@ -931,6 +934,7 @@ private: // data members
   nsCOMPtr<nsIGlobalHistory2> mGlobalHistory;
   nsCOMPtr<nsIWebBrowserFind> mFind;
   nsCOMPtr<nsICommandManager> mCommandManager;
+  RefPtr<mozilla::BrowsingContext> mBrowsingContext;
 
   // Dimensions of the docshell
   nsIntRect mBounds;

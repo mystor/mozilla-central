@@ -7,6 +7,7 @@
 #include "mozilla/ModuleUtils.h"
 #include "nsDocShellCID.h"
 
+#include "BrowsingContext.h"
 #include "nsDocShell.h"
 #include "nsDefaultURIFixup.h"
 #include "nsWebNavigationInfo.h"
@@ -59,6 +60,7 @@ Initialize()
   }
   gInitialized = true;
 
+  mozilla::BrowsingContext::Init();
   nsresult rv = nsSHistory::Startup();
   NS_ENSURE_SUCCESS(rv, rv);
 

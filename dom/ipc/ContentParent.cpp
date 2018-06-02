@@ -34,6 +34,7 @@
 #include "mozilla/StyleSheetInlines.h"
 #include "mozilla/DataStorage.h"
 #include "mozilla/devtools/HeapSnapshotTempFileHelperParent.h"
+#include "mozilla/docshell/BrowsingContext.h"
 #include "mozilla/docshell/OfflineCacheUpdateParent.h"
 #include "mozilla/dom/ClientManager.h"
 #include "mozilla/dom/ClientOpenWindowOpActors.h"
@@ -5713,5 +5714,31 @@ ContentParent::RecvBHRThreadHang(const HangDetails& aDetails)
       new nsHangDetails(HangDetails(aDetails));
     obs->NotifyObservers(hangDetails, "bhr-thread-hang", nullptr);
   }
+  return IPC_OK();
+}
+
+mozilla::ipc::IPCResult
+ContentParent::RecvAttachBrowsingContext(
+  const BrowsingContextId& aParentId,
+  const BrowsingContextId& aChildId,
+  const nsString& aName)
+{
+  RefPtr<BrowsingContext> parent = BrowsingContext::Get(aParentId);
+  RefPtr<BrowsingContext> child = new BrowsingContext(aChildId, aName);
+
+  child->Attach(parent);
+
+  return IPC_OK();
+}
+
+mozilla::ipc::IPCResult
+ContentParent::RecvDetachBrowsingContext(
+  const BrowsingContextId& aContextId)
+{
+  RefPtr<BrowsingContext> context = BrowsingContext::Get(aContextId);
+  if (context) {
+    context->Detach();
+  }
+
   return IPC_OK();
 }

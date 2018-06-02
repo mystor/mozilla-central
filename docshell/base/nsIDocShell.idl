@@ -18,6 +18,7 @@
 class nsPresContext;
 class nsIPresShell;
 namespace mozilla {
+class BrowsingContext;
 class Encoding;
 class HTMLEditor;
 namespace dom {
@@ -1201,6 +1202,9 @@ interface nsIDocShell : nsIDocShellTreeItem
    */
   mozilla::HTMLEditor* GetHTMLEditor();
   nsresult SetHTMLEditor(mozilla::HTMLEditor* aHTMLEditor);
+
+  void AttachBrowsingContext(nsIDocShell* aParentDocShell);
+  void DetachBrowsingContext();
 %}
 
   /**

@@ -78,7 +78,12 @@ EXPORTS.mozilla += [
     'LoadContext.h',
 ]
 
+EXPORTS.mozilla.docshell += [
+    'BrowsingContext.h',
+]
+
 UNIFIED_SOURCES += [
+    'BrowsingContext.cpp',
     'LoadContext.cpp',
     'nsAboutRedirector.cpp',
     'nsDefaultURIFixup.cpp',

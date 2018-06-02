@@ -692,6 +692,10 @@ nsFrameLoader::AddTreeItemToTreeOwner(nsIDocShellTreeItem* aItem,
     aParentNode->AddChild(aItem);
   }
 
+  if (nsCOMPtr<nsIDocShell> childAsDocShell = do_QueryInterface(aItem)) {
+    childAsDocShell->AttachBrowsingContext(aParentNode);
+  }
+
   bool retval = false;
   if (aParentType == nsIDocShellTreeItem::typeChrome && isContent) {
     retval = true;

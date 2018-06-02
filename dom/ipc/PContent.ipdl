@@ -100,6 +100,7 @@ using mozilla::Telemetry::ChildEventData from "mozilla/TelemetryComms.h";
 using mozilla::Telemetry::DiscardedData from "mozilla/TelemetryComms.h";
 using mozilla::CrossProcessMutexHandle from "mozilla/ipc/CrossProcessMutex.h";
 using refcounted class nsIInputStream from "mozilla/ipc/IPCStreamUtils.h";
+using mozilla::dom::BrowsingContextId from "mozilla/dom/ipc/IdType.h";
 
 union ChromeRegistryItem
 {
@@ -1146,6 +1147,12 @@ both:
      */
     async NotifyPushSubscriptionModifiedObservers(nsCString scope,
                                                   Principal principal);
+
+    async AttachBrowsingContext(BrowsingContextId aParentContextId,
+                                BrowsingContextId aContextId,
+                                nsString aName);
+
+    async DetachBrowsingContext(BrowsingContextId aContextId);
 };
 
 }

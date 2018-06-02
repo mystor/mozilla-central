@@ -21,6 +21,7 @@
 #include "mozilla/Unused.h"
 #include "mozilla/TelemetryIPC.h"
 #include "mozilla/devtools/HeapSnapshotTempFileHelperChild.h"
+#include "mozilla/docshell/BrowsingContext.h"
 #include "mozilla/docshell/OfflineCacheUpdateChild.h"
 #include "mozilla/dom/ClientManager.h"
 #include "mozilla/dom/ClientOpenWindowOpActors.h"
@@ -3766,6 +3767,32 @@ ContentChild::GetSpecificMessageEventTarget(const Message& aMsg)
     default:
       return nullptr;
   }
+}
+
+mozilla::ipc::IPCResult
+ContentChild::RecvAttachBrowsingContext(
+  const BrowsingContextId& aParentId,
+  const BrowsingContextId& aChildId,
+  const nsString& aName)
+{
+  RefPtr<BrowsingContext> parent = BrowsingContext::Get(aParentId);
+  RefPtr<BrowsingContext> child = BrowsingContext::GetOrCreate(aChildId, aName);
+
+  child->Attach(parent);
+
+  return IPC_OK();
+}
+
+mozilla::ipc::IPCResult
+ContentChild::RecvDetachBrowsingContext(
+  const BrowsingContextId& aContextId)
+{
+  RefPtr<BrowsingContext> context = BrowsingContext::Get(aContextId);
+  if (context) {
+    context->Detach();
+  }
+
+  return IPC_OK();
 }
 
 #ifdef NIGHTLY_BUILD
