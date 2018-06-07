@@ -842,6 +842,87 @@ DataTransfer::GetTransferables(nsILoadContext* aLoadContext)
   return transArray.forget();
 }
 
+// What flavor should we store data with this type as in the nsITransferable?
+// Returns either a null-terminated cstring with the type to use, or nullptr if
+// the type is custom.
+static const char*
+ToTransFlavor(const nsAString& aFlavor)
+{
+  // BACKCOMPAT: Store "text/plain" as "text/unicode" for internal consumers.
+  if (aFlavor->EqualsLiteral(kTextMime)) {
+    return kUnicodeMime;
+  }
+
+  const char* knownFormats[] = {
+    /* kTextMime, */ kHTMLMime, kNativeHTMLMime, kRTFMime,
+    kURLMime, kURLDataMime, kURLDescriptionMime, kURLPrivateMime,
+    kPNGImageMime, kJPEGImageMime, kGIFImageMime, kNativeImageMime,
+    kFileMime, kFilePromiseMime, kFilePromiseURLMime,
+    kFilePromiseDestFilename, kFilePromiseDirectoryMime,
+    kMozTextInternal, kHTMLContext, kHTMLInfo, kImageRequestMime };
+
+  for (uint32_t fi = 0; fi < ArrayLength(knownFormats), ++fi) {
+    if (aFlavor->EqualsASCII(knownFormats[fi])) {
+      return knownFormats[fi];
+    }
+  }
+  return nullptr; // Custom type
+}
+
+// Either add a DataTransferItem directly to the nsITransferable, add it to the
+// aCustomData URLParams object, or skip it.
+//
+// Returns true if data was added to aTrans.
+bool
+DataTransfer::AddToTrans(nsITransferable* aTrans, DataTransferItem* aItem,
+                         URLParams& aCustomData)
+{
+  nsCOMPtr<nsISupports> transData;
+  uint32_t transBytes;
+
+  // Get the nsISupports data to put in the nsITransferable from the DataTransferItem.
+  IgnoredErrorResult err;
+  nsCOMPtr<nsIVariant> vdata = aItem->Data(&aSubjectPrincipal, err);
+  if (!vdata || err.Failed() ||
+      !ConvertFromVariant(vdata, getter_AddRefs(transData), &transBytes) ||
+      !transData) {
+    NS_WARNING("Extracting Transferable data from DataTransferItem failed");
+    return false;
+  }
+
+  // Determine which 'flavor' to use to store the transferable.
+  nsAutoString internalType;
+  aItem->GetInternalType(internalType);
+  const char* transFlavor = ToTransFlavor(internalType);
+
+  // If we are looking at a custom type (one without a specific transfer
+  // flavor), add it to aCustomData.
+  //
+  // NOTE: We currently only support encoding custom string data into the
+  // transferable. Other data types will only be preserved during in-app drags
+  // due to the DataTransfer being cached on the Drag Service.
+  if (!transFlavor) {
+    nsAutoString strData;
+    nsCOMPtr<nsISupportsString> wrappedData = do_QueryInterface(transData);
+    if (!wrappedData || NS_FAILED(wrappedData->GetData(strData))) {
+      return false;
+    }
+
+    aCustomData.Append(internalType, strData);
+    return false; // Data was not directly added to aTrans
+  }
+
+  // If a converter is set for a format, add the converter to the transferable.
+  nsCOMPtr<nsIFormatConverter> converter = do_QueryInterface(transData);
+  if (converter) {
+    aTrans->AddDataFlavor(format);
+    aTrans->SetConverter(converter);
+    return false; // No data was added, only converters.
+  }
+
+  return NS_SUCCEEDED(aTrans->SetTransferData(transFlavor, transData, transBytes));
+}
+
 already_AddRefed<nsITransferable>
 DataTransfer::GetTransferable(uint32_t aIndex, nsILoadContext* aLoadContext)
 {
@@ -849,248 +930,39 @@ DataTransfer::GetTransferable(uint32_t aIndex, nsILoadContext* aLoadContext)
     return nullptr;
   }
 
-  const nsTArray<RefPtr<DataTransferItem>>& item = *mItems->MozItemsAt(aIndex);
-  uint32_t count = item.Length();
-  if (!count) {
-    return nullptr;
-  }
-
-  nsCOMPtr<nsITransferable> transferable =
+  nsCOMPtr<nsITransferable> trans =
     do_CreateInstance("@mozilla.org/widget/transferable;1");
-  if (!transferable) {
+  if (!trans) {
     return nullptr;
   }
-  transferable->Init(aLoadContext);
+  trans->Init(aLoadContext);
 
-  nsCOMPtr<nsIStorageStream> storageStream;
-  nsCOMPtr<nsIObjectOutputStream> stream;
-
-  bool added = false;
-  bool handlingCustomFormats = true;
-
-  // When writing the custom data, we need to ensure that there is sufficient
-  // space for a (uint32_t) data ending type, and the null byte character at
-  // the end of the nsCString. We claim that space upfront and store it in
-  // baseLength. This value will be set to zero if a write error occurs
-  // indicating that the data and length are no longer valid.
-  const uint32_t baseLength = sizeof(uint32_t) + 1;
-  uint32_t totalCustomLength = baseLength;
-
-  const char* knownFormats[] = {
-    kTextMime, kHTMLMime, kNativeHTMLMime, kRTFMime,
-    kURLMime, kURLDataMime, kURLDescriptionMime, kURLPrivateMime,
-    kPNGImageMime, kJPEGImageMime, kGIFImageMime, kNativeImageMime,
-    kFileMime, kFilePromiseMime, kFilePromiseURLMime,
-    kFilePromiseDestFilename, kFilePromiseDirectoryMime,
-    kMozTextInternal, kHTMLContext, kHTMLInfo, kImageRequestMime };
-
-  /*
-   * Two passes are made here to iterate over all of the types. First, look for
-   * any types that are not in the list of known types. For this pass,
-   * handlingCustomFormats will be true. Data that corresponds to unknown types
-   * will be pulled out and inserted into a single type (kCustomTypesMime) by
-   * writing the data into a stream.
-   *
-   * The second pass will iterate over the formats looking for known types.
-   * These are added as is. The unknown types are all then inserted as a single
-   * type (kCustomTypesMime) in the same position of the first custom type. This
-   * model is used to maintain the format order as best as possible.
-   *
-   * The format of the kCustomTypesMime type is one or more of the following
-   * stored sequentially:
-   *   <32-bit> type (only none or string is supported)
-   *   <32-bit> length of format
-   *   <wide string> format
-   *   <32-bit> length of data
-   *   <wide string> data
-   * A type of eCustomClipboardTypeId_None ends the list, without any following
-   * data.
-   */
-  do {
-    for (uint32_t f = 0; f < count; f++) {
-      RefPtr<DataTransferItem> formatitem = item[f];
-      nsCOMPtr<nsIVariant> variant = formatitem->DataNoSecurityCheck();
-      if (!variant) { // skip empty items
-        continue;
-      }
-
-      nsAutoString type;
-      formatitem->GetInternalType(type);
-
-      // If the data is of one of the well-known formats, use it directly.
-      bool isCustomFormat = true;
-      for (uint32_t f = 0; f < ArrayLength(knownFormats); f++) {
-        if (type.EqualsASCII(knownFormats[f])) {
-          isCustomFormat = false;
-          break;
-        }
-      }
-
-      uint32_t lengthInBytes;
-      nsCOMPtr<nsISupports> convertedData;
-
-      if (handlingCustomFormats) {
-        if (!ConvertFromVariant(variant, getter_AddRefs(convertedData),
-                                &lengthInBytes)) {
-          continue;
-        }
-
-        // When handling custom types, add the data to the stream if this is a
-        // custom type. If totalCustomLength is 0, then a write error occurred
-        // on a previous item, so ignore any others.
-        if (isCustomFormat && totalCustomLength > 0) {
-          // If it isn't a string, just ignore it. The dataTransfer is cached in
-          // the drag sesion during drag-and-drop, so non-strings will be
-          // available when dragging locally.
-          nsCOMPtr<nsISupportsString> str(do_QueryInterface(convertedData));
-          if (str) {
-            nsAutoString data;
-            str->GetData(data);
-
-            if (!stream) {
-              // Create a storage stream to write to.
-              NS_NewStorageStream(1024, UINT32_MAX, getter_AddRefs(storageStream));
-
-              nsCOMPtr<nsIOutputStream> outputStream;
-              storageStream->GetOutputStream(0, getter_AddRefs(outputStream));
-
-              stream = NS_NewObjectOutputStream(outputStream);
-            }
-
-            CheckedInt<uint32_t> formatLength =
-              CheckedInt<uint32_t>(type.Length()) * sizeof(nsString::char_type);
-
-            // The total size of the stream is the format length, the data
-            // length, two integers to hold the lengths and one integer for
-            // the string flag. Guard against large data by ignoring any that
-            // don't fit.
-            CheckedInt<uint32_t> newSize = formatLength + totalCustomLength +
-                                           lengthInBytes + (sizeof(uint32_t) * 3);
-            if (newSize.isValid()) {
-              // If a write error occurs, set totalCustomLength to 0 so that
-              // further processing gets ignored.
-              nsresult rv = stream->Write32(eCustomClipboardTypeId_String);
-              if (NS_WARN_IF(NS_FAILED(rv))) {
-                totalCustomLength = 0;
-                continue;
-              }
-              rv = stream->Write32(formatLength.value());
-              if (NS_WARN_IF(NS_FAILED(rv))) {
-                totalCustomLength = 0;
-                continue;
-              }
-              rv = stream->WriteBytes((const char *)type.get(), formatLength.value());
-              if (NS_WARN_IF(NS_FAILED(rv))) {
-                totalCustomLength = 0;
-                continue;
-              }
-              rv = stream->Write32(lengthInBytes);
-              if (NS_WARN_IF(NS_FAILED(rv))) {
-                totalCustomLength = 0;
-                continue;
-              }
-              rv = stream->WriteBytes((const char *)data.get(), lengthInBytes);
-              if (NS_WARN_IF(NS_FAILED(rv))) {
-                totalCustomLength = 0;
-                continue;
-              }
-
-              totalCustomLength = newSize.value();
-            }
-          }
-        }
-      } else if (isCustomFormat && stream) {
-        // This is the second pass of the loop (handlingCustomFormats is false).
-        // When encountering the first custom format, append all of the stream
-        // at this position. If totalCustomLength is 0 indicating a write error
-        // occurred, or no data has been added to it, don't output anything,
-        if (totalCustomLength > baseLength) {
-          // Write out an end of data terminator.
-          nsresult rv = stream->Write32(eCustomClipboardTypeId_None);
-          if (NS_SUCCEEDED(rv)) {
-            nsCOMPtr<nsIInputStream> inputStream;
-            storageStream->NewInputStream(0, getter_AddRefs(inputStream));
-
-            RefPtr<nsStringBuffer> stringBuffer =
-              nsStringBuffer::Alloc(totalCustomLength);
-
-            // Subtract off the null terminator when reading.
-            totalCustomLength--;
-
-            // Read the data from the stream and add a null-terminator as
-            // ToString needs it.
-            uint32_t amountRead;
-            rv = inputStream->Read(static_cast<char*>(stringBuffer->Data()),
-                              totalCustomLength, &amountRead);
-            if (NS_SUCCEEDED(rv)) {
-              static_cast<char*>(stringBuffer->Data())[amountRead] = 0;
-
-              nsCString str;
-              stringBuffer->ToString(totalCustomLength, str);
-              nsCOMPtr<nsISupportsCString>
-                strSupports(do_CreateInstance(NS_SUPPORTS_CSTRING_CONTRACTID));
-              strSupports->SetData(str);
-
-              nsresult rv = transferable->SetTransferData(kCustomTypesMime,
-                                                          strSupports,
-                                                          totalCustomLength);
-              if (NS_FAILED(rv)) {
-                return nullptr;
-              }
-
-              added = true;
-            }
-          }
-        }
-
-        // Clear the stream so it doesn't get used again.
-        stream = nullptr;
-      } else {
-        // This is the second pass of the loop and a known type is encountered.
-        // Add it as is.
-        if (!ConvertFromVariant(variant, getter_AddRefs(convertedData),
-                                &lengthInBytes)) {
-          continue;
-        }
-
-        // The underlying drag code uses text/unicode, so use that instead of
-        // text/plain
-        const char* format;
-        NS_ConvertUTF16toUTF8 utf8format(type);
-        if (utf8format.EqualsLiteral(kTextMime)) {
-          format = kUnicodeMime;
-        } else {
-          format = utf8format.get();
-        }
-
-        // If a converter is set for a format, set the converter for the
-        // transferable and don't add the item
-        nsCOMPtr<nsIFormatConverter> converter =
-          do_QueryInterface(convertedData);
-        if (converter) {
-          transferable->AddDataFlavor(format);
-          transferable->SetConverter(converter);
-          continue;
-        }
-
-        nsresult rv = transferable->SetTransferData(format, convertedData,
-                                                    lengthInBytes);
-        if (NS_FAILED(rv)) {
-          return nullptr;
-        }
-
-        added = true;
-      }
-    }
-
-    handlingCustomFormats = !handlingCustomFormats;
-  } while (!handlingCustomFormats);
-
-  // only return the transferable if data was successfully added to it
-  if (added) {
-    return transferable.forget();
+  // Load the data into the nsITransferable, and extract a set of custom data.
+  bool addedData = false;
+  URLParams customData;
+  for (auto& dti : *mItems->MozItemsAt(aIndex)) {
+    addedData = AddToTrans(trans, dti, customData) || addedData;
   }
 
+  // If we have any custom data, serialize & add it to our nsITransferable with
+  // kCustomTypesMime.
+  if (customData.Length() > 0) {
+    nsCString custom;
+    customData.Serialize(custom);
+
+    nsCOMPtr<nsISupportsCString> customSupports =
+      do_CreateInstance(NS_SUPPORTS_CSTRING_CONTRACTID);
+    customSupports->SetData(custom);
+
+    addedData = NS_SUCCEEDED(aTrans->SetTransferData(kCustomTypesMime, customSupports,
+                                                     custom.Length())) || addedData;
+  }
+
+  // If at least one of our attempts to add data to the transferable succeeded,
+  // return it.
+  if (addedData) {
+    return trans.forget();
+  }
   return nullptr;
 }
 
@@ -1430,6 +1302,12 @@ void
 DataTransfer::FillInExternalCustomTypes(uint32_t aIndex,
                                         nsIPrincipal* aPrincipal)
 {
+  // Force loading the custom type data from whatever data provider we have by
+  // creating a DataTransferItem, and forcing the data to be filled-in. We never
+  // actually add this item to our DataTransfer.
+  //
+  // XXX(nika): This seems super sketchy
+  // XXX(nika): Should we assert we're external here?
   RefPtr<DataTransferItem> item = new DataTransferItem(this,
                                                        NS_LITERAL_STRING(kCustomTypesMime),
                                                        DataTransferItem::KIND_STRING);
@@ -1447,57 +1325,28 @@ void
 DataTransfer::FillInExternalCustomTypes(nsIVariant* aData, uint32_t aIndex,
                                         nsIPrincipal* aPrincipal)
 {
-  char* chrs;
-  uint32_t len = 0;
-  nsresult rv = aData->GetAsStringWithSize(&len, &chrs);
-  if (NS_FAILED(rv)) {
+  nsAutoCString encoded;
+  if (NS_FAILED(aData->GetAsACString(encoded))) {
     return;
   }
 
-  CheckedInt<int32_t> checkedLen(len);
-  if (!checkedLen.isValid()) {
-    return;
-  }
-
-  nsCOMPtr<nsIInputStream> stringStream;
-  NS_NewByteInputStream(getter_AddRefs(stringStream), chrs, checkedLen.value(),
-                        NS_ASSIGNMENT_ADOPT);
-
-  nsCOMPtr<nsIObjectInputStream> stream =
-    NS_NewObjectInputStream(stringStream);
-
-  uint32_t type;
-  do {
-    rv = stream->Read32(&type);
-    NS_ENSURE_SUCCESS_VOID(rv);
-    if (type == eCustomClipboardTypeId_String) {
-      uint32_t formatLength;
-      rv = stream->Read32(&formatLength);
-      NS_ENSURE_SUCCESS_VOID(rv);
-      char* formatBytes;
-      rv = stream->ReadBytes(formatLength, &formatBytes);
-      NS_ENSURE_SUCCESS_VOID(rv);
-      nsAutoString format;
-      format.Adopt(reinterpret_cast<char16_t*>(formatBytes),
-                   formatLength / sizeof(char16_t));
-
-      uint32_t dataLength;
-      rv = stream->Read32(&dataLength);
-      NS_ENSURE_SUCCESS_VOID(rv);
-      char* dataBytes;
-      rv = stream->ReadBytes(dataLength, &dataBytes);
-      NS_ENSURE_SUCCESS_VOID(rv);
-      nsAutoString data;
-      data.Adopt(reinterpret_cast<char16_t*>(dataBytes),
-                 dataLength / sizeof(char16_t));
-
+  struct CustomTypeAdder : public URLParams::ForEachIterator
+  {
+    bool URLParamsIterator(const nsAString& aFormat, const nsAString& aValue) override {
       RefPtr<nsVariantCC> variant = new nsVariantCC();
-      rv = variant->SetAsAString(data);
+      rv = variant->SetAsAString(aValue);
       NS_ENSURE_SUCCESS_VOID(rv);
 
-      SetDataWithPrincipal(format, variant, aIndex, aPrincipal);
+      mDataTransfer->SetDataWithPrincipal(aFormat, variant, mIndex, mPrincipal);
     }
-  } while (type != eCustomClipboardTypeId_None);
+
+    uint32_t mIndex;
+    nsIPrincipal* mPrincipal;
+    DataTransfer* mDataTransfer;
+  };
+
+  CustomTypeAdder iter = { aIndex, aPrincipal, this };
+  URLParams::Parse(encoded, iter);
 }
 
 void

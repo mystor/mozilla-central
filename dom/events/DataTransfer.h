@@ -454,6 +454,10 @@ protected:
                             nsIPrincipal& aSubjectPrincipal,
                             mozilla::ErrorResult& aRv);
 
+  // Helper method for adding a single DataTransferItem to a nsITransferable.
+  bool AddToTrans(nsITransferable* aTrans, DataTransferItem* aItem,
+                  URLParams& aCustomData);
+
   nsCOMPtr<nsISupports> mParent;
 
   // the drop effect and effect allowed
