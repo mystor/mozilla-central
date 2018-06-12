@@ -192,8 +192,7 @@ ThreadLink::ThreadLink(MessageChannel *aChan, MessageChannel *aTargetChan)
 ThreadLink::~ThreadLink()
 {
     MOZ_ASSERT(mChan);
-    MOZ_ASSERT(mChan->mMonitor);
-    MonitorAutoLock lock(*mChan->mMonitor);
+    auto lock = mChan->AutoLock();
 
     // Bug 848949: We need to prevent the other side
     // from sending us any more messages to avoid Use-After-Free.
@@ -222,7 +221,7 @@ void
 ThreadLink::EchoMessage(Message *msg)
 {
     mChan->AssertWorkerThread();
-    mChan->mMonitor->AssertCurrentThreadOwns();
+    mChan->AssertCurrentThreadOwns();
 
     mChan->OnMessageReceivedFromLink(std::move(*msg));
     delete msg;
@@ -234,7 +233,7 @@ ThreadLink::SendMessage(Message *msg)
     if (!mChan->mIsPostponingSends) {
         mChan->AssertWorkerThread();
     }
-    mChan->mMonitor->AssertCurrentThreadOwns();
+    mChan->AssertCurrentThreadOwns();
 
     if (mTargetChan)
         mTargetChan->OnMessageReceivedFromLink(std::move(*msg));
@@ -245,7 +244,7 @@ void
 ThreadLink::SendClose()
 {
     mChan->AssertWorkerThread();
-    mChan->mMonitor->AssertCurrentThreadOwns();
+    mChan->AssertCurrentThreadOwns();
 
     mChan->mChannelState = ChannelClosed;
 
@@ -261,7 +260,7 @@ ThreadLink::SendClose()
 bool
 ThreadLink::Unsound_IsClosed() const
 {
-    MonitorAutoLock lock(*mChan->mMonitor);
+    auto lock = mChan->AutoLock();
     return mChan->mChannelState == ChannelClosed;
 }
 

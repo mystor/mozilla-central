@@ -112,6 +112,7 @@ class ProcessLink
     Transport::Listener* mExistingListener; // channel's previous listener
 };
 
+// ThreadLink is used both for cross-thread links, as well as same-thread links.
 class ThreadLink : public MessageLink
 {
   public:

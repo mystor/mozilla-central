@@ -180,6 +180,12 @@ private:
     // in MessageChannel.cpp.
     bool Open(MessageChannel *aTargetChan, nsIEventTarget *aEventTarget, Side aSide);
 
+    // "Open" a connection to another MessageChannel on the same thread.
+    //
+    // Returns true if the link was successfully established,
+    // i.e., mChannelState == ChannelConnected
+    bool OpenSameThread(MessageChannel* aTargetChan, Side aSide);
+
     // Close the underlying transport channel.
     void Close();
 
@@ -480,16 +486,16 @@ private:
   private:
     // Called from both threads
     size_t InterruptStackDepth() const {
-        mMonitor->AssertCurrentThreadOwns();
+        AssertCurrentThreadOwns();
         return mInterruptStack.size();
     }
 
     bool AwaitingInterruptReply() const {
-        mMonitor->AssertCurrentThreadOwns();
+        AssertCurrentThreadOwns();
         return !mInterruptStack.empty();
     }
     bool AwaitingIncomingMessage() const {
-        mMonitor->AssertCurrentThreadOwns();
+        AssertCurrentThreadOwns();
         return mIsWaitingForIncoming;
     }
 
@@ -499,7 +505,7 @@ private:
         explicit AutoEnterWaitForIncoming(MessageChannel& aChannel)
             : mChannel(aChannel)
         {
-            aChannel.mMonitor->AssertCurrentThreadOwns();
+            aChannel.AssertCurrentThreadOwns();
             aChannel.mIsWaitingForIncoming = true;
         }
 
@@ -560,6 +566,12 @@ private:
     void NotifyMaybeChannelError();
 
   private:
+    // Same thread links are open, and don't have a monitor.
+    bool IsSameThreadLink() const
+    {
+        return !mMonitor && ChannelClosed != mChannelState;
+    }
+
     // Can be run on either thread
     void AssertWorkerThread() const
     {
@@ -568,14 +580,54 @@ private:
                            "not on worker thread!");
     }
 
-    // The "link" thread is either the I/O thread (ProcessLink) or the
-    // other actor's work thread (ThreadLink).  In either case, it is
-    // NOT our worker thread.
+    // The "link" thread is one of the following:
+    //  1. The I/O thread (ProcessLink)
+    //  2. The other actor's work thread (ThreadLink)
+    //  3. The worker thread (SameThreadLink)
+    //
+    // In the first 2 cases, we can assert we're not on our worker thread, and
+    // in the 3rd case we assert we are on our worker thread.
     void AssertLinkThread() const
     {
         MOZ_ASSERT(mWorkerThread, "Channel hasn't been opened yet");
-        MOZ_RELEASE_ASSERT(mWorkerThread != GetCurrentVirtualThread(),
-                           "on worker thread but should not be!");
+        if (IsSameThreadLink()) {
+            AssertWorkerThread();
+        } else {
+            MOZ_RELEASE_ASSERT(mWorkerThread != GetCurrentVirtualThread(),
+                               "on worker thread but should not be!");
+        }
+    }
+
+    // Assert that we currently own our monitor, if we have one.
+    void AssertCurrentThreadOwns() const
+    {
+        if (mMonitor) {
+            mMonitor->AssertCurrentThreadOwns();
+        }
+    }
+    void AssertNotCurrentThreadOwns() const
+    {
+        if (mMonitor) {
+            mMonitor->AssertNotCurrentThreadOwns();
+        }
+    }
+
+    // Establish a lock on our monitor, if we have one.
+    Maybe<MonitorAutoLock> AutoLock() const
+    {
+        Maybe<MonitorAutoLock> lock;
+        if (mMonitor) {
+            lock.emplace(*mMonitor);
+        }
+        return lock;
+    }
+    Maybe<MonitorAutoUnlock> AutoUnlock() const
+    {
+        Maybe<MonitorAutoUnlock> unlock;
+        if (mMonitor) {
+            unlock.emplace(*mMonitor);
+        }
+        return unlock;
     }
 
   private:

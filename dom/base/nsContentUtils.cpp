@@ -10707,6 +10707,15 @@ nsContentUtils::GenerateBrowsingContextId()
   return GenerateProcessSpecificId(++gNextBrowsingContextId);
 }
 
+// RelatedContextSet IDs are composed in a similar manner to Window ID.
+static uint64_t gNextRelatedContextSetId= 0;
+
+/* static */ uint64_t
+nsContentUtils::GenerateRelatedContextSetId()
+{
+  return GenerateProcessSpecificId(++gNextRelatedContextSetId);
+}
+
 /* static */ bool
 nsContentUtils::GetUserIsInteracting()
 {

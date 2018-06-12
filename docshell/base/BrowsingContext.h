@@ -59,5 +59,19 @@ private:
   nsString mName;
 };
 
+namespace ipc {
+// Serialization helpers for BrowsingContext
+//
+// WARNING: BrowsingContext may only be serialized over PContent managed
+// protocols. Sending a BrowsingContext to a process will establish ongoing
+// synchronization of related contexts to that process.
+template<>
+struct IPDLParamTraits<BrowsingContext>
+{
+  static void Write(IPC::Message* aMsg, IProtocol* aActor, BrowsingContext* aBC);
+  static bool Read(const IPC::Message* aMsg, PickleIterator* aIter,
+                   IProtocol* aActor, RefPtr<BrowsingContext>& aBC);
+};
+} // namespace ipc
 } // namespace mozilla
 #endif

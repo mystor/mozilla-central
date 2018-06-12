@@ -3154,6 +3154,8 @@ public:
 
   static uint64_t GenerateBrowsingContextId();
 
+  static uint64_t GenerateRelatedContextSetId();
+
   /**
    * Check whether we should skip moving the cursor for a same-value .value set
    * on a text input or textarea.
