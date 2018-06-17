@@ -3322,7 +3322,26 @@ TabParent::RecvInvokeDragSession(nsTArray<IPCDataTransfer>&& aTransfers,
                                  const LayoutDeviceIntRect& aDragRect,
                                  const nsCString& aPrincipalURISpec)
 {
-  mInitialDataTransferItems.Clear();
+  nsCOMPtr<nsIPrincipal> principal;
+  if (!aPrincipalURISpec.IsEmpty()) {
+    // If principal is given, try using it first.
+    principal = BasePrincipal::CreateCodebasePrincipal(aPrincipalURISpec);
+  }
+  if (!principal) {
+    // Fallback to system principal, to handle like the data is from browser
+    // chrome or OS.
+    principal = nsContentUtils::GetSystemPrincipal();
+  }
+
+  mInitialDataTransferItems = new DataTransfer::TransferableSource(principal);
+  for (uint32_t i = 0; i < aTransfers.Length(); ++i) {
+    RefPtr<nsTransferable> trans = new nsTransferable(nullptr);
+    nsresult rv = nsContentUtils::IPCTransferableToTransferable(aTransfers[i], trans, this);
+    if (NS_SUCCEEDED(rv)) {
+      mInitialDataTransferItems->Add(trans);
+    }
+  }
+
   nsIPresShell* shell = mFrameElement->OwnerDoc()->GetShell();
   if (!shell) {
     if (Manager()->IsContentParent()) {
@@ -3337,9 +3356,6 @@ TabParent::RecvInvokeDragSession(nsTArray<IPCDataTransfer>&& aTransfers,
   }
 
   EventStateManager* esm = shell->GetPresContext()->EventStateManager();
-  for (uint32_t i = 0; i < aTransfers.Length(); ++i) {
-    mInitialDataTransferItems.AppendElement(std::move(aTransfers[i].items()));
-  }
   if (Manager()->IsContentParent()) {
     nsCOMPtr<nsIDragService> dragService =
       do_GetService("@mozilla.org/widget/dragservice;1");
@@ -3377,65 +3393,11 @@ void
 TabParent::AddInitialDnDDataTo(DataTransfer* aDataTransfer,
                                nsACString& aPrincipalURISpec)
 {
-  aPrincipalURISpec.Assign(mDragPrincipalURISpec);
+  aPrincipalURISpec.Assign(std::move(mDragPrincipalURISpec));
+  aDataTransfer->SetDataSource(mInitialDataTransferItems);
 
-  nsCOMPtr<nsIPrincipal> principal;
-  if (!mDragPrincipalURISpec.IsEmpty()) {
-    // If principal is given, try using it first.
-    principal = BasePrincipal::CreateCodebasePrincipal(mDragPrincipalURISpec);
-  }
-  if (!principal) {
-    // Fallback to system principal, to handle like the data is from browser
-    // chrome or OS.
-    principal = nsContentUtils::GetSystemPrincipal();
-  }
-
-  for (uint32_t i = 0; i < mInitialDataTransferItems.Length(); ++i) {
-    nsTArray<IPCDataTransferItem>& itemArray = mInitialDataTransferItems[i];
-    for (auto& item : itemArray) {
-      RefPtr<nsVariantCC> variant = new nsVariantCC();
-      // Special case kFilePromiseMime so that we get the right
-      // nsIFlavorDataProvider for it.
-      if (item.flavor().EqualsLiteral(kFilePromiseMime)) {
-        RefPtr<nsISupports> flavorDataProvider =
-          new nsContentAreaDragDropDataProvider();
-        variant->SetAsISupports(flavorDataProvider);
-      } else if (item.data().type() == IPCDataTransferData::TnsString) {
-        variant->SetAsAString(item.data().get_nsString());
-      } else if (item.data().type() == IPCDataTransferData::TIPCBlob) {
-        RefPtr<BlobImpl> impl =
-          IPCBlobUtils::Deserialize(item.data().get_IPCBlob());
-        variant->SetAsISupports(impl);
-      } else if (item.data().type() == IPCDataTransferData::TShmem) {
-        if (nsContentUtils::IsFlavorImage(item.flavor())) {
-          // An image! Get the imgIContainer for it and set it in the variant.
-          nsCOMPtr<imgIContainer> imageContainer;
-          nsresult rv =
-            nsContentUtils::DataTransferItemToImage(item,
-                                                    getter_AddRefs(imageContainer));
-          if (NS_FAILED(rv)) {
-            continue;
-          }
-          variant->SetAsISupports(imageContainer);
-        } else {
-          Shmem data = item.data().get_Shmem();
-          variant->SetAsACString(nsDependentCString(data.get<char>(), data.Size<char>()));
-        }
-
-        mozilla::Unused << DeallocShmem(item.data().get_Shmem());
-      }
-
-      // We set aHidden to false, as we don't need to worry about hiding data
-      // from content in the parent process where there is no content.
-      // XXX: Nested Content Processes may change this
-      aDataTransfer->SetDataWithPrincipalFromOtherProcess(NS_ConvertUTF8toUTF16(item.flavor()),
-                                                          variant, i,
-                                                          principal,
-                                                          /* aHidden = */ false);
-    }
-  }
-  mInitialDataTransferItems.Clear();
-  mDragPrincipalURISpec.Truncate(0);
+  mInitialDataTransferItems = nullptr;
+  mDragPrincipalURISpec.Truncate();
 }
 
 bool

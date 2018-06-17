@@ -145,45 +145,55 @@ DataTransferItem::FillInExternalData()
     format = kURLDataMime;
   }
 
-  nsCOMPtr<nsITransferable> trans =
-    do_CreateInstance("@mozilla.org/widget/transferable;1");
-  if (NS_WARN_IF(!trans)) {
-    return;
-  }
+  RefPtr<DataTransfer::DataSource> ds = mDataTransfer->GetDataSource();
 
-  trans->Init(nullptr);
-  trans->AddDataFlavor(format);
-
-  if (mDataTransfer->GetEventMessage() == ePaste) {
-    MOZ_ASSERT(mIndex == 0, "index in clipboard must be 0");
-
-    nsCOMPtr<nsIClipboard> clipboard =
-      do_GetService("@mozilla.org/widget/clipboard;1");
-    if (!clipboard || mDataTransfer->ClipboardType() < 0) {
-      return;
-    }
-
-    nsresult rv = clipboard->GetData(trans, mDataTransfer->ClipboardType());
-    if (NS_WARN_IF(NS_FAILED(rv))) {
-      return;
-    }
-  } else {
-    nsCOMPtr<nsIDragSession> dragSession = nsContentUtils::GetDragSession();
-    if (!dragSession) {
-      return;
-    }
-
-    nsresult rv = dragSession->GetData(trans, mIndex);
-    if (NS_WARN_IF(NS_FAILED(rv))) {
-      return;
-    }
-  }
-
-  uint32_t length = 0;
   nsCOMPtr<nsISupports> data;
-  nsresult rv = trans->GetTransferData(format, getter_AddRefs(data), &length);
-  if (NS_WARN_IF(NS_FAILED(rv) || !data)) {
-    return;
+  if (ds) {
+    data = ds->GetData(format, mIndex);
+    if (NS_WARN_IF(!data)) [
+      return;
+    ]
+  } else {
+    // XXX(nika): We could merge these codepaths into DataSource?
+    nsCOMPtr<nsITransferable> trans =
+      do_CreateInstance("@mozilla.org/widget/transferable;1");
+    if (NS_WARN_IF(!trans)) {
+      return;
+    }
+
+    trans->Init(nullptr);
+    trans->AddDataFlavor(format);
+  
+    if (mDataTransfer->GetEventMessage() == ePaste) {
+      MOZ_ASSERT(mIndex == 0, "index in clipboard must be 0");
+  
+      nsCOMPtr<nsIClipboard> clipboard =
+        do_GetService("@mozilla.org/widget/clipboard;1");
+      if (!clipboard || mDataTransfer->ClipboardType() < 0) {
+        return;
+      }
+  
+      nsresult rv = clipboard->GetData(trans, mDataTransfer->ClipboardType());
+      if (NS_WARN_IF(NS_FAILED(rv))) {
+        return;
+      }
+    } else {
+      nsCOMPtr<nsIDragSession> dragSession = nsContentUtils::GetDragSession();
+      if (!dragSession) {
+        return;
+      }
+  
+      nsresult rv = dragSession->GetData(trans, mIndex);
+      if (NS_WARN_IF(NS_FAILED(rv))) {
+        return;
+      }
+    }
+  
+    uint32_t length = 0;
+    nsresult rv = trans->GetTransferData(format, getter_AddRefs(data), &length);
+    if (NS_WARN_IF(NS_FAILED(rv) || !data)) {
+      return;
+    }
   }
 
   // Fill the variant

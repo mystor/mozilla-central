@@ -1,0 +1,121 @@
+<!doctype html>
+<html>
+<head>
+  <title>Tests for the DatTransferItemList object</title>
+  <script type="text/javascript" src="/tests/SimpleTest/SimpleTest.js"></script>
+  <script type="text/javascript" src="/tests/SimpleTest/EventUtils.js"></script>
+  <script type="text/javascript" src="/tests/SimpleTest/AddTask.js"></script>
+  <script type="text/javascript" src="/tests/SimpleTest/ChromeUtils.js"></script>
+  <link rel="stylesheet" type="text/css" href="/tests/SimpleTest/test.css">
+</head>
+
+<body>
+  <button id="copybtn">clicky</button>
+
+<script>
+  const Ci = SpecialPowers.Ci;
+  const Cc = SpecialPowers.Cc;
+  const Services = SpecialPowers.Services;
+
+  const MIMEUnicode = "text/unicode";
+  const MIMEPlain = "text/plain";
+  const MIMEClipdata = "application/x-moz-custom-clipdata";
+  const plainValue = "plaintext";
+  let data = [
+    ['random/datatype', 'random1'],
+    ['yetanother/mimetype', 'random2'],
+    ['justkeep?going!?!@@', 'random3'],
+    ['Why not 📋 EMOJIS 👌', 'random4']
+  ];
+
+  // Read a data type from the clipboard.
+  function clipData(type) {
+    // Create the transferable
+    let trans = Cc['@mozilla.org/widget/transferable;1']
+                  .createInstance(SpecialPowers.Ci.nsITransferable);
+    trans.init(SpecialPowers.wrap(window)
+                            .getInterface(Ci.nsIWebNavigation)
+                            .QueryInterface(Ci.nsILoadContext));
+
+    // Make sure we fetch the given type.
+    trans.addDataFlavor(type);
+
+    // Read the clipboard.
+    Services.clipboard.getData(trans, Services.clipboard.kGlobalClipboard);
+
+    // Extract the transferData.
+    try {
+      let data = SpecialPowers.createBlankObject();
+      trans.getTransferData(type, data, {});
+
+      return SpecialPowers.wrap(data).value
+        .QueryInterface(Ci.nsISupportsString).data;
+    } catch(e) {
+      return null;
+    }
+  }
+
+  add_task(async function() {
+    // Spin the event loop to make sure the document is ready.
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    document.addEventListener('copy', e => {
+      console.log("copy event fired");
+      let dt = e.clipboardData;
+      // Add some normal plaintext data too.
+      dt.setData(MIMEPlain, plainValue);
+
+      data.forEach(([k, v]) => { dt.setData(k, v); });
+      e.preventDefault();
+    }, { once: true })
+
+    // Shove some custom clipdata onto the clipboard.
+    let copybtn = document.querySelector('#copybtn');
+    copybtn.addEventListener('click', e => {
+      console.log("copy event fired");
+      ok(document.execCommand('copy'), "copy event succeeds");
+    }, { once: true });
+
+
+    // Perform the copy & wait for the plaintext value to appear on the clipboard.
+    await SimpleTest.promiseClipboardChange(plainValue, () => {
+      synthesizeMouseAtCenter(copybtn, {}, window);
+    });
+
+    // We also need to make sure that MIMEClipdata has also appeared on our
+    // clipboard, because asynchronous clipboards exist.
+    /*
+    while (!clipData(MIMEClipdata)) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    */
+
+    is(clipData(MIMEUnicode), 'plaintext', "Should have plaintext type");
+    data.forEach(([k, v]) => is(clipData(k), null, "Should not have given type"));
+
+    // Use URI encoding to create the value which we should expect to see in MIMEClipdata.
+    function encode(s) { // Encode as a section of a query string.
+      return encodeURIComponent(s).replace('%20', '+');
+    }
+    let queryString = data.map(([k, v]) => encode(k) + "=" + encode(v)).join('&');
+    // is(clipData(MIMEClipdata), queryString, "Got the wrong expected ClipData?");
+
+    // Make sure it round-trips when we paste again.
+    let sawpaste = false;
+    document.addEventListener('paste', e => {
+      sawpaste = true;
+      let dt = e.clipboardData;
+
+      is(dt.getData(MIMEPlain), plainValue);
+      data.forEach(([k, v]) => is(dt.getData(k), v));
+
+      e.preventDefault();
+    }, { once: true });
+
+    SpecialPowers.wrap(document).execCommand('paste');
+    ok(sawpaste, "Didn't see a paste?");
+  });
+
+</script>
+</body>
+</html>

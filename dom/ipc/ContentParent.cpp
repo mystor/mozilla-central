@@ -2632,17 +2632,13 @@ ContentParent::RecvSetClipboard(const IPCDataTransfer& aDataTransfer,
   nsCOMPtr<nsIClipboard> clipboard(do_GetService(kCClipboardCID, &rv));
   NS_ENSURE_SUCCESS(rv, IPC_OK());
 
-  nsCOMPtr<nsITransferable> trans =
-    do_CreateInstance("@mozilla.org/widget/transferable;1", &rv);
+  RefPtr<nsTransferable> trans = new nsTransferable(nullptr);
+  rv = nsContentUtils::IPCTransferableToTransferable(aDataTransfer, trans, this);
   NS_ENSURE_SUCCESS(rv, IPC_OK());
-  trans->Init(nullptr);
 
-  rv = nsContentUtils::IPCTransferableToTransferable(aDataTransfer,
-                                                     aIsPrivateData,
-                                                     aRequestingPrincipal,
-                                                     aContentPolicyType,
-                                                     trans, this, nullptr);
-  NS_ENSURE_SUCCESS(rv, IPC_OK());
+  trans->SetIsPrivateData(aIsPrivateData);
+  trans->SetRequestingPrincipal(aRequestingPrincipal);
+  trans->SetContentPolicyType(aContentPolicyType);
 
   clipboard->SetData(trans, nullptr, aWhichClipboard);
   return IPC_OK();

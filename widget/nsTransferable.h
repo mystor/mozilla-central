@@ -60,11 +60,17 @@ private:
  * XP Transferable wrapper
  */
 
-class nsTransferable : public nsITransferable
+class nsTransferable final : public nsITransferable
 {
 public:
 
   nsTransferable();
+
+  nsTransferable(nsILoadContext* aLoadContext)
+    : nsTransferable()
+  {
+    Init(aLoadContext);
+  }
 
     // nsISupports
   NS_DECL_ISUPPORTS

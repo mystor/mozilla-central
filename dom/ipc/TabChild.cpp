@@ -2178,12 +2178,12 @@ TabChild::RecvPasteTransferable(const IPCDataTransfer& aDataTransfer,
   NS_ENSURE_SUCCESS(rv, IPC_OK());
   trans->Init(nullptr);
 
-  rv = nsContentUtils::IPCTransferableToTransferable(aDataTransfer,
-                                                     aIsPrivateData,
-                                                     aRequestingPrincipal,
-                                                     aContentPolicyType,
-                                                     trans, nullptr, this);
+  rv = nsContentUtils::IPCTransferableToTransferable(aDataTransfer, trans, this);
   NS_ENSURE_SUCCESS(rv, IPC_OK());
+
+  trans->SetIsPrivateData(aIsPrivateData);
+  trans->SetRequestingPrincipal(aRequestingPrincipal);
+  trans->SetContentPolicyType(aContentPolicyType);
 
   nsCOMPtr<nsIDocShell> ourDocShell = do_GetInterface(WebNavigation());
   if (NS_WARN_IF(!ourDocShell)) {

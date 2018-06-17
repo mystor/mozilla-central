@@ -682,7 +682,7 @@ private:
 
   uint32_t mChromeFlags;
 
-  nsTArray<nsTArray<IPCDataTransferItem>> mInitialDataTransferItems;
+  RefPtr<DataTransfer::TransferableSource> mInitialDataTransferItems;
 
   RefPtr<gfx::DataSourceSurface> mDnDVisualization;
   bool mDragValid;

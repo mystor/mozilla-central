@@ -13,6 +13,8 @@ interface nsIPrincipal;
 
 %{ C++
 
+#include "nsTArray.h"
+
 // these probably shouldn't live here, but in some central repository shared
 // by the entire app.
 #define kTextMime                   "text/plain"
@@ -91,8 +93,9 @@ interface nsIFlavorDataProvider : nsISupports
   void getFlavorData(in nsITransferable aTransferable, in string aFlavor, out nsISupports aData, out unsigned long aDataLen);
 };
 
+native FlavorArray(nsTArray<nsCString>);
 
-[scriptable, uuid(97e0c418-1c1e-4106-bad1-9fcb11dff2fe)]
+[scriptable, builtinclass, uuid(97e0c418-1c1e-4106-bad1-9fcb11dff2fe)]
 interface nsITransferable : nsISupports
 {
   const long kFlavorHasDataProvider = 0;
@@ -130,6 +133,7 @@ interface nsITransferable : nsISupports
     *          the internal list, so it may be edited w/out affecting the transferable.
     */
   nsIArray flavorsTransferableCanExport ( ) ;
+  [nostdcall, notxpcom] FlavorArray exportFlavors();
 
   /**
     * Given a flavor retrieve the data. 
@@ -169,6 +173,7 @@ interface nsITransferable : nsISupports
     *          the internal list, so it may be edited w/out affecting the transferable.
     */
   nsIArray flavorsTransferableCanImport ( ) ;
+  [nostdcall, notxpcom] FlavorArray importFlavors();
 
   /**
     * Sets the data in the transferable with the specified flavor. The transferable

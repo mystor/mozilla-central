@@ -23,9 +23,10 @@ public:
   nsSupportsID();
 
 private:
+  friend class nsISupportsID;
   ~nsSupportsID() {}
 
-  nsID* mData;
+  nsID mData;
 };
 
 /***************************************************************************/
@@ -40,6 +41,7 @@ public:
   nsSupportsCString() {}
 
 private:
+  friend class nsISupportsCString;
   ~nsSupportsCString() {}
 
   nsCString mData;
@@ -57,6 +59,7 @@ public:
   nsSupportsString() {}
 
 private:
+  friend class nsISupportsString;
   ~nsSupportsString() {}
 
   nsString mData;
@@ -74,6 +77,7 @@ public:
   nsSupportsPRBool();
 
 private:
+  friend class nsISupportsPRBool;
   ~nsSupportsPRBool() {}
 
   bool mData;
@@ -91,6 +95,7 @@ public:
   nsSupportsPRUint8();
 
 private:
+  friend class nsISupportsPRUint8;
   ~nsSupportsPRUint8() {}
 
   uint8_t mData;
@@ -108,6 +113,7 @@ public:
   nsSupportsPRUint16();
 
 private:
+  friend class nsISupportsPRUint16;
   ~nsSupportsPRUint16() {}
 
   uint16_t mData;
@@ -125,6 +131,7 @@ public:
   nsSupportsPRUint32();
 
 private:
+  friend class nsISupportsPRUint32;
   ~nsSupportsPRUint32() {}
 
   uint32_t mData;
@@ -142,6 +149,7 @@ public:
   nsSupportsPRUint64();
 
 private:
+  friend class nsISupportsPRUint64;
   ~nsSupportsPRUint64() {}
 
   uint64_t mData;
@@ -159,6 +167,7 @@ public:
   nsSupportsPRTime();
 
 private:
+  friend class nsISupportsPRTime;
   ~nsSupportsPRTime() {}
 
   PRTime mData;
@@ -176,6 +185,7 @@ public:
   nsSupportsChar();
 
 private:
+  friend class nsISupportsChar;
   ~nsSupportsChar() {}
 
   char mData;
@@ -193,6 +203,7 @@ public:
   nsSupportsPRInt16();
 
 private:
+  friend class nsISupportsPRInt16;
   ~nsSupportsPRInt16() {}
 
   int16_t mData;
@@ -210,6 +221,7 @@ public:
   nsSupportsPRInt32();
 
 private:
+  friend class nsISupportsPRInt32;
   ~nsSupportsPRInt32() {}
 
   int32_t mData;
@@ -227,6 +239,7 @@ public:
   nsSupportsPRInt64();
 
 private:
+  friend class nsISupportsPRInt64;
   ~nsSupportsPRInt64() {}
 
   int64_t mData;
@@ -244,6 +257,7 @@ public:
   nsSupportsFloat();
 
 private:
+  friend class nsISupportsFloat;
   ~nsSupportsFloat() {}
 
   float mData;
@@ -261,6 +275,7 @@ public:
   nsSupportsDouble();
 
 private:
+  friend class nsISupportsDouble;
   ~nsSupportsDouble() {}
 
   double mData;
@@ -277,34 +292,17 @@ public:
 
   nsSupportsInterfacePointer();
 
+  template<typename T>
+  explicit nsSupportsInterfacePointer(T* aSupports)
+    : mData(aSupports), mIID(NS_GET_TEMPLATE_IID(T))
+  { }
+
 private:
-  ~nsSupportsInterfacePointer();
+  friend class nsISupportsInterfacePointer;
+  ~nsSupportsInterfacePointer() {}
 
   nsCOMPtr<nsISupports> mData;
-  nsID* mIID;
-};
-
-/***************************************************************************/
-
-/**
- * Wraps a static const char* buffer for use with nsISupportsCString
- *
- * Only use this class with static buffers, or arena-allocated buffers of
- * permanent lifetime!
- */
-class nsSupportsDependentCString final : public nsISupportsCString
-{
-public:
-  NS_DECL_ISUPPORTS
-  NS_DECL_NSISUPPORTSPRIMITIVE
-  NS_DECL_NSISUPPORTSCSTRING
-
-  explicit nsSupportsDependentCString(const char* aStr);
-
-private:
-  ~nsSupportsDependentCString() {}
-
-  nsDependentCString mData;
+  nsID mIID;
 };
 
 #endif /* nsSupportsPrimitives_h__ */

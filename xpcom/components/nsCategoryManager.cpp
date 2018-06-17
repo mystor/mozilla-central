@@ -105,10 +105,10 @@ BaseStringEnumerator::GetNext(nsISupports** aResult)
     return NS_ERROR_FAILURE;
   }
 
-  auto* str = new nsSupportsDependentCString(mArray[mSimpleCurItem++]);
-  if (!str) {
-    return NS_ERROR_OUT_OF_MEMORY;
-  }
+  // This string is in an arena, but this extra allocation here shouldn't be too
+  // big of a deal.
+  auto* str = new nsSupportsCString();
+  str->Value().Assign(mArray[mSimpleCurItem++]);
 
   *aResult = str;
   NS_ADDREF(*aResult);

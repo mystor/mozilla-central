@@ -144,6 +144,7 @@ class TabParent;
 } // namespace dom
 
 namespace ipc {
+class IProtocol;
 class Shmem;
 class IShmemAllocator;
 }
@@ -2783,12 +2784,8 @@ public:
   static bool IsFlavorImage(const nsACString& aFlavor);
 
   static nsresult IPCTransferableToTransferable(const mozilla::dom::IPCDataTransfer& aDataTransfer,
-                                                const bool& aIsPrivateData,
-                                                nsIPrincipal* aRequestingPrincipal,
-                                                const nsContentPolicyType& aContentPolicyType,
                                                 nsITransferable* aTransferable,
-                                                mozilla::dom::nsIContentParent* aContentParent,
-                                                mozilla::dom::TabChild* aTabChild);
+                                                mozilla::ipc::IProtocol* aActor);
 
   static void TransferablesToIPCTransferables(nsIArray* aTransferables,
                                               nsTArray<mozilla::dom::IPCDataTransfer>& aIPC,

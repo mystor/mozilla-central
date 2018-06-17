@@ -37,6 +37,7 @@ class DOMStringList;
 class Element;
 class FileList;
 class Promise;
+class URLParams;
 template<typename T> class Optional;
 
 #define NS_DATATRANSFER_IID \
@@ -61,6 +62,41 @@ public:
     ReadWrite,
     ReadOnly,
     Protected,
+  };
+
+  // A source of data for the DataTransfer - common data sources include the
+  // clipboard, drag service, and a list of nsITransferables.
+  class DataSource
+  {
+  public:
+    NS_INLINE_DECL_REFCOUNTING(DataSource)
+
+    virtual uint32_t MozItemCount() = 0;
+    virtual void CacheFlavors(DataTransfer* aDataTransfer, uint32_t aIndex) = 0;
+    virtual already_AddRefed<nsISupports> GetData(const char* aFormat, uint32_t aIndex) = 0;
+
+  private:
+    virtual ~DataSource() {}
+  };
+
+  // Data Source for a list of nsITransferables.
+  class TransferableSource : public DataSource
+  {
+  public:
+    TransferableSource(nsIPrincipal* aPrincipal = nsContentUtils::GetSystemPrincipal())
+      : mPrincipal(aPrincipal)
+    { }
+
+    void Add(nsITransferable* aTrans);
+
+    uint32_t MozItemCount() override { return mTrans.Length(); }
+    void CacheFlavors(DataTransfer* aDataTransfer, uint32_t aIndex) override;
+    already_AddRefed<nsISupports> GetData(const char* aFormat, uint32_t aIndex) override;
+
+  private:
+    nsTArray<nsCOMPtr<nsITransferable>> mTrans;
+    nsCOMPtr<nsIPrincipal> mPrincipal;
+    bool mHideNonFiles = false;
   };
 
 protected:
@@ -100,6 +136,10 @@ public:
   // operations, or if access to the system clipboard should not be allowed.
   DataTransfer(nsISupports* aParent, EventMessage aEventMessage,
                bool aIsExternal, int32_t aClipboardType);
+
+  // Control where the DataTransfer reads its data from - potentially overriding
+  // the default.
+  void SetDataSource(DataSource* aSource);
 
   virtual JSObject*
   WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
@@ -419,12 +459,14 @@ public:
   already_AddRefed<DataTransfer> MozCloneForEvent(const nsAString& aEvent,
                                                   ErrorResult& aRv);
 
-protected:
-
-  // caches text and uri-list data formats that exist in the drag service or
-  // clipboard for retrieval later.
+  // caches text and uri-list data formats that exist in the data source, drag
+  // service or clipboard for retrieval later.
+  //
+  // Don't call this if you're not a drag service.
   nsresult CacheExternalData(const char* aFormat, uint32_t aIndex,
                              nsIPrincipal* aPrincipal, bool aHidden);
+
+protected:
 
   // caches the formats that exist in the drag service that were added by an
   // external drag
@@ -494,6 +536,10 @@ protected:
 
   // the target of the drag. The drag and dragend events will fire at this.
   nsCOMPtr<mozilla::dom::Element> mDragTarget;
+
+  // The external data source to pull in data from. This data source will
+  // override other external sources.
+  RefPtr<DataSource> mDataSource;
 
   // the custom drag image and coordinates within the image. If mDragImage is
   // null, the default image is created from the drag target.

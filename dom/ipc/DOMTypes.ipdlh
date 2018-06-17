@@ -29,6 +29,7 @@ using struct mozilla::layers::TextureFactoryIdentifier from "mozilla/layers/Comp
 using mozilla::layers::CompositorOptions from "mozilla/layers/CompositorOptions.h";
 using mozilla::layers::LayersId from "mozilla/layers/LayersTypes.h";
 using mozilla::gfx::SurfaceFormat from "mozilla/gfx/Types.h";
+using mozilla::gfx::IntSize from "mozilla/gfx/Point.h";
 
 
 namespace mozilla {
@@ -56,29 +57,40 @@ struct ClonedMessageData
   MessagePortIdentifier[] identfiers;
 };
 
-union IPCDataTransferData
+// When dragging/pasting images, we often store the data as a nsIInputStream
+// or shared memory imgIContainer. This is the IPC representation of those
+// data types. IPCStream is intentionally not used to support sync IPC.
+struct IDTImageContainer
 {
-  nsString;  // text
-  Shmem;     // images using Shmem
-  IPCBlob;   // files
-};
-
-struct IPCDataTransferImage
-{
-  uint32_t width;
-  uint32_t height;
+  IntSize size;
   uint32_t stride;
   SurfaceFormat format;
+  Shmem data;
+};
+
+struct IDTEagerStream
+{
+  nsCString data;
+};
+
+// The different varieties of DataTransfer items.
+union IPCDataTransferData
+{
+  nsString;          // text
+  nsCString;         // bytes
+  IDTImageContainer; // images
+  IDTEagerStream;    // eager streams
+  IPCBlob;           // files
 };
 
 struct IPCDataTransferItem
 {
   nsCString flavor;
-  // The image details are only used when transferring images.
-  IPCDataTransferImage imageDetails;
   IPCDataTransferData data;
 };
 
+// XXX: This is a nsITransferable over IPC - not a DataTransfer. Rename?
+// XXX: The conversion method is IPCTransferableToTransferable already.
 struct IPCDataTransfer
 {
   IPCDataTransferItem[] items;

@@ -230,6 +230,7 @@
 #include "VRManagerChild.h"
 #include "private/pprio.h"
 #include "nsString.h"
+#include "nsTransferable.h"
 
 #ifdef MOZ_WIDGET_GTK
 #include "nsAppRunner.h"
@@ -3239,47 +3240,26 @@ ContentChild::RecvInvokeDragSession(nsTArray<IPCDataTransfer>&& aTransfers,
     dragService->GetCurrentSession(getter_AddRefs(session));
     if (session) {
       session->SetDragAction(aAction);
-      // Check if we are receiving any file objects. If we are we will want
-      // to hide any of the other objects coming in from content.
-      bool hasFiles = false;
-      for (uint32_t i = 0; i < aTransfers.Length() && !hasFiles; ++i) {
-        auto& items = aTransfers[i].items();
-        for (uint32_t j = 0; j < items.Length() && !hasFiles; ++j) {
-          if (items[j].data().type() == IPCDataTransferData::TIPCBlob) {
-            hasFiles = true;
-          }
+
+      // Create a TransferableSource from our nsITransferables. This will
+      // automatically detect & hide non-file objects in transfers.
+      RefPtr<DataTransfer::TransferableSource> source =
+        new DataTransfer::TransferableSource();
+
+      for (uint32_t i = 0; i < aTransfers.Length(); ++i) {
+        RefPtr<nsTransferable> trans = new nsTransferable(nullptr);
+        nsresult rv = nsContentUtils::IPCTransferableToTransferable(
+          aTransfers[i], trans, this);
+        if (NS_SUCCEEDED(rv)) {
+          source->Add(trans);
         }
       }
 
-      // Add the entries from the IPC to the new DataTransfer
-      nsCOMPtr<DataTransfer> dataTransfer =
+      // Create the DataTransfer and tell it to pull from our DataSource.
+      RefPtr<DataTransfer> dataTransfer =
         new DataTransfer(nullptr, eDragStart, false, -1);
-      for (uint32_t i = 0; i < aTransfers.Length(); ++i) {
-        auto& items = aTransfers[i].items();
-        for (uint32_t j = 0; j < items.Length(); ++j) {
-          const IPCDataTransferItem& item = items[j];
-          RefPtr<nsVariantCC> variant = new nsVariantCC();
-          if (item.data().type() == IPCDataTransferData::TnsString) {
-            const nsString& data = item.data().get_nsString();
-            variant->SetAsAString(data);
-          } else if (item.data().type() == IPCDataTransferData::TShmem) {
-            Shmem data = item.data().get_Shmem();
-            variant->SetAsACString(nsDependentCString(data.get<char>(), data.Size<char>()));
-            Unused << DeallocShmem(data);
-          } else if (item.data().type() == IPCDataTransferData::TIPCBlob) {
-            RefPtr<BlobImpl> blobImpl =
-              IPCBlobUtils::Deserialize(item.data().get_IPCBlob());
-            variant->SetAsISupports(blobImpl);
-          } else {
-            continue;
-          }
-          // We should hide this data from content if we have a file, and we aren't a file.
-          bool hidden = hasFiles && item.data().type() != IPCDataTransferData::TIPCBlob;
-          dataTransfer->SetDataWithPrincipalFromOtherProcess(
-            NS_ConvertUTF8toUTF16(item.flavor()), variant, i,
-            nsContentUtils::GetSystemPrincipal(), hidden);
-        }
-      }
+
+      dataTransfer->SetDataSource(source);
       session->SetDataTransfer(dataTransfer);
     }
   }

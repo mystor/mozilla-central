@@ -38,7 +38,9 @@
 #include "mozilla/dom/BindingUtils.h"
 #include "mozilla/dom/OSFileSystem.h"
 #include "mozilla/dom/Promise.h"
+#include "mozilla/dom/URLSearchParams.h"
 #include "nsNetUtil.h"
+#include "nsTransferable.h"
 
 namespace mozilla {
 namespace dom {
@@ -160,6 +162,7 @@ DataTransfer::DataTransfer(nsISupports* aParent,
                            bool aIsCrossDomainSubFrameDrop,
                            int32_t aClipboardType,
                            DataTransferItemList* aItems,
+                           DataSource* aDataSource,
                            Element* aDragImage,
                            uint32_t aDragImageX,
                            uint32_t aDragImageY)
@@ -173,6 +176,7 @@ DataTransfer::DataTransfer(nsISupports* aParent,
   , mUserCancelled(aUserCancelled)
   , mIsCrossDomainSubFrameDrop(aIsCrossDomainSubFrameDrop)
   , mClipboardType(aClipboardType)
+  , mDataSource(aDataSource)
   , mDragImage(aDragImage)
   , mDragImageX(aDragImageX)
   , mDragImageY(aDragImageY)
@@ -210,6 +214,19 @@ JSObject*
 DataTransfer::WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto)
 {
   return DataTransferBinding::Wrap(aCx, this, aGivenProto);
+}
+
+void
+DataTransfer::SetDataSource(DataTransfer::DataSource* aSource)
+{
+  mDataSource = aSource;
+  mIsExternal = true;
+
+  // Cache which flavors the data source provides us.
+  uint32_t itemCount = mDataSource->MozItemCount();
+  for (uint32_t i = 0; i < itemCount; ++i) {
+    mDataSource->CacheFlavors(this, i);
+  }
 }
 
 void
@@ -803,8 +820,8 @@ DataTransfer::Clone(nsISupports* aParent, EventMessage aEventMessage,
   RefPtr<DataTransfer> newDataTransfer =
     new DataTransfer(aParent, aEventMessage, mEffectAllowed, mCursorState,
                      mIsExternal, aUserCancelled, aIsCrossDomainSubFrameDrop,
-                     mClipboardType, mItems, mDragImage, mDragImageX,
-                     mDragImageY);
+                     mClipboardType, mItems, mDataSource, mDragImage,
+                     mDragImageX, mDragImageY);
 
   newDataTransfer.forget(aNewDataTransfer);
   return NS_OK;
@@ -849,7 +866,7 @@ static const char*
 ToTransFlavor(const nsAString& aFlavor)
 {
   // BACKCOMPAT: Store "text/plain" as "text/unicode" for internal consumers.
-  if (aFlavor->EqualsLiteral(kTextMime)) {
+  if (aFlavor.EqualsLiteral(kTextMime)) {
     return kUnicodeMime;
   }
 
@@ -861,8 +878,8 @@ ToTransFlavor(const nsAString& aFlavor)
     kFilePromiseDestFilename, kFilePromiseDirectoryMime,
     kMozTextInternal, kHTMLContext, kHTMLInfo, kImageRequestMime };
 
-  for (uint32_t fi = 0; fi < ArrayLength(knownFormats), ++fi) {
-    if (aFlavor->EqualsASCII(knownFormats[fi])) {
+  for (uint32_t fi = 0; fi < ArrayLength(knownFormats); ++fi) {
+    if (aFlavor.EqualsASCII(knownFormats[fi])) {
       return knownFormats[fi];
     }
   }
@@ -881,11 +898,9 @@ DataTransfer::AddToTrans(nsITransferable* aTrans, DataTransferItem* aItem,
   uint32_t transBytes;
 
   // Get the nsISupports data to put in the nsITransferable from the DataTransferItem.
-  IgnoredErrorResult err;
-  nsCOMPtr<nsIVariant> vdata = aItem->Data(&aSubjectPrincipal, err);
-  if (!vdata || err.Failed() ||
-      !ConvertFromVariant(vdata, getter_AddRefs(transData), &transBytes) ||
-      !transData) {
+  nsCOMPtr<nsIVariant> vdata = aItem->DataNoSecurityCheck();
+  if (!vdata || !ConvertFromVariant(vdata, getter_AddRefs(transData),
+                                    &transBytes) || !transData) {
     NS_WARNING("Extracting Transferable data from DataTransferItem failed");
     return false;
   }
@@ -915,7 +930,7 @@ DataTransfer::AddToTrans(nsITransferable* aTrans, DataTransferItem* aItem,
   // If a converter is set for a format, add the converter to the transferable.
   nsCOMPtr<nsIFormatConverter> converter = do_QueryInterface(transData);
   if (converter) {
-    aTrans->AddDataFlavor(format);
+    aTrans->AddDataFlavor(transFlavor);
     aTrans->SetConverter(converter);
     return false; // No data was added, only converters.
   }
@@ -930,12 +945,7 @@ DataTransfer::GetTransferable(uint32_t aIndex, nsILoadContext* aLoadContext)
     return nullptr;
   }
 
-  nsCOMPtr<nsITransferable> trans =
-    do_CreateInstance("@mozilla.org/widget/transferable;1");
-  if (!trans) {
-    return nullptr;
-  }
-  trans->Init(aLoadContext);
+  RefPtr<nsTransferable> trans = new nsTransferable(aLoadContext);
 
   // Load the data into the nsITransferable, and extract a set of custom data.
   bool addedData = false;
@@ -947,15 +957,17 @@ DataTransfer::GetTransferable(uint32_t aIndex, nsILoadContext* aLoadContext)
   // If we have any custom data, serialize & add it to our nsITransferable with
   // kCustomTypesMime.
   if (customData.Length() > 0) {
-    nsCString custom;
+    nsAutoString custom;
     customData.Serialize(custom);
 
+    // XXX(nika): There was some reason I needed to make this a cstring - not
+    // sure what.
     nsCOMPtr<nsISupportsCString> customSupports =
-      do_CreateInstance(NS_SUPPORTS_CSTRING_CONTRACTID);
-    customSupports->SetData(custom);
+      new nsSupportsCString(NS_ConvertUTF16toUTF8(custom));
 
-    addedData = NS_SUCCEEDED(aTrans->SetTransferData(kCustomTypesMime, customSupports,
-                                                     custom.Length())) || addedData;
+    addedData = NS_SUCCEEDED(trans->SetTransferData(kCustomTypesMime, customSupports,
+                                                    customSupports->Value().Length()))
+      || addedData;
   }
 
   // If at least one of our attempts to add data to the transferable succeeded,
@@ -1124,6 +1136,9 @@ DataTransfer::CacheExternalData(const char* aFormat, uint32_t aIndex,
   ErrorResult rv;
   RefPtr<DataTransferItem> item;
 
+  // XXX(nika): Why do we do this check here and then re-do it in GetRealFormat
+  // below? Can we get away with just using GetRealFormat? Also, this check is
+  // case sensitive, unlike the one in GetRealFormat. Is that intentional?
   if (strcmp(aFormat, kUnicodeMime) == 0) {
     item = mItems->SetDataWithPrincipal(NS_LITERAL_STRING("text/plain"), nullptr,
                                         aIndex, aPrincipal, false, aHidden, rv);
@@ -1133,6 +1148,7 @@ DataTransfer::CacheExternalData(const char* aFormat, uint32_t aIndex,
     return NS_OK;
   }
 
+  // XXX(nika): Should we handle kURLDataMime in GetRealFormat?
   if (strcmp(aFormat, kURLDataMime) == 0) {
     item = mItems->SetDataWithPrincipal(NS_LITERAL_STRING("text/uri-list"), nullptr,
                                         aIndex, aPrincipal, false, aHidden, rv);
@@ -1207,6 +1223,7 @@ DataTransfer::CacheExternalDragFormats()
   }
 }
 
+// TODO: Every call to HasDataMatchingFlavors in this function performs sync IPC!
 void
 DataTransfer::CacheExternalClipboardFormats(bool aPlainTextOnly)
 {
@@ -1332,12 +1349,16 @@ DataTransfer::FillInExternalCustomTypes(nsIVariant* aData, uint32_t aIndex,
 
   struct CustomTypeAdder : public URLParams::ForEachIterator
   {
+    CustomTypeAdder(uint32_t aIndex, nsIPrincipal* aPrincipal, DataTransfer* aDataTransfer)
+      : mIndex(aIndex), mPrincipal(aPrincipal), mDataTransfer(aDataTransfer)
+    {}
+
     bool URLParamsIterator(const nsAString& aFormat, const nsAString& aValue) override {
       RefPtr<nsVariantCC> variant = new nsVariantCC();
-      rv = variant->SetAsAString(aValue);
-      NS_ENSURE_SUCCESS_VOID(rv);
+      MOZ_ALWAYS_SUCCEEDS(variant->SetAsAString(aValue));
 
       mDataTransfer->SetDataWithPrincipal(aFormat, variant, mIndex, mPrincipal);
+      return true;
     }
 
     uint32_t mIndex;
@@ -1345,7 +1366,7 @@ DataTransfer::FillInExternalCustomTypes(nsIVariant* aData, uint32_t aIndex,
     DataTransfer* mDataTransfer;
   };
 
-  CustomTypeAdder iter = { aIndex, aPrincipal, this };
+  CustomTypeAdder iter(aIndex, aPrincipal, this);
   URLParams::Parse(encoded, iter);
 }
 
@@ -1356,6 +1377,57 @@ DataTransfer::SetMode(DataTransfer::Mode aMode)
     mMode = Mode::ReadOnly;
   } else {
     mMode = aMode;
+  }
+}
+
+void
+DataTransfer::TransferableSource::CacheFlavors(DataTransfer* aDataTransfer,
+                                               uint32_t aIndex)
+{
+  if (aIndex >= mTrans.Length()) {
+    return;
+  }
+
+  // XXX(nika): This isn't exactly a fun API D: - perhaps we should change it?
+  nsCOMPtr<nsIArray> flavors;
+  uint32_t length = 0;
+  mTrans[aIndex]->FlavorsTransferableCanExport(getter_AddRefs(flavors));
+  if (flavors) {
+    flavors->GetLength(&length);
+  }
+
+  // Add an empty entry for each type the transferable can export.
+  for (uint32_t i = 0; i < length; ++i) {
+    nsCOMPtr<nsISupportsCString> flavor = do_QueryElementAt(flavors, i);
+    if (!flavor) {
+      continue;
+    }
+    aDataTransfer->CacheExternalData(flavor->Value().get(), aIndex, mPrincipal,
+                                     /* aHidden = */ mHideNonFiles &&
+                                     !flavor->Value().EqualsLiteral(kFileMime));
+  }
+}
+
+already_AddRefed<nsISupports>
+DataTransfer::TransferableSource::GetData(const char* aFormat, uint32_t aIndex)
+{
+  nsresult rv = NS_ERROR_FAILURE;
+  nsCOMPtr<nsISupports> data;
+  if (aIndex < mTrans.Length()) {
+    uint32_t dummy = 0;
+    rv = mTrans[aIndex]->GetTransferData(aFormat, getter_AddRefs(data), &dummy);
+  }
+  return NS_SUCCEEDED(rv) ? data.forget() : nullptr;
+}
+
+void
+DataTransfer::TransferableSource::Add(nsITransferable* aTrans)
+{
+  mTrans.AppendElement(aTrans);
+
+  if (!mHideNonFiles) { // Hide files if we got one.
+    nsCOMPtr<nsISupports> file = GetData(kFileMime, mTrans.Length() - 1);
+    mHideNonFiles = file;
   }
 }
 

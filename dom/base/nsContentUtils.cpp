@@ -222,6 +222,7 @@
 #include "mozilla/HangAnnotations.h"
 #include "mozilla/Encoding.h"
 #include "nsXULElement.h"
+#include "nsSupportsPrimitives.h"
 
 #include "nsIBidiKeyboard.h"
 
@@ -7737,12 +7738,8 @@ nsContentUtils::SetKeyboardIndicatorsOnRemoteChildren(nsPIDOMWindowOuter* aWindo
 
 nsresult
 nsContentUtils::IPCTransferableToTransferable(const IPCDataTransfer& aDataTransfer,
-                                              const bool& aIsPrivateData,
-                                              nsIPrincipal* aRequestingPrincipal,
-                                              const nsContentPolicyType& aContentPolicyType,
                                               nsITransferable* aTransferable,
-                                              mozilla::dom::nsIContentParent* aContentParent,
-                                              mozilla::dom::TabChild* aTabChild)
+                                              IProtocol* aActor)
 {
   nsresult rv;
 
@@ -7750,62 +7747,84 @@ nsContentUtils::IPCTransferableToTransferable(const IPCDataTransfer& aDataTransf
   for (const auto& item : items) {
     aTransferable->AddDataFlavor(item.flavor().get());
 
-    if (item.data().type() == IPCDataTransferData::TnsString) {
-      nsCOMPtr<nsISupportsString> dataWrapper =
-        do_CreateInstance(NS_SUPPORTS_STRING_CONTRACTID, &rv);
-      NS_ENSURE_SUCCESS(rv, rv);
 
-      const nsString& text = item.data().get_nsString();
-      rv = dataWrapper->SetData(text);
-      NS_ENSURE_SUCCESS(rv, rv);
+    nsCOMPtr<nsISupports> data;
+    size_t size = sizeof(nsISupports*);
 
-      rv = aTransferable->SetTransferData(item.flavor().get(), dataWrapper,
-                                  text.Length() * sizeof(char16_t));
+    switch (item.data().type()) {
+      case IPCDataTransferData::TnsString:
+        data = new nsSupportsString(item.data().get_nsString());
+        size = text.Length() * sizeof(char16_t);
+        break;
 
-      NS_ENSURE_SUCCESS(rv, rv);
-    } else if (item.data().type() == IPCDataTransferData::TShmem) {
-      if (nsContentUtils::IsFlavorImage(item.flavor())) {
-        nsCOMPtr<imgIContainer> imageContainer;
-        rv = nsContentUtils::DataTransferItemToImage(item,
-                                                     getter_AddRefs(imageContainer));
-        NS_ENSURE_SUCCESS(rv, rv);
+      case IPCDataTransferData::TnsCString:
+        data = new nsSupportsCString(item.data().get_nsCString());
+        size = text.Length();
+        break;
 
-        nsCOMPtr<nsISupportsInterfacePointer> imgPtr =
-          do_CreateInstance(NS_SUPPORTS_INTERFACE_POINTER_CONTRACTID);
-        NS_ENSURE_TRUE(imgPtr, NS_ERROR_FAILURE);
+      case IPCDataTransferData::TIDTImageContainer:
+      {
+        IDTImageContainer& ipcData = item.data().get_IDTImageContainer();
 
-        rv = imgPtr->SetData(imageContainer);
-        NS_ENSURE_SUCCESS(rv, rv);
+        // Check that we have enough data in our buffer.
+        SurfaceBufLen bl(ipcData.size(), ipcData.format(), ipcData.stride());
+        if (NS_WARN_IF(!bl.mValid || bl.mMaxLength > ipcData.data().Size<char>())) {
+          return NS_ERROR_FAILURE;
+        }
 
-        aTransferable->SetTransferData(item.flavor().get(), imgPtr, sizeof(nsISupports*));
-      } else {
-        nsCOMPtr<nsISupportsCString> dataWrapper =
-          do_CreateInstance(NS_SUPPORTS_CSTRING_CONTRACTID, &rv);
-        NS_ENSURE_SUCCESS(rv, rv);
+        RefPtr<DataSourceSurface> image =
+          CreateDataSourceSurfaceFromData(ipcData.size(),
+                                          ipcData.format(),
+                                          ipcData.data().get<char>(),
+                                          ipcData.stride());
 
-        // The buffer contains the terminating null.
-        Shmem itemData = item.data().get_Shmem();
-        const nsDependentCString text(itemData.get<char>(),
-                                      itemData.Size<char>());
-        rv = dataWrapper->SetData(text);
-        NS_ENSURE_SUCCESS(rv, rv);
+        RefPtr<gfxDrawable> drawable = new gfxSurfaceDrawable(image, size);
+        nsCOMPtr<imgIContainer> imageContainer =
+          image::ImageOps::CreateFromDrawable(drawable);
 
-        rv = aTransferable->SetTransferData(item.flavor().get(), dataWrapper, text.Length());
+        // ugh - let's wrap it up into a supports interface pointer
+        data = new nsSupportsInterfacePointer(imageContainer);
 
-        NS_ENSURE_SUCCESS(rv, rv);
+        Unused << aActor->DeallocShmem(ipcData.data());
+        break;
       }
 
-      if (aContentParent) {
-        Unused << aContentParent->DeallocShmem(item.data().get_Shmem());
-      } else if (aTabChild) {
-        Unused << aTabChild->DeallocShmem(item.data().get_Shmem());
+      case IPCDataTransferData::TIDTEagerStream:
+      {
+        nsCOMPtr<nsIInputStream> istream;
+        rv = NS_NewCStringInputStream(getter_AddRefs(istream),
+                                      item.data().get_IDTEagerStream().data());
+        NS_ENSURE_SUCCESS(rv, rv);
+
+        // ugh - let's wrap it up into a supports interface pointer
+        data = new nsSupportsInterfacePointer(istream);
+        break;
       }
+
+      case IPCDataTransferData::TIPCBlob:
+      {
+        RefPtr<BlobImpl> blob =
+          IPCBlobUtils::Deserialize(item.data().get_IPCBlob());
+        NS_ENSURE_TRUE(blob, NS_ERROR_FAILURE);
+
+        data = new nsSupportsInterfacePointer(blob);
+        break;
+      }
+
+      default:
+        NS_WARNING("Unknown data type!");
     }
-  }
 
-  aTransferable->SetIsPrivateData(aIsPrivateData);
-  aTransferable->SetRequestingPrincipal(aRequestingPrincipal);
-  aTransferable->SetContentPolicyType(aContentPolicyType);
+    // Ensure we create the real data provider in the parent process for file
+    // promises.
+    if (item.flavor().EqualsLiteral(kFilePromiseMime) && XRE_IsParentProcess()) {
+      data = new nsContentAreaDragDropDataProvider();
+      size = nsITransferable::kFlavorHasDataProvider;
+    }
+
+    rv = aTransferable->SetTransferData(item.flavor().get(), data, size);
+    NS_ENSURE_SUCCESS(rv, rv);
+  }
   return NS_OK;
 }
 
@@ -7899,6 +7918,7 @@ nsContentUtils::DataTransferItemToImage(const IPCDataTransferItem& aItem,
 
   Shmem data = aItem.data().get_Shmem();
 
+  // Validate we have enough data in our shmem buffer to send the string over.
   RefPtr<DataSourceSurface> image =
       CreateDataSourceSurfaceFromData(size,
                                       imageDetails.format(),
@@ -7957,216 +7977,185 @@ nsContentUtils::TransferableToIPCTransferable(nsITransferable* aTransferable,
 {
   MOZ_ASSERT((aChild && !aParent) || (!aChild && aParent));
 
-  if (aTransferable) {
-    nsCOMPtr<nsIArray> flavorList;
-    aTransferable->FlavorsTransferableCanExport(getter_AddRefs(flavorList));
-    if (flavorList) {
-      uint32_t flavorCount = 0;
-      flavorList->GetLength(&flavorCount);
-      for (uint32_t j = 0; j < flavorCount; ++j) {
-        nsCOMPtr<nsISupportsCString> flavor = do_QueryElementAt(flavorList, j);
-        if (!flavor) {
+  if (!aTransferable) {
+    return;
+  }
+
+  nsCOMPtr<nsIArray> flavorList;
+  aTransferable->FlavorsTransferableCanExport(getter_AddRefs(flavorList));
+  if (flavorList) {
+    uint32_t flavorCount = 0;
+    flavorList->GetLength(&flavorCount);
+    for (uint32_t j = 0; j < flavorCount; ++j) {
+      nsCOMPtr<nsISupportsCString> flavor = do_QueryElementAt(flavorList, j);
+      if (!flavor) {
+        continue;
+      }
+
+      nsAutoCString flavorStr;
+      flavor->GetData(flavorStr);
+      if (!flavorStr.Length()) {
+        continue;
+      }
+
+      // Helper for adding flavor data to the IPCDataTransfer
+      auto AddEntry = [&] (IPCDataTransferData aData) {
+        IPCDataTransferItem* item = aIPCDataTransfer->items().AppendElement();
+        item->flavor() = flavorStr;
+        item->data() = std::move(aData);
+      };
+
+      nsCOMPtr<nsISupports> data;
+      uint32_t dataLen = 0;
+      aTransferable->GetTransferData(flavorStr.get(), getter_AddRefs(data), &dataLen);
+
+      // If we have a nsISupportsInterfacePointer, unwrap it.
+      nsCOMPtr<nsISupportsInterfacePointer> sip = do_QueryInterface(data);
+      if (sip) {
+        data = sip->Value();
+      }
+
+      // Handle string data by directly storing it in the IPCDataTransfer.
+      nsCOMPtr<nsISupportsString> text = do_QueryInterface(data);
+      if (text) {
+        AddEntry(text->Value());
+      }
+
+      nsCOMPtr<nsISupportsCString> ctext = do_QueryInterface(data);
+      if (ctext) {
+        AddEntry(ctext->Value());
+      }
+
+      // We might be inside sync IPC, so we consume the full nsIInputStream
+      // and send the raw data down.
+      //
+      // XXX(nika): In the future, consider using IPCStream?
+      nsCOMPtr<nsIInputStream> istream = do_QueryInterface(data);
+      if (istream) {
+        nsCString imageData;
+        NS_ConsumeStream(istream, UINT32_MAX, imageData);
+
+        AddEntry(IDTEagerStream(std::move(imageData)));
+      }
+
+      // We might have a image container surface.
+      nsCOMPtr<imgIContainer> image = do_QueryInterface(data);
+      if (image) {
+        RefPtr<mozilla::gfx::SourceSurface> surface =
+          image->GetFrame(imgIContainer::FRAME_CURRENT,
+                          imgIContainer::FLAG_SYNC_DECODE);
+        if (!surface) {
+          continue;
+        }
+        RefPtr<mozilla::gfx::DataSourceSurface> dataSurface =
+          surface->GetDataSurface();
+        if (!dataSurface) {
           continue;
         }
 
-        nsAutoCString flavorStr;
-        flavor->GetData(flavorStr);
-        if (!flavorStr.Length()) {
+        size_t length = 0;
+        int32_t stride = 0;
+        Shmem bytes = GetSurfaceData(dataSurface, &length, &stride);
+
+        IDTImageContainer container;
+        container.size() = dataSurface->GetSize();
+        container.format() = dataSurface->GetFormat();
+        container.stride() = dataSurface->GetStride();
+        container.data() = ByteBuf(bytes.forget(), length, length);
+
+        AddEntry(std::move(container));
+      }
+
+      // Try to send nsIFile or BlobImpl objects over IPC
+      nsCOMPtr<BlobImpl> blobImpl;
+      nsCOMPtr<nsIFile> file = do_QueryInterface(data);
+      if (file) {
+        // If we can send this over as a blob, do so. Otherwise, we're
+        // responding to a sync message and the child can't process the blob
+        // constructor before processing our response, which would crash. In
+        // that case, hope that the caller is nsClipboardProxy::GetData,
+        // called from editor and send over images as raw data.
+        if (aInSyncMessage) {
+          nsAutoCString type;
+          if (IsFileImage(file, type)) {
+            // NOTE: Use the flavor we read from the file, rather than our
+            // computed flavor.
+            IPCDataTransferItem* item = aIPCDataTransfer->items().AppendElement();
+            item->flavor() = type;
+
+            nsCString data;
+            SlurpFileToString(file, data);
+            item->data() = IDTEagerStream(std::move(data));
+          }
+
           continue;
         }
 
-        nsCOMPtr<nsISupports> data;
-        uint32_t dataLen = 0;
-        aTransferable->GetTransferData(flavorStr.get(), getter_AddRefs(data), &dataLen);
-
-        nsCOMPtr<nsISupportsString> text = do_QueryInterface(data);
-        nsCOMPtr<nsISupportsCString> ctext = do_QueryInterface(data);
-        if (text) {
-          nsAutoString dataAsString;
-          text->GetData(dataAsString);
-          IPCDataTransferItem* item = aIPCDataTransfer->items().AppendElement();
-          item->flavor() = flavorStr;
-          item->data() = dataAsString;
-        } else if (ctext) {
-          nsAutoCString dataAsString;
-          ctext->GetData(dataAsString);
-          IPCDataTransferItem* item = aIPCDataTransfer->items().AppendElement();
-          item->flavor() = flavorStr;
-
-          Shmem dataAsShmem = ConvertToShmem(aChild, aParent, dataAsString);
-          if (!dataAsShmem.IsReadable() || !dataAsShmem.Size<char>()) {
-            continue;
-          }
-
-          item->data() = dataAsShmem;
-        } else {
-          nsCOMPtr<nsISupportsInterfacePointer> sip =
-            do_QueryInterface(data);
-          if (sip) {
-            sip->GetData(getter_AddRefs(data));
-          }
-
-          // Images to be pasted on the clipboard are nsIInputStreams
-          nsCOMPtr<nsIInputStream> stream(do_QueryInterface(data));
-          if (stream) {
-            IPCDataTransferItem* item = aIPCDataTransfer->items().AppendElement();
-            item->flavor() = flavorStr;
-
-            nsCString imageData;
-            NS_ConsumeStream(stream, UINT32_MAX, imageData);
-
-            Shmem imageDataShmem = ConvertToShmem(aChild, aParent, imageData);
-            if (!imageDataShmem.IsReadable() || !imageDataShmem.Size<char>()) {
+        if (aParent) {
+          bool isDir = false;
+          if (NS_SUCCEEDED(file->IsDirectory(&isDir)) && isDir) {
+            nsAutoString path;
+            if (NS_WARN_IF(NS_FAILED(file->GetPath(path)))) {
               continue;
             }
 
-            item->data() = imageDataShmem;
-            continue;
-          }
-
-          // Images to be placed on the clipboard are imgIContainers.
-          nsCOMPtr<imgIContainer> image(do_QueryInterface(data));
-          if (image) {
-            RefPtr<mozilla::gfx::SourceSurface> surface =
-              image->GetFrame(imgIContainer::FRAME_CURRENT,
-                              imgIContainer::FLAG_SYNC_DECODE);
-            if (!surface) {
-              continue;
-            }
-            RefPtr<mozilla::gfx::DataSourceSurface> dataSurface =
-              surface->GetDataSurface();
-            if (!dataSurface) {
-              continue;
-            }
-            size_t length;
-            int32_t stride;
-            IShmemAllocator* allocator = aChild ? static_cast<IShmemAllocator*>(aChild)
-                                                : static_cast<IShmemAllocator*>(aParent);
-            Maybe<Shmem> surfaceData = GetSurfaceData(dataSurface, &length, &stride,
-                                                      allocator);
-
-            if (surfaceData.isNothing()) {
-              continue;
-            }
-
-            IPCDataTransferItem* item = aIPCDataTransfer->items().AppendElement();
-            item->flavor() = flavorStr;
-            // Turn item->data() into an nsCString prior to accessing it.
-            item->data() = surfaceData.ref();
-
-            IPCDataTransferImage& imageDetails = item->imageDetails();
-            mozilla::gfx::IntSize size = dataSurface->GetSize();
-            imageDetails.width() = size.width;
-            imageDetails.height() = size.height;
-            imageDetails.stride() = stride;
-            imageDetails.format() = dataSurface->GetFormat();
-
-            continue;
-          }
-
-          // Otherwise, handle this as a file.
-          nsCOMPtr<BlobImpl> blobImpl;
-          nsCOMPtr<nsIFile> file = do_QueryInterface(data);
-          if (file) {
-            // If we can send this over as a blob, do so. Otherwise, we're
-            // responding to a sync message and the child can't process the blob
-            // constructor before processing our response, which would crash. In
-            // that case, hope that the caller is nsClipboardProxy::GetData,
-            // called from editor and send over images as raw data.
-            if (aInSyncMessage) {
-              nsAutoCString type;
-              if (IsFileImage(file, type)) {
-                IPCDataTransferItem* item = aIPCDataTransfer->items().AppendElement();
-                item->flavor() = type;
-                nsAutoCString data;
-                SlurpFileToString(file, data);
-
-                Shmem dataAsShmem = ConvertToShmem(aChild, aParent, data);
-                item->data() = dataAsShmem;
-              }
-
-              continue;
-            }
-
-            if (aParent) {
-              bool isDir = false;
-              if (NS_SUCCEEDED(file->IsDirectory(&isDir)) && isDir) {
-                nsAutoString path;
-                if (NS_WARN_IF(NS_FAILED(file->GetPath(path)))) {
-                  continue;
-                }
-
-                RefPtr<FileSystemSecurity> fss = FileSystemSecurity::GetOrCreate();
-                fss->GrantAccessToContentProcess(aParent->ChildID(), path);
-              }
-            }
-
-            blobImpl = new FileBlobImpl(file);
-
-            IgnoredErrorResult rv;
-
-            // Ensure that file data is cached no that the content process
-            // has this data available to it when passed over:
-            blobImpl->GetSize(rv);
-            if (NS_WARN_IF(rv.Failed())) {
-              continue;
-            }
-
-            blobImpl->GetLastModified(rv);
-            if (NS_WARN_IF(rv.Failed())) {
-              continue;
-            }
-          } else {
-            if (aInSyncMessage) {
-              // Can't do anything.
-              continue;
-            }
-            blobImpl = do_QueryInterface(data);
-          }
-          if (blobImpl) {
-            IPCDataTransferData data;
-            IPCBlob ipcBlob;
-
-            // If we failed to create the blob actor, then this blob probably
-            // can't get the file size for the underlying file, ignore it for
-            // now. TODO pass this through anyway.
-            if (aChild) {
-              nsresult rv = IPCBlobUtils::Serialize(blobImpl, aChild, ipcBlob);
-              if (NS_WARN_IF(NS_FAILED(rv))) {
-                continue;
-              }
-
-              data = ipcBlob;
-            } else if (aParent) {
-              nsresult rv = IPCBlobUtils::Serialize(blobImpl, aParent, ipcBlob);
-              if (NS_WARN_IF(NS_FAILED(rv))) {
-                continue;
-              }
-
-              data = ipcBlob;
-            }
-
-            IPCDataTransferItem* item = aIPCDataTransfer->items().AppendElement();
-            item->flavor() = flavorStr;
-            item->data() = data;
-          } else {
-            // This is a hack to support kFilePromiseMime.
-            // On Windows there just needs to be an entry for it,
-            // and for OSX we need to create
-            // nsContentAreaDragDropDataProvider as nsIFlavorDataProvider.
-            if (flavorStr.EqualsLiteral(kFilePromiseMime)) {
-              IPCDataTransferItem* item = aIPCDataTransfer->items().AppendElement();
-              item->flavor() = flavorStr;
-              item->data() = NS_ConvertUTF8toUTF16(flavorStr);
-            } else if (!data) {
-              // Empty element, transfer only the flavor
-              IPCDataTransferItem* item = aIPCDataTransfer->items().AppendElement();
-              item->flavor() = flavorStr;
-              item->data() = nsString();
-              continue;
-            }
+            RefPtr<FileSystemSecurity> fss = FileSystemSecurity::GetOrCreate();
+            fss->GrantAccessToContentProcess(aParent->ChildID(), path);
           }
         }
+
+        blobImpl = new FileBlobImpl(file);
+
+        // Ensure that file data is cached no that the content process
+        // has this data available to it when passed over:
+        IgnoredErrorResult rv;
+        blobImpl->GetSize(rv);
+        if (NS_WARN_IF(rv.Failed())) {
+          continue;
+        }
+
+        blobImpl->GetLastModified(rv);
+        if (NS_WARN_IF(rv.Failed())) {
+          continue;
+        }
+      } else {
+        if (aInSyncMessage) {
+          // Can't do anything.
+          continue;
+        }
+        blobImpl = do_QueryInterface(data);
+      }
+
+      // Try to send our blob out to another process.
+      if (blobImpl) {
+        MOZ_ASSERT(!aInSyncMessage, "Shouldn't be here in a sync message!");
+
+        nsresult rv = NS_ERROR_UNEXPECTED;
+        IPCBlob ipcBlob;
+        if (aChild) {
+          rv = IPCBlobUtils::Serialize(blobImpl, aChild, ipcBlob);
+        } else if (aParent) {
+          rv = IPCBlobUtils::Serialize(blobImpl, aParent, ipcBlob);
+        }
+
+        // If we failed to create the blob actor, then this blob probably
+        // can't get the file size for the underlying file, ignore it for
+        // now. TODO pass this through anyway.
+        if (NS_WARN_IF(NS_FAILED(rv))) {
+          continue;
+        }
+
+        AddEntry(std::move(ipcBlob));
+        continue;
+      }
+
+      // This is a hack to support kFilePromiseMime.
+      // On Windows there just needs to be an entry for it,
+      // and for OSX we need to create
+      // nsContentAreaDragDropDataProvider as nsIFlavorDataProvider.
+      if (!data || flavorStr.EqualsLiteral(kFilePromiseMime)) {
+        AddEntry(EmptyString()); // Just add an empty string entry.
+        continue;
       }
     }
   }
@@ -8234,51 +8223,59 @@ private:
   IShmemAllocator* mAllocator;
 };
 
+struct SurfaceBufLen
+{
+  SurfaceBufLen(IntSize aSize, SurfaceFormat aFormat, int32_t aStride) {
+    CheckedInt32 requiredBytes = CheckedInt32(aStride) * size.height;
+    mValid = requiredBytes.isValid();
+
+    if (mValid) {
+      mMaxBufLen = requiredBytes.Value();
+
+      // Surface data handling is totally nuts. This is the magic one needs to
+      // know to access the data.
+      mBufLen = mMaxBufLen - aStride + (aSize.width * BytesPerPixel(aFormat));
+    }
+  }
+
+  bool mValid;
+  size_t mMaxBufLen;
+  size_t mBufLen;
+};
+
 /*
  * Get the pixel data from the given source surface and return it as a buffer.
  * The length and stride will be assigned from the surface.
  */
 template <typename GetSurfaceDataContext = GetSurfaceDataRawBuffer>
 typename GetSurfaceDataContext::ReturnType
-GetSurfaceDataImpl(mozilla::gfx::DataSourceSurface* aSurface,
+GetSurfaceDataImpl(DataSourceSurface* aSurface,
                    size_t* aLength, int32_t* aStride,
                    GetSurfaceDataContext aContext = GetSurfaceDataContext())
 {
-  mozilla::gfx::DataSourceSurface::MappedSurface map;
-  if (!aSurface->Map(mozilla::gfx::DataSourceSurface::MapType::READ, &map)) {
+  DataSourceSurface::ScopedMap map(aSurface, DataSourceSurface::MapType::READ);
+  if (!map.IsMapped()) {
     return GetSurfaceDataContext::NullValue();
   }
 
-  mozilla::gfx::IntSize size = aSurface->GetSize();
-  mozilla::CheckedInt32 requiredBytes =
-    mozilla::CheckedInt32(map.mStride) * mozilla::CheckedInt32(size.height);
-  if (!requiredBytes.isValid()) {
-    aSurface->Unmap();
-    return GetSurfaceDataContext::NullValue();
-  }
-
-  size_t maxBufLen = requiredBytes.value();
-  mozilla::gfx::SurfaceFormat format = aSurface->GetFormat();
-
-  // Surface data handling is totally nuts. This is the magic one needs to
-  // know to access the data.
-  size_t bufLen = maxBufLen - map.mStride + (size.width * BytesPerPixel(format));
+  SurfaceBufLen bl(aSurface->GetSize(), aSurface->GetFormat(), map.GetStride());
 
   // nsDependentCString wants null-terminated string.
-  typename GetSurfaceDataContext::ReturnType surfaceData = aContext.Allocate(maxBufLen + 1);
+  typename GetSurfaceDataContext::ReturnType surfaceData =
+    aContext.Allocate(bl.mMaxBufLen + 1);
+
   if (GetSurfaceDataContext::GetBuffer(surfaceData)) {
     memcpy(GetSurfaceDataContext::GetBuffer(surfaceData),
-           reinterpret_cast<char*>(map.mData),
-           bufLen);
+           reinterpret_cast<char*>(map.GetData()),
+           bl.mBufLen);
     memset(GetSurfaceDataContext::GetBuffer(surfaceData) + bufLen,
            0,
-           maxBufLen - bufLen + 1);
+           bl.mMaxBufLen - bl.mBufLen + 1);
   }
 
-  *aLength = maxBufLen;
-  *aStride = map.mStride;
+  *aLength = bl.mMaxBufLen;
+  *aStride = map.GetStride();
 
-  aSurface->Unmap();
   return surfaceData;
 }
 } // Anonymous namespace.

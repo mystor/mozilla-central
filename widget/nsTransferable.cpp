@@ -225,6 +225,17 @@ nsTransferable::Init(nsILoadContext* aContext)
   return NS_OK;
 }
 
+static already_AddRefd<nsIMutableArray>
+ToArrayIface(const nsTArray<nsCString>& aFlavors)
+{
+  nsCOMPtr<nsIMutableArray> array = nsArray::Create();
+  for (const nsCString& str : aFlavors) {
+    nsCOMPtr<nsISupports> wrapper = new nsSupportsCString(str);
+    array->AppendElement(wrapper);
+  }
+  return array.forget();
+}
+
 //
 // GetTransferDataFlavors
 //
@@ -235,23 +246,20 @@ nsTransferable::Init(nsILoadContext* aContext)
 already_AddRefed<nsIMutableArray>
 nsTransferable::GetTransferDataFlavors()
 {
-  MOZ_ASSERT(mInitialized);
-
-  nsCOMPtr<nsIMutableArray> array = nsArray::Create();
-
-  for (size_t i = 0; i < mDataArray.Length(); ++i) {
-    DataStruct& data = mDataArray.ElementAt(i);
-    nsCOMPtr<nsISupportsCString> flavorWrapper = do_CreateInstance(NS_SUPPORTS_CSTRING_CONTRACTID);
-    if ( flavorWrapper ) {
-      flavorWrapper->SetData ( data.GetFlavor() );
-      nsCOMPtr<nsISupports> genericWrapper ( do_QueryInterface(flavorWrapper) );
-      array->AppendElement( genericWrapper );
-    }
-  }
-
-  return array.forget();
+  return ToArrayIface(GetDataFlavors());
 }
 
+nsTArray<nsCString>
+nsTransferable::GetDataFlavors()
+{
+  MOZ_ASSERT(mInitialized);
+
+  nsTArray<nsCString> flavors;
+  for (DataStruct& data : mDataArray) {
+    flavors.AppendElement(data.GetFlavor());
+  }
+  return flavors;
+}
 
 //
 // GetTransferData
@@ -536,6 +544,12 @@ nsTransferable::FlavorsTransferableCanImport(nsIArray **_retval)
   array.forget(_retval);
   return NS_OK;
 } // FlavorsTransferableCanImport
+
+nsTArray<nsCString>
+nsTransferable::ImportFlavors()
+{
+
+}
 
 
 //
