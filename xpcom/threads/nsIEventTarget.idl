@@ -118,7 +118,14 @@ public:
    * events, so this event would never run and has not been dispatched.
    */
   [noscript, binaryname(Dispatch)] void dispatchFromC(in alreadyAddRefed_nsIRunnable event,
-                                                      [default(DISPATCH_NORMAL)] in unsigned long flags);
+                                                      in unsigned long flags);
+
+  %{C++
+  nsresult Dispatch(already_AddRefed<nsIRunnable> event) {
+    return Dispatch(std::move(event), NS_DISPATCH_NORMAL);
+  }
+  %}
+
   /**
    * Version of Dispatch to expose to JS, which doesn't require an alreadyAddRefed<>
    * (it will be converted to that internally)

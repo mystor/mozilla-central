@@ -77,7 +77,7 @@ def write_interface(iface, fd):
             'base': base,
             'methods': 'Ok(&[\n%s])' % methods,
         })
-    except xpidl.RustNoncompat as reason:
+    except xpidl.UnsupportedError as reason:
         fd.write(derive_iface_tmpl % {
             'name': iface.name,
             'base': base,

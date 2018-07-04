@@ -19,8 +19,8 @@ from ply import yacc
         'returns True or False'
 
     def nativeType(self, calltype):
-        'returns a string representation of the native type
-        calltype must be 'in', 'out', or 'inout'
+        returns a string representation of the native type
+        calltype must be 'in', 'out', 'inout', or 'own'.
 
 Interface members const/method/attribute conform to the following pattern:
 
@@ -112,72 +112,160 @@ class BuiltinLocation(object):
         return self.get()
 
 
-class Builtin(object):
+class IDLError(Exception):
+    def __init__(self, message, location, warning=False):
+        self.message = message
+        self.location = location
+        self.warning = warning
+
+    def __str__(self):
+        return "%s: %s, %s" % (self.warning and 'warning' or 'error',
+                               self.message, self.location)
+
+
+class UnsupportedError(IDLError):
+    def __init__(self, message, location="<unknown>"):
+        IDLError.__init__(self, message, location)
+
+
+class IDLType(object):
+    cxx = None
+    rust = None
+    xpt = None
+
+    def convert(self, calltype, target, config, const=False):
+        """Convert the type into a useful value for the target"""
+
+        # Mapping from calltype to the index in the tuple to look up.
+        CALLTYPE_IDX = {'in': 0, 'out': 1, 'inout': 1, 'own': 2}
+
+        # Types have templates defined in tuples.
+        if config is None:
+            raise UnsupportedError(
+                "{} unsupported for {}".format(self, target),
+                self.location)
+
+        assert isinstance(config, tuple)
+        assert len(config) == 3
+
+        # Look up the template based on the calltype.
+        template = config[CALLTYPE_IDX[calltype]]
+        if template is None:
+            raise UnsupportedError(
+                "{} unsupported for {}".format(self, calltype),
+                self.location)
+
+        # Run the format algorithm on the template.
+        return template.format(self=self,
+            cxx_const='const ' if const else '')
+
+    def nativeType(self, calltype, const=False):
+        return self.convert(calltype, 'c++', self.cxx, const=const)
+
+    def rustType(self, calltype, const=False):
+        return self.convert(calltype, 'rust', self.rust, const=const)
+
+    def xptType(self, calltype):
+        if self.xpt is None:
+            raise UnsupportedError(
+                "{} unsupported for xpt".format(self),
+                self.location)
+        return self.xpt
+
+    def isScriptable(self):
+        return self.xpt is not None
+
+
+class Builtin(IDLType):
     kind = 'builtin'
     location = BuiltinLocation
 
-    def __init__(self, name, nativename, rustname, signed=False, maybeConst=False):
+    def __init__(self, name, cxx=None, xpt=None, rust=None, maybeConst=False):
+        # Handle cxx and rust arguments being passed literals.
+        if isinstance(cxx, basestring):
+            cxx = (cxx, '%s*' % cxx, cxx)
+        if isinstance(rust, basestring):
+            rust = (rust, '*mut %s' % rust, rust)
+
         self.name = name
-        self.nativename = nativename
-        self.rustname = rustname
-        self.signed = signed
+        self.cxx = cxx
+        self.xpt = xpt
+        self.rust = rust
         self.maybeConst = maybeConst
 
-    def isScriptable(self):
-        return True
-
-    def isPointer(self):
-        """Check if this type is a pointer type - this will control how pointers act"""
-        return self.nativename.endswith('*')
-
-    def nativeType(self, calltype, shared=False, const=False):
-        if const:
-            print >>sys.stderr, IDLError(
-                "[const] doesn't make sense on builtin types.", self.location, warning=True)
-            const = 'const '
-        elif calltype == 'in' and self.isPointer():
-            const = 'const '
-        elif shared:
-            if not self.isPointer():
-                raise IDLError("[shared] not applicable to non-pointer types.", self.location)
-            const = 'const '
-        else:
-            const = ''
-        return "%s%s %s" % (const, self.nativename,
-                            calltype != 'in' and '*' or '')
-
-    def rustType(self, calltype, shared=False, const=False):
-        # We want to rewrite any *mut pointers to *const pointers if constness
-        # was requested.
-        const = const or (calltype == 'in' and self.isPointer()) or shared
-        rustname = self.rustname
-        if const and self.isPointer():
-            rustname = self.rustname.replace("*mut", "*const")
-
-        return "%s%s" % (calltype != 'in' and '*mut ' or '', rustname)
+        builtinMap[name] = self
 
 
-builtinNames = [
-    Builtin('boolean', 'bool', 'bool'),
-    Builtin('void', 'void', 'libc::c_void'),
-    Builtin('octet', 'uint8_t', 'libc::uint8_t'),
-    Builtin('short', 'int16_t', 'libc::int16_t', True, True),
-    Builtin('long', 'int32_t', 'libc::int32_t', True, True),
-    Builtin('long long', 'int64_t', 'libc::int64_t', True, False),
-    Builtin('unsigned short', 'uint16_t', 'libc::uint16_t', False, True),
-    Builtin('unsigned long', 'uint32_t', 'libc::uint32_t', False, True),
-    Builtin('unsigned long long', 'uint64_t', 'libc::uint64_t', False, False),
-    Builtin('float', 'float', 'libc::c_float', True, False),
-    Builtin('double', 'double', 'libc::c_double', True, False),
-    Builtin('char', 'char', 'libc::c_char', True, False),
-    Builtin('string', 'char *', '*const libc::c_char', False, False),
-    Builtin('wchar', 'char16_t', 'libc::int16_t', False, False),
-    Builtin('wstring', 'char16_t *', '*const libc::int16_t', False, False),
-]
+#################################################
+# Define the set of builtins avaliable in XPIDL #
+#################################################
 
+# Map from typename to each builtin. Filled as Builtin objects are constructed.
 builtinMap = {}
-for b in builtinNames:
-    builtinMap[b.name] = b
+
+# Simple builtin primitive types
+Builtin('boolean', cxx='bool', rust='bool', xpt='TD_BOOL')
+Builtin('void', cxx='void', rust='libc::c_void', xpt='TD_VOID')
+Builtin('octet', cxx='uint8_t', rust='libc::uint8_t', xpt='TD_UINT8')
+Builtin('short', cxx='int16_t', rust='libc::int16_t', xpt='TD_INT16', maybeConst=True)
+Builtin('long', cxx='int32_t', rust='libc::int32_t', xpt='TD_INT32', maybeConst=True)
+Builtin('long long', cxx='int64_t', rust='libc::int64_t', xpt='TD_INT64')
+Builtin('unsigned short', cxx='uint16_t', rust='libc::uint16_t', xpt='TD_UINT16', maybeConst=True)
+Builtin('unsigned long', cxx='uint32_t', rust='libc::uint32_t', xpt='TD_UINT32', maybeConst=True)
+Builtin('unsigned long long', cxx='uint64_t', rust='libc::uint64_t', xpt='TD_UINT64')
+Builtin('float', cxx='float', rust='libc::c_float', xpt='TD_FLOAT')
+Builtin('double', cxx='double', rust='libc::c_double', xpt='TD_DOUBLE')
+Builtin('char', cxx='char', rust='libc::c_char', xpt='TD_CHAR')
+Builtin('wchar', cxx='char16_t', rust='libc::int16_t', xpt='TD_WCHAR')
+
+# String class types
+for name, xpt in [('AString', 'TD_ASTRING'), ('DOMString', 'TD_DOMSTRING')]:
+    Builtin(name, xpt=xpt,
+        cxx=('const nsAString&', 'nsAString&', 'nsString'),
+        rust=('*const nsstring::nsAString', '*mut nsstring::nsAString',
+              'nsstring::nsString'))
+
+for name, xpt in [('ACString', 'TD_CSTRING'), ('AUTF8String', 'TD_UTF8STRING')]:
+    Builtin(name, xpt=xpt,
+        cxx=('const nsACString&', 'nsACString&', 'nsCString'),
+        rust=('*const nsstring::nsACString', '*mut nsstring::nsACString',
+              'nsstring::nsCString'))
+
+# Raw string pointers
+Builtin('string', xpt='TD_PSTRING', cxx=('const char*', 'char**', None))
+Builtin('wstring', xpt='TD_PWSTRING', cxx=('const char16_t*', 'char16_t**', None))
+
+# jsval uses HandleValue and MutableHandleValue for in/out-params, & Value for
+# owned array elements.
+Builtin('jsval', xpt='TD_JSVAL',
+        cxx=('JS::HandleValue', 'JS::MutableHandleValue', 'JS::Value'))
+
+# Promises are passed like interfaces.
+Builtin('Promise', xpt='TD_PROMISE',
+        cxx=('mozilla::dom::Promise*', 'mozilla::dom::Promise**', 
+             'RefPtr<mozilla::dom::Promise>'))
+
+# nsQIResult is a special type used for iid_is parameters. It is effectively a
+# special void*.
+Builtin('nsQIResult', xpt='TD_INTERFACE_IS_TYPE',
+        cxx=('void*', 'void**', None),
+        rust=('*const libc::c_void', '*mut *mut libc::c_void', None))
+
+# Generate all of the different nsID variant types
+for nsid in ['nsID', 'nsIID', 'nsCID']:
+    # Bare nsID is never scriptable, and can appear in TArrays.
+    Builtin(nsid, xpt=None,
+            cxx=(nsid, '%s*' % nsid, nsid),
+            rust=(nsid, '*mut %s' % nsid, nsid))
+
+    # XXX(nika): nsIDRef is incorrectly considered scriptable in outparams.
+    Builtin(nsid+'Ref', xpt='TD_PNSIID',
+            cxx=('const %s&' % nsid, '%s&' % nsid, None),
+            rust=('*const %s' % nsid, '*mut %s' % nsid, None))
+
+    Builtin(nsid+'Ptr', xpt='TD_PNSIID',
+            cxx=('const %s*' % nsid, '%s**' % nsid, None),
+            rust=('*const %s' % nsid, '*mut *mut %s' % nsid, None))
 
 
 class Location(object):
@@ -265,30 +353,6 @@ class NameMap(object):
             raise IDLError("Name '%s' not found", location)
 
 
-class RustNoncompat(Exception):
-    """
-    This exception is raised when a particular type or function cannot be safely exposed to
-    rust code
-    """
-
-    def __init__(self, reason):
-        self.reason = reason
-
-    def __str__(self):
-        return self.reason
-
-
-class IDLError(Exception):
-    def __init__(self, message, location, warning=False):
-        self.message = message
-        self.location = location
-        self.warning = warning
-
-    def __str__(self):
-        return "%s: %s, %s" % (self.warning and 'warning' or 'error',
-                               self.message, self.location)
-
-
 class Include(object):
     kind = 'include'
 
@@ -328,8 +392,21 @@ class IDL(object):
         self.namemap.set(object)
 
     def getName(self, id, location):
+        if isinstance(id, basestring):
+            id = TypeId(id)
+
+        if len(id.params) > 0:
+            # Templated types
+            if id.name == 'TArray':
+                if len(id.params) != 1:
+                    raise IDLError("TArray takes eactly 1 parameter", location)
+                return TArray(id.params[0])
+
+            raise IDLError("Unknown templated type %s" % id.name, location)
+
+        # normal single-name type
         try:
-            return self.namemap[id]
+            return self.namemap[id.name]
         except KeyError:
             raise IDLError("type '%s' not found" % id, location)
 
@@ -380,8 +457,14 @@ class CDATA(object):
         return 0
 
 
-class Typedef(object):
+class Typedef(IDLType):
     kind = 'typedef'
+
+    # XXX(nika): This won't work for some builtin types which don't follow the
+    # usual type patterns. We should probably check that we're using a sane
+    # realtype.
+    cxx = ('{self.name}', '{self.name}*', '{self.name}')
+    rust = ('{self.name}', '*mut {self.name}', '{self.name}')
 
     def __init__(self, type, name, location, doccomments):
         self.type = type
@@ -396,28 +479,30 @@ class Typedef(object):
         parent.setName(self)
         self.realtype = parent.getName(self.type, self.location)
 
+    # Override isScriptable and xptType to call on realtype.
     def isScriptable(self):
         return self.realtype.isScriptable()
 
-    def nativeType(self, calltype):
-        return "%s %s" % (self.name,
-                          calltype != 'in' and '*' or '')
-
-    def rustType(self, calltype):
-        return "%s%s" % (calltype != 'in' and '*mut ' or '',
-                         self.name)
+    def xptType(self, calltype):
+        return self.realtype.xptType(calltype)
 
     def __str__(self):
         return "typedef %s %s\n" % (self.type, self.name)
 
 
-class Forward(object):
+class Forward(IDLType):
     kind = 'forward'
+
+    cxx = ('{self.name}*', '{self.name}**', 'RefPtr<{self.name}>')
+    rust = ('*const {self.name}', '*mut *const {self.name}', None)
+    xpt = 'TD_INTERFACE_TYPE'
 
     def __init__(self, name, location, doccomments):
         self.name = name
         self.location = location
         self.doccomments = doccomments
+        if rustBlacklistedForward(self.name):
+            self.rust = None
 
     def __eq__(self, other):
         return other.kind == 'forward' and other.name == self.name
@@ -436,51 +521,14 @@ class Forward(object):
 
         parent.setName(self)
 
-    def isScriptable(self):
-        return True
-
-    def nativeType(self, calltype):
-        return "%s %s" % (self.name,
-                          calltype != 'in' and '* *' or '*')
-
-    def rustType(self, calltype):
-        if rustBlacklistedForward(self.name):
-            raise RustNoncompat("forward declaration %s is unsupported" % self.name)
-        return "%s*const %s" % (calltype != 'in' and '*mut ' or '',
-                                self.name)
-
     def __str__(self):
         return "forward-declared %s\n" % self.name
 
 
-class Native(object):
+class Native(IDLType):
     kind = 'native'
 
     modifier = None
-    specialtype = None
-
-    specialtypes = {
-        'nsid': None,
-        'domstring': 'nsAString',
-        'utf8string': 'nsACString',
-        'cstring': 'nsACString',
-        'astring': 'nsAString',
-        'jsval': 'JS::Value',
-        'promise': '::mozilla::dom::Promise',
-    }
-
-    # Mappings from C++ native name types to rust native names. Types which
-    # aren't listed here are incompatible with rust code.
-    rust_nativenames = {
-        'void': "libc::c_void",
-        'char': "u8",
-        'char16_t': "u16",
-        'nsID': "nsID",
-        'nsIID': "nsIID",
-        'nsCID': "nsCID",
-        'nsAString': "::nsstring::nsAString",
-        'nsACString': "::nsstring::nsACString",
-    }
 
     def __init__(self, name, nativename, attlist, location):
         self.name = name
@@ -494,35 +542,23 @@ class Native(object):
                 if self.modifier is not None:
                     raise IDLError("More than one ptr/ref modifier", aloc)
                 self.modifier = name
-            elif name in self.specialtypes.keys():
-                if self.specialtype is not None:
-                    raise IDLError("More than one special type", aloc)
-                self.specialtype = name
-                if self.specialtypes[name] is not None:
-                    self.nativename = self.specialtypes[name]
             else:
                 raise IDLError("Unexpected attribute", aloc)
+
+        # Native are only supported in cxx, define templates by modifier.
+        self.cxx = ('{self.nativename}', '{self.nativename}*', '{self.nativename}')
+        if self.modifier == 'ptr':
+            self.cxx = ('{cxx_const}{self.nativename}*', '{self.nativename}**', None)
+        elif self.modifier == 'ref':
+            self.cxx = ('{cxx_const}{self.nativename}&', '{self.nativename}&', None)
 
     def __eq__(self, other):
         return (self.name == other.name and
                 self.nativename == other.nativename and
-                self.modifier == other.modifier and
-                self.specialtype == other.specialtype)
+                self.modifier == other.modifier)
 
     def resolve(self, parent):
         parent.setName(self)
-
-    def isScriptable(self):
-        if self.specialtype is None:
-            return False
-
-        if self.specialtype == 'promise':
-            return self.modifier == 'ptr'
-
-        if self.specialtype == 'nsid':
-            return self.modifier is not None
-
-        return self.modifier == 'ref'
 
     def isPtr(self, calltype):
         return self.modifier == 'ptr'
@@ -530,57 +566,15 @@ class Native(object):
     def isRef(self, calltype):
         return self.modifier == 'ref'
 
-    def nativeType(self, calltype, const=False, shared=False):
-        if shared:
-            if calltype != 'out':
-                raise IDLError("[shared] only applies to out parameters.")
-            const = True
-
-        if self.specialtype not in [None, 'promise'] and calltype == 'in':
-            const = True
-
-        if self.specialtype == 'jsval':
-            if calltype == 'out' or calltype == 'inout':
-                return "JS::MutableHandleValue "
-            return "JS::HandleValue "
-
-        if self.isRef(calltype):
-            m = '& '
-        elif self.isPtr(calltype):
-            m = '*' + ((self.modifier == 'ptr' and calltype != 'in') and '*' or '')
-        else:
-            m = calltype != 'in' and '*' or ''
-        return "%s%s %s" % (const and 'const ' or '', self.nativename, m)
-
-    def rustType(self, calltype, const=False, shared=False):
-        if shared:
-            if calltype != 'out':
-                raise IDLError("[shared] only applies to out parameters.")
-            const = True
-
-        if self.specialtype is not None and calltype == 'in':
-            const = True
-
-        if self.nativename not in self.rust_nativenames:
-            raise RustNoncompat("native type %s is unsupported" % self.nativename)
-        name = self.rust_nativenames[self.nativename]
-
-        if self.isRef(calltype):
-            m = const and '&' or '&mut '
-        elif self.isPtr(calltype):
-            m = (const and '*const ' or '*mut ')
-            if self.modifier == 'ptr' and calltype != 'in':
-                m += '*mut '
-        else:
-            m = calltype != 'in' and '*mut ' or ''
-        return "%s%s" % (m, name)
-
     def __str__(self):
         return "native %s(%s)\n" % (self.name, self.nativename)
 
 
-class WebIDL(object):
+class WebIDL(IDLType):
     kind = 'webidl'
+
+    cxx = ('{self.native}*', '{self.native}**', 'RefPtr<{self.native}>')
+    xpt = 'TD_DOMOBJECT'
 
     def __init__(self, name, location):
         self.name = name
@@ -609,22 +603,19 @@ class WebIDL(object):
 
         parent.setName(self)
 
-    def isScriptable(self):
-        return True  # All DOM objects are script exposed.
-
-    def nativeType(self, calltype):
-        return "%s %s" % (self.native, calltype != 'in' and '* *' or '*')
-
-    def rustType(self, calltype):
-        # Just expose the type as a void* - we can't do any better.
-        return "%s*const libc::c_void" % (calltype != 'in' and '*mut ' or '')
-
     def __str__(self):
         return "webidl %s\n" % self.name
 
 
-class Interface(object):
+class Interface(IDLType):
     kind = 'interface'
+
+    cxx = ('{self.name}*', '{self.name}**', 'RefPtr<{self.name}>')
+    rust = ('*const {self.name}', '*mut *const {self.name}', None)
+
+    # NOTE: this is not whether *this* interface is scriptable... it's whether,
+    # when used as a type, it's scriptable, which is true of all interfaces.
+    xpt = 'TD_INTERFACE_TYPE'
 
     def __init__(self, name, attlist, base, members, location, doccomments):
         self.name = name
@@ -644,9 +635,6 @@ class Interface(object):
             if m.kind == 'method' and m.notxpcom and name != 'nsISupports':
                 # An interface cannot be implemented by JS if it has a
                 # notxpcom method. Such a type is an "implicit builtinclass".
-                #
-                # XXX(nika): Why does nostdcall not imply builtinclass?
-                # It could screw up the shims as well...
                 self.implicit_builtinclass = True
 
     def __eq__(self, other):
@@ -706,21 +694,6 @@ class Interface(object):
         if self.countEntries() > 250 and not self.attributes.builtinclass:
             raise IDLError("interface '%s' has too many entries" % self.name, self.location)
 
-    def isScriptable(self):
-        # NOTE: this is not whether *this* interface is scriptable... it's
-        # whether, when used as a type, it's scriptable, which is true of all
-        # interfaces.
-        return True
-
-    def nativeType(self, calltype, const=False):
-        return "%s%s %s" % (const and 'const ' or '',
-                            self.name,
-                            calltype != 'in' and '* *' or '*')
-
-    def rustType(self, calltype):
-        return "%s*const %s" % (calltype != 'in' and '*mut ' or '',
-                                self.name)
-
     def __str__(self):
         l = ["interface %s\n" % self.name]
         if self.base is not None:
@@ -748,7 +721,7 @@ class Interface(object):
 
     def needsJSTypes(self):
         for m in self.members:
-            if m.kind == "attribute" and m.type == "jsval":
+            if m.kind == "attribute" and m.type == TypeId("jsval"):
                 return True
             if m.kind == "method" and m.needsJSTypes():
                 return True
@@ -1084,11 +1057,11 @@ class Method(object):
     def needsJSTypes(self):
         if self.implicit_jscontext:
             return True
-        if self.type == "jsval":
+        if self.type == TypeId("jsval"):
             return True
         for p in self.params:
             t = p.realtype
-            if isinstance(t, Native) and t.specialtype == "jsval":
+            if isinstance(t, Builtin) and t.name == "jsval":
                 return True
         return False
 
@@ -1104,9 +1077,6 @@ class Param(object):
     retval = False
     shared = False
     optional = False
-    null = None
-    undefined = None
-    default_value = None
 
     def __init__(self, paramtype, type, name, attlist, location, realtype=None):
         self.paramtype = paramtype
@@ -1126,25 +1096,6 @@ class Param(object):
                 if value is None:
                     raise IDLError("'iid_is' must specify a parameter", aloc)
                 self.iid_is = value
-            elif name == 'Null':
-                if value is None:
-                    raise IDLError("'Null' must specify a parameter", aloc)
-                if value not in ('Empty', 'Null', 'Stringify'):
-                    raise IDLError("'Null' parameter value must be 'Empty', 'Null', "
-                                   "or 'Stringify'",
-                                   aloc)
-                self.null = value
-            elif name == 'Undefined':
-                if value is None:
-                    raise IDLError("'Undefined' must specify a parameter", aloc)
-                if value not in ('Empty', 'Null'):
-                    raise IDLError("'Undefined' parameter value must be 'Empty' or 'Null'",
-                                   aloc)
-                self.undefined = value
-            elif name == 'default':
-                if value is None:
-                    raise IDLError("'default' must specify a default value", aloc)
-                self.default_value = value
             else:
                 if value is not None:
                     raise IDLError("Unexpected value for attribute '%s'" % name,
@@ -1167,20 +1118,10 @@ class Param(object):
         self.realtype = method.iface.idl.getName(self.type, self.location)
         if self.array:
             self.realtype = Array(self.realtype)
-        if (self.null is not None and
-                getBuiltinOrNativeTypeName(self.realtype) != '[domstring]'):
-            raise IDLError("'Null' attribute can only be used on DOMString",
-                           self.location)
-        if (self.undefined is not None and
-                getBuiltinOrNativeTypeName(self.realtype) != '[domstring]'):
-            raise IDLError("'Undefined' attribute can only be used on DOMString",
-                           self.location)
 
     def nativeType(self):
         kwargs = {}
-        if self.shared:
-            kwargs['shared'] = True
-        if self.const:
+        if self.const or self.shared:
             kwargs['const'] = True
 
         try:
@@ -1192,15 +1133,17 @@ class Param(object):
 
     def rustType(self):
         kwargs = {}
-        if self.shared:
-            kwargs['shared'] = True
         if self.const:
             kwargs['const'] = True
+
+        if self.shared:
+            raise UnsupportedError("[shared] is unsupported")
 
         try:
             return self.realtype.rustType(self.paramtype, **kwargs)
         except IDLError as e:
-            raise IDLError(e.message, self.location)
+            e.location = self.location
+            raise
         except TypeError as e:
             raise IDLError("Unexpected parameter attribute", self.location)
 
@@ -1211,20 +1154,73 @@ class Param(object):
                                self.name)
 
 
-class Array(object):
+class Array(IDLType):
+    kind = 'array'
+
+    xpt = 'TD_ARRAY'
+
     def __init__(self, basetype):
         self.type = basetype
+        self.location = self.type.location
+
+        # Ensure that certain builtin types are never put into [array]
+        # XXX(nika): This list is non-exhaustive
+        if self.type.kind == 'builtin' and \
+            self.type.name in ['jsval', 'DOMString', 'AUTF8String', 
+                               'ACString', 'AString']:
+            raise IDLError("Unsupported [array] element type", self.type.location)
 
     def isScriptable(self):
         return self.type.isScriptable()
 
     def nativeType(self, calltype, const=False):
+        # For historical reasons, Array has very odd behaviour when it comes to
+        # selecting how to define array types. For this reason it is deprecated.
         return "%s%s*" % (const and 'const ' or '',
                           self.type.nativeType(calltype))
 
-    def rustType(self, calltype, const=False):
-        return "%s %s" % (const and '*const' or '*mut',
-                          self.type.rustType(calltype))
+
+class TArray(object):
+    kind = 'tarray'
+
+    cxx = ('const nsTArray<{self.cxxElt}>&', 'nsTArray<{self.cxxElt}>&',
+           'nsTArray<{self.cxxElt}>')
+    xpt = 'TD_TARRAY'
+
+    def __init__(self, eltType):
+        self.type = eltType
+        self.ownRust = self.type.nativeType('own')
+
+    def isScriptable(self):
+        return self.type.isScriptable()
+
+    @property
+    def cxxElt(self):
+        return self.type.nativeType('own')
+
+    @property
+    def rustElt(self):
+        return self.type.rustType('own')
+
+
+class TypeId(object):
+    def __init__(self, name, params=[]):
+        self.name = name
+        self.params = tuple(params)
+
+    def __key(self):
+        return (self.name, self.params)
+
+    def __eq__(self, other):
+        return self.__key() == other.__key()
+
+    def __hash__(self):
+        return self.__key().__hash__()
+
+    def __str__(self):
+        if len(self.params) > 0:
+            return "%s<%s>" % (self.name, ", ".join(self.params))
+        return self.name
 
 
 class IDLParser(object):
@@ -1267,7 +1263,7 @@ class IDLParser(object):
     t_LSHIFT = r'<<'
     t_RSHIFT = r'>>'
 
-    literals = '"(){}[],;:=|+-*'
+    literals = '"(){}[]<>,;:=|+-*'
 
     t_ignore = ' \t'
 
@@ -1360,7 +1356,7 @@ class IDLParser(object):
         p[0].insert(0, p[1])
 
     def p_typedef(self, p):
-        """typedef : TYPEDEF IDENTIFIER IDENTIFIER ';'"""
+        """typedef : TYPEDEF type IDENTIFIER ';'"""
         p[0] = Typedef(type=p[2],
                        name=p[3],
                        location=self.getLocation(p, 1),
@@ -1473,7 +1469,7 @@ class IDLParser(object):
         p[0] = CDATA(p[1], self.getLocation(p, 1))
 
     def p_member_const(self, p):
-        """member : CONST IDENTIFIER IDENTIFIER '=' number ';' """
+        """member : CONST type IDENTIFIER '=' number ';' """
         p[0] = ConstMember(type=p[2], name=p[3],
                            value=p[5], location=self.getLocation(p, 1),
                            doccomments=p.slice[1].doccomments)
@@ -1535,7 +1531,7 @@ class IDLParser(object):
         p[0] = lambda i: n1(i) | n2(i)
 
     def p_member_att(self, p):
-        """member : attributes optreadonly ATTRIBUTE IDENTIFIER IDENTIFIER ';'"""
+        """member : attributes optreadonly ATTRIBUTE type IDENTIFIER ';'"""
         if 'doccomments' in p[1]:
             doccomments = p[1]['doccomments']
         elif p[2] is not None:
@@ -1551,11 +1547,14 @@ class IDLParser(object):
                          doccomments=doccomments)
 
     def p_member_method(self, p):
-        """member : attributes IDENTIFIER IDENTIFIER '(' paramlist ')' raises ';'"""
+        """member : attributes type IDENTIFIER '(' paramlist ')' raises ';'"""
         if 'doccomments' in p[1]:
             doccomments = p[1]['doccomments']
         else:
-            doccomments = p.slice[2].doccomments
+            try:
+                doccomments = p.slice[2].doccomments
+            except AttributeError:
+                doccomments = []
 
         p[0] = Method(type=p[2],
                       name=p[3],
@@ -1584,7 +1583,7 @@ class IDLParser(object):
         p[0].insert(0, p[2])
 
     def p_param(self, p):
-        """param : attributes paramtype IDENTIFIER IDENTIFIER"""
+        """param : attributes paramtype type IDENTIFIER"""
         p[0] = Param(paramtype=p[2],
                      type=p[3],
                      name=p[4],
@@ -1619,6 +1618,23 @@ class IDLParser(object):
 
     def p_idlist_continue(self, p):
         """idlist : IDENTIFIER ',' idlist"""
+        p[0] = list(p[3])
+        p[0].insert(0, p[1])
+
+    def p_type(self, p):
+        """type : IDENTIFIER '<' typelist '>'
+                | IDENTIFIER"""
+        if len(p) == 2:
+            p[0] = TypeId(p[1])
+        else:
+            p[0] = TypeId(p[1], p[3])
+
+    def p_typelist(self, p):
+        """typelist : type"""
+        p[0] = [p[1]]
+
+    def p_typelist_continue(self, p):
+        """typelist : type ',' typelist"""
         p[0] = list(p[3])
         p[0].insert(0, p[1])
 

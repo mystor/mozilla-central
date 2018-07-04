@@ -123,7 +123,7 @@ def paramlistAsNative(m, empty='void'):
                 m.params[paramIter].paramtype == "out"):
             t = m.params[paramIter].type
             # Strings can't be optional, so this shouldn't happen, but let's make sure:
-            if t == "AString" or t == "ACString" or t == "DOMString" or t == "AUTF8String":
+            if t.name in ["AString", "ACString", "DOMString", "AUTF8String"]:
                 break
             l[paramIter] += " = nullptr"
             paramIter -= 1
@@ -135,12 +135,7 @@ def paramlistAsNative(m, empty='void'):
 
 
 def paramAsNative(p):
-    default_spec = ''
-    if p.default_value:
-        default_spec = " = " + p.default_value
-    return "%s%s%s" % (p.nativeType(),
-                       p.name,
-                       default_spec)
+    return "%s%s" % (p.nativeType(), p.name)
 
 
 def paramlistNames(m):
@@ -362,7 +357,7 @@ def write_interface(iface, fd):
             enums.append("    %(name)s = %(value)s%(signed)s" % {
                          'name': c.name,
                          'value': value,
-                         'signed': (not basetype.signed) and 'U' or ''})
+                         'signed': 'U' if 'unsigned' in basetype.name else ''})
         fd.write(",\n".join(enums))
         fd.write("\n  };\n\n")
 

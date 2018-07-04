@@ -128,9 +128,9 @@ def attributeRawParamList(iface, a, getter):
     l = [(attributeParamName(a),
           a.realtype.rustType('out' if getter else 'in'))]
     if a.implicit_jscontext:
-        raise xpidl.RustNoncompat("jscontext is unsupported")
+        raise xpidl.UnsupportedError("jscontext is unsupported")
     if a.nostdcall:
-        raise xpidl.RustNoncompat("nostdcall is unsupported")
+        raise xpidl.UnsupportedError("nostdcall is unsupported")
     return l
 
 
@@ -145,10 +145,10 @@ def attrAsVTableEntry(iface, m, getter):
         return "pub %s: unsafe extern \"system\" fn (%s) -> nsresult" % \
             (attributeNativeName(m, getter),
              attributeParamList(iface, m, getter))
-    except xpidl.RustNoncompat as reason:
+    except xpidl.UnsupportedError as reason:
         return """\
 /// Unable to generate binding because `%s`
-pub %s: *const ::libc::c_void""" % (reason, attributeNativeName(m, getter))
+pub %s: *const ::libc::c_void""" % (reason.message, attributeNativeName(m, getter))
 
 
 # Method VTable generation functions
@@ -167,13 +167,13 @@ def methodRawParamList(iface, m):
     l = [(rustSanitize(p.name), p.rustType()) for p in m.params]
 
     if m.implicit_jscontext:
-        raise xpidl.RustNoncompat("jscontext is unsupported")
+        raise xpidl.UnsupportedError("jscontext is unsupported")
 
     if m.optional_argc:
-        raise xpidl.RustNoncompat("optional_argc is unsupported")
+        raise xpidl.UnsupportedError("optional_argc is unsupported")
 
     if m.nostdcall:
-        raise xpidl.RustNoncompat("nostdcall is unsupported")
+        raise xpidl.UnsupportedError("nostdcall is unsupported")
 
     if not m.notxpcom and m.realtype.name != 'void':
         l.append(("_retval", m.realtype.rustType('out')))
@@ -193,10 +193,10 @@ def methodAsVTableEntry(iface, m):
             (methodNativeName(m),
              methodParamList(iface, m),
              methodReturnType(m))
-    except xpidl.RustNoncompat as reason:
+    except xpidl.UnsupportedError as reason:
         return """\
 /// Unable to generate binding because `%s`
-pub %s: *const ::libc::c_void""" % (reason, methodNativeName(m))
+pub %s: *const ::libc::c_void""" % (reason.message, methodNativeName(m))
 
 
 method_impl_tmpl = """\
@@ -219,7 +219,7 @@ def methodAsWrapper(iface, m):
             'ret_ty': methodReturnType(m),
             'args': ', '.join(args),
         }
-    except xpidl.RustNoncompat:
+    except xpidl.UnsupportedError:
         # Dummy field for the doc comments to attach to.
         # Private so that it's not shown in rustdoc.
         return "const _%s: () = ();" % methodNativeName(m)
@@ -239,10 +239,10 @@ pub unsafe fn %(name)s(&self) -> %(realtype)s {
 def attrAsWrapper(iface, m, getter):
     try:
         if m.implicit_jscontext:
-            raise xpidl.RustNoncompat("jscontext is unsupported")
+            raise xpidl.UnsupportedError("jscontext is unsupported")
 
         if m.nostdcall:
-            raise xpidl.RustNoncompat("nostdcall is unsupported")
+            raise xpidl.UnsupportedError("nostdcall is unsupported")
 
         name = attributeParamName(m)
 
@@ -261,7 +261,7 @@ def attrAsWrapper(iface, m, getter):
             'args': name,
         }
 
-    except xpidl.RustNoncompat:
+    except xpidl.UnsupportedError:
         # Dummy field for the doc comments to attach to.
         # Private so that it's not shown in rustdoc.
         return "const _%s: () = ();" % attributeNativeName(m, getter)
@@ -308,9 +308,9 @@ def print_rust_bindings(idl, fd, filename):
                              (p.realtype.nativeType('in'), p.name))
                     fd.write(doccomments(p.doccomments))
                 fd.write("pub type %s = %s;\n\n" % (p.name, p.realtype.rustType('in')))
-            except xpidl.RustNoncompat as reason:
+            except xpidl.UnsupportedError as reason:
                 fd.write("/* unable to generate %s typedef because `%s` */\n\n" %
-                         (p.name, reason))
+                         (p.name, reason.message))
 
 
 base_vtable_tmpl = """

@@ -11,94 +11,39 @@ import xpidl
 import json
 import itertools
 
-# A map of xpidl.py types to xpt enum variants
-TypeMap = {
-    # builtins
-    'boolean':            'TD_BOOL',
-    'void':               'TD_VOID',
-    'int16_t':            'TD_INT16',
-    'int32_t':            'TD_INT32',
-    'int64_t':            'TD_INT64',
-    'uint8_t':            'TD_UINT8',
-    'uint16_t':           'TD_UINT16',
-    'uint32_t':           'TD_UINT32',
-    'uint64_t':           'TD_UINT64',
-    'octet':              'TD_UINT8',
-    'short':              'TD_INT16',
-    'long':               'TD_INT32',
-    'long long':          'TD_INT64',
-    'unsigned short':     'TD_UINT16',
-    'unsigned long':      'TD_UINT32',
-    'unsigned long long': 'TD_UINT64',
-    'float':              'TD_FLOAT',
-    'double':             'TD_DOUBLE',
-    'char':               'TD_CHAR',
-    'string':             'TD_PSTRING',
-    'wchar':              'TD_WCHAR',
-    'wstring':            'TD_PWSTRING',
-    # special types
-    'nsid':               'TD_PNSIID',
-    'domstring':          'TD_DOMSTRING',
-    'astring':            'TD_ASTRING',
-    'utf8string':         'TD_UTF8STRING',
-    'cstring':            'TD_CSTRING',
-    'jsval':              'TD_JSVAL',
-    'promise':            'TD_PROMISE',
-}
-
 
 def flags(*flags):
     return [flag for flag, cond in flags if cond]
 
 
 def get_type(type, calltype, iid_is=None, size_is=None):
-    while isinstance(type, xpidl.Typedef):
-        type = type.realtype
+    try:
+        xpt = {'tag': type.xptType(calltype)}
+    except xpidl.UnsupportedError:
+        return {'tag': 'TD_VOID'}
 
-    if isinstance(type, xpidl.Builtin):
-        ret = {'tag': TypeMap[type.name]}
-        if type.name in ['string', 'wstring'] and size_is is not None:
-            ret['tag'] += '_SIZE_IS'
-            ret['size_is'] = size_is
-        return ret
+    if xpt['tag'] in ['TD_STRING', 'TD_WSTRING'] and size_is is not None:
+        xpt['tag'] += '_SIZE_IS'
+        xpt['size_is'] = size_is
 
-    if isinstance(type, xpidl.Array):
+    if xpt['tag'] == 'TD_ARRAY':
         # NB: For an Array<T> we pass down the iid_is to get the type of T.
         #     This allows Arrays of InterfaceIs types to work.
-        return {
-            'tag': 'TD_ARRAY',
-            'size_is': size_is,
-            'element': get_type(type.type, calltype, iid_is),
-        }
+        xpt['size_is'] = size_is
+        xpt['element'] = get_type(type.type, calltype, iid_is)
 
-    if isinstance(type, xpidl.Interface) or isinstance(type, xpidl.Forward):
-        return {
-            'tag': 'TD_INTERFACE_TYPE',
-            'name': type.name,
-        }
+    if xpt['tag'] == 'TD_INTERFACE_TYPE':
+        xpt['name'] = type.name
 
-    if isinstance(type, xpidl.WebIDL):
-        return {
-            'tag': 'TD_DOMOBJECT',
-            'name': type.name,
-            'native': type.native,
-            'headerFile': type.headerFile,
-        }
+    if xpt['tag'] == 'TD_DOMOBJECT':
+        xpt['name'] = type.name
+        xpt['native'] = type.native
+        xpt['headerFile'] = type.headerFile
 
-    if isinstance(type, xpidl.Native):
-        if type.specialtype:
-            return {
-                'tag': TypeMap[type.specialtype]
-            }
-        elif iid_is is not None:
-            return {
-                'tag': 'TD_INTERFACE_IS_TYPE',
-                'iid_is': iid_is,
-            }
-        else:
-            return {'tag': 'TD_VOID'}
+    if xpt['tag'] == 'TD_INTERFACE_IS_TYPE':
+        xpt['iid_is'] = iid_is
 
-    raise Exception("Unknown type!")
+    return xpt
 
 
 def mk_param(type, in_=0, out=0, optional=0):
