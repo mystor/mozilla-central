@@ -463,11 +463,14 @@ FTPChannelParent::OnStartRequest(nsIRequest* aRequest, nsISupports* aContext)
 
   // Send down any permissions which are relevant to this URL if we are
   // performing a document load.
-  if (!mIPCClosed) {
-    PContentParent* pcp = Manager()->Manager();
-    MOZ_ASSERT(pcp, "We should have a manager if our IPC isn't closed");
-    DebugOnly<nsresult> rv =
-      static_cast<ContentParent*>(pcp)->AboutToLoadHttpFtpWyciwygDocumentForChild(chan);
+  if (!mIPCClosed && chan->IsDocument()) {
+    ContentParent* cp = static_cast<ContentParent*>(Manager()->Manager());
+    MOZ_ASSERT(cp, "We should have a manager if our IPC isn't closed");
+
+    nsresult rv = cp->AboutToLoadDocumentForChild(chan, mTabParent);
+    if (rv == NS_BINDING_ABORTED) {
+      return rv;
+    }
     MOZ_ASSERT(NS_SUCCEEDED(rv));
   }
 

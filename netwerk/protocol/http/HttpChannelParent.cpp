@@ -1409,11 +1409,17 @@ HttpChannelParent::OnStartRequest(nsIRequest *aRequest, nsISupports *aContext)
 
   // Send down any permissions which are relevant to this URL if we are
   // performing a document load. We can't do that if mIPCClosed is set.
-  if (!mIPCClosed) {
-    PContentParent* pcp = Manager()->Manager();
-    MOZ_ASSERT(pcp, "We should have a manager if our IPC isn't closed");
-    DebugOnly<nsresult> rv =
-      static_cast<ContentParent*>(pcp)->AboutToLoadHttpFtpWyciwygDocumentForChild(chan);
+  //
+  // NOTE: Also check IsNavigation in addition to IsDocument to correctly
+  // transmit permissions etc. for view-source: URLs.
+  if (!mIPCClosed && (chan->IsDocument() || chan->IsNavigation())) {
+    ContentParent* cp = static_cast<ContentParent*>(Manager()->Manager());
+    MOZ_ASSERT(cp, "We should have a manager if our IPC isn't closed");
+
+    rv = cp->AboutToLoadDocumentForChild(chan, mTabParent);
+    if (rv == NS_BINDING_ABORTED) {
+      return rv;
+    }
     MOZ_ASSERT(NS_SUCCEEDED(rv));
   }
 

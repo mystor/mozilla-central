@@ -661,7 +661,7 @@ public:
   // HTTP(S), FTP or wyciwyg channel for a content process.  It is a useful
   // place to start to kick off work as early as possible in response to such
   // document loads.
-  nsresult AboutToLoadHttpFtpWyciwygDocumentForChild(nsIChannel* aChannel);
+  nsresult AboutToLoadDocumentForChild(nsIChannel* aChannel, TabParent* aTab);
 
   nsresult TransmitPermissionsForPrincipal(nsIPrincipal* aPrincipal);
 

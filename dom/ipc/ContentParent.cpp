@@ -5543,25 +5543,8 @@ ContentParent::UpdateCookieStatus(nsIChannel   *aChannel)
 }
 
 nsresult
-ContentParent::AboutToLoadHttpFtpWyciwygDocumentForChild(nsIChannel* aChannel)
+ContentParent::AboutToLoadDocumentForChild(nsIChannel* aChannel, TabParent* aTab)
 {
-  MOZ_ASSERT(aChannel);
-
-  nsresult rv;
-  bool isDocument = aChannel->IsDocument();
-  if (!isDocument) {
-    // We may be looking at a nsIHttpChannel which has isMainDocumentChannel set
-    // (e.g. the internal http channel for a view-source: load.).
-    nsCOMPtr<nsIHttpChannel> httpChannel = do_QueryInterface(aChannel);
-    if (httpChannel) {
-      rv = httpChannel->GetIsMainDocumentChannel(&isDocument);
-      NS_ENSURE_SUCCESS(rv, rv);
-    }
-  }
-  if (!isDocument) {
-    return NS_OK;
-  }
-
   // Get the principal for the channel result, so that we can get the permission
   // key for the document which will be created from this response.
   nsIScriptSecurityManager* ssm = nsContentUtils::GetSecurityManager();
@@ -5570,9 +5553,11 @@ ContentParent::AboutToLoadHttpFtpWyciwygDocumentForChild(nsIChannel* aChannel)
   }
 
   nsCOMPtr<nsIPrincipal> principal;
-  rv = ssm->GetChannelResultPrincipal(aChannel, getter_AddRefs(principal));
+  nsresult rv = ssm->GetChannelResultPrincipal(aChannel, getter_AddRefs(principal));
   NS_ENSURE_SUCCESS(rv, rv);
 
+  // Then transmit down permissions and cookies which the document may need
+  // access to.
   rv = TransmitPermissionsForPrincipal(principal);
   NS_ENSURE_SUCCESS(rv, rv);
 
