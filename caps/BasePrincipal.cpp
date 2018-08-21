@@ -59,6 +59,16 @@ BasePrincipal::GetOriginNoSuffix(nsACString& aOrigin)
   return NS_OK;
 }
 
+NS_IMETHODIMP
+BasePrincipal::GetSiteOrigin(nsACString& aSiteOrigin)
+{
+  MOZ_ASSERT(mInitialized);
+  // For most principals, the SiteOrigin matches the Origin for a document
+  // precisely. Principals types which allow mutating |domain| must override
+  // this method.
+  return GetOrigin(aSiteOrigin);
+}
+
 bool
 BasePrincipal::Subsumes(nsIPrincipal* aOther, DocumentDomainConsideration aConsideration)
 {

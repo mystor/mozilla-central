@@ -246,6 +246,16 @@ interface nsIPrincipal : nsISerializable
     readonly attribute AUTF8String originSuffix;
 
     /**
+     * A canonical representation of the site-origin for this principal.
+     * This string has the same format as |origin| (see above).
+     * |subsumesConsideringDomain| will always be false for principals with
+     * different |siteOrigin| values.
+     *
+     * TODO(nika): Use this in DocGroup.
+     */
+    readonly attribute ACString siteOrigin;
+
+    /**
      * The base domain of the codebase URI to which this principal pertains
      * (generally the document URI), handling null principals and
      * non-hierarchical schemes correctly.
