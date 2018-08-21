@@ -48,6 +48,10 @@
 // This must start with the DEFAULT_REMOTE_TYPE above.
 #define LARGE_ALLOCATION_REMOTE_TYPE "webLargeAllocation"
 
+// This must start with the DEFAULT_REMOTE_TYPE above.
+// note: ISOLATED_REMOTE_TYPE is used as a prefix.
+#define ISOLATED_REMOTE_TYPE "webIsolated="
+
 class nsConsoleService;
 class nsIContentProcessInfo;
 class nsICycleCollectorLogSink;

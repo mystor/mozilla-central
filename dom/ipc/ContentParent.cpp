@@ -694,6 +694,11 @@ ContentParent::GetMaxProcessCount(const nsAString& aContentProcessType)
     return GetMaxWebProcessCount();
   }
 
+  if (nsContentUtils::IsIsolatedRemoteType(aContentProcessType)) {
+    return static_cast<uint32_t>(
+      Preferences::GetInt("dom.ipc.processCount.webIsolated", 1));
+  }
+
   nsAutoCString processCountPref("dom.ipc.processCount.");
   processCountPref.Append(NS_ConvertUTF16toUTF8(aContentProcessType));
 
@@ -5545,6 +5550,27 @@ ContentParent::UpdateCookieStatus(nsIChannel   *aChannel)
 nsresult
 ContentParent::AboutToLoadDocumentForChild(nsIChannel* aChannel, TabParent* aTab)
 {
+  // Don't consider changing processes for inner loads, such as those from
+  // view-source: URIs.
+  if (aChannel->IsDocument()) {
+    nsAutoString target;
+    switch (nsContentUtils::ShouldLoadChangeProcess(aChannel, GetRemoteType(), target)) {
+      case nsContentUtils::ProcessTargetAction::Current: {
+        break;
+      }
+
+      case nsContentUtils::ProcessTargetAction::Switch: {
+        // Perform a process-changing redirect load.
+        return NS_BINDING_ABORTED;
+      }
+
+      case nsContentUtils::ProcessTargetAction::Abort: {
+        NS_WARNING("Aborted due to nsContentUtils::ShouldLoadChangeProcess");
+        return NS_BINDING_ABORTED;
+      }
+    }
+  }
+
   // Get the principal for the channel result, so that we can get the permission
   // key for the document which will be created from this response.
   nsIScriptSecurityManager* ssm = nsContentUtils::GetSecurityManager();

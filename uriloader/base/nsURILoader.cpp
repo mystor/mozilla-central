@@ -31,6 +31,7 @@
 #include "nsIDocShellTreeItem.h"
 #include "nsIDocShellTreeOwner.h"
 #include "nsIThreadRetargetableStreamListener.h"
+#include "nsIXULRuntime.h"
 
 #include "nsString.h"
 #include "nsThreadUtils.h"
@@ -278,6 +279,34 @@ NS_IMETHODIMP nsDocumentOpenInfo::OnStartRequest(nsIRequest *request, nsISupport
       nsAutoCString largeAllocationHeader;
       rv = httpChannel->GetResponseHeader(NS_LITERAL_CSTRING("Large-Allocation"), largeAllocationHeader);
       if (NS_SUCCEEDED(rv) && nsContentUtils::AttemptLargeAllocationLoad(httpChannel)) {
+        return NS_BINDING_ABORTED;
+      }
+    }
+  }
+
+  // Get the current process' remote type.
+  nsAutoString remoteType;
+  nsCOMPtr<nsIXULRuntime> runtime = do_GetService("@mozilla.org/xre/runtime;1");
+  if (!runtime || NS_FAILED(runtime->GetRemoteType(remoteType))) {
+    remoteType.SetIsVoid(true);
+  }
+
+  nsCOMPtr<nsIChannel> chan = do_QueryInterface(request);
+  if (chan) {
+    // Check whether or not the load should be aborted.
+    nsAutoString target;
+    switch (nsContentUtils::ShouldLoadChangeProcess(chan, remoteType, target)) {
+      case nsContentUtils::ProcessTargetAction::Current: {
+        break; // Continue load as-today
+      }
+
+      case nsContentUtils::ProcessTargetAction::Switch: {
+        // Perform a process-changing redirect load.
+        return NS_BINDING_ABORTED;
+      }
+
+      case nsContentUtils::ProcessTargetAction::Abort: {
+        NS_WARNING("Aborted due to nsContentUtils::ShouldLoadChangeProcess");
         return NS_BINDING_ABORTED;
       }
     }

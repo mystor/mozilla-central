@@ -3321,6 +3321,52 @@ public:
    */
   static bool StringifyJSON(JSContext* aCx, JS::MutableHandle<JS::Value> vp, nsAString& aOutStr);
 
+  /**
+   * Determine whether or not |aRemoteType| is isolated.
+   */
+  static bool IsIsolatedRemoteType(const nsAString& aRemoteType);
+
+  /**
+   * Determine the |siteOrigin| of a given process from its remoteType. Returns
+   * |true| if the remoteType is isolated, and |false| otherwise.
+   */
+  static bool GetRemoteTypeSiteOrigin(const nsAString& aRemoteType,
+                                      nsACString& aSiteOrigin);
+
+  /**
+   * Return value of |ShouldRedirectChannelLoad|. Specifies the action to be
+   * taken for loads of the given channel.
+   */
+  enum class ProcessTargetAction
+  {
+    // Perform the load in the current process.
+    Current,
+
+    // Perform the load in a different process of type |aRemoteType|.
+    // If |aRemoteType| is the null DOMString, perform the load in chrome.
+    Switch,
+
+    // Abort a disallowed subdocument load. This should not be returned for
+    // toplevel documents.
+    Abort,
+  };
+
+  /**
+   * Determine whether a document channel load should be redirected into another
+   * process.
+   *
+   * @param aChannel            Document channel performing a load.
+   * @param aCurrentRemoteType  remoteType of the process handling |aChannel|.
+   *                            |null| DOMStrings specify the chrome process.
+   * @param aRemoteType         Filled with the remote type to switch to, or
+   *                            |null| to switch into the chrome process.
+   * @returns The action to take with the given channel.
+   */
+  static ProcessTargetAction
+  ShouldLoadChangeProcess(nsIChannel* aChannel,
+                          const nsAString& aCurrentRemoteType,
+                          nsAString& aRemoteType);
+
 private:
   static bool InitializeEventTable();
 

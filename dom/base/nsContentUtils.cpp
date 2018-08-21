@@ -42,6 +42,7 @@
 #include "mozilla/LoadInfo.h"
 #include "mozilla/dom/BlobURLProtocolHandler.h"
 #include "mozilla/dom/ContentChild.h"
+#include "mozilla/dom/ContentParent.h"
 #include "mozilla/dom/CustomElementRegistry.h"
 #include "mozilla/dom/MessageBroadcaster.h"
 #include "mozilla/dom/DocumentFragment.h"
@@ -11120,4 +11121,101 @@ nsContentUtils::StringifyJSON(JSContext* aCx, JS::MutableHandle<JS::Value> aValu
                               JSONCreator, &serializedValue), false);
   aOutStr = serializedValue;
   return true;
+}
+
+/* static */ bool
+nsContentUtils::IsIsolatedRemoteType(const nsAString& aRemoteType)
+{
+  return StringBeginsWith(aRemoteType, NS_LITERAL_STRING(ISOLATED_REMOTE_TYPE));
+}
+
+/* static */ bool
+nsContentUtils::GetRemoteTypeSiteOrigin(const nsAString& aRemoteType,
+                                        nsACString& aSiteOrigin)
+{
+  aSiteOrigin.Truncate();
+  if (IsIsolatedRemoteType(aRemoteType)) {
+    nsDependentSubstring so = Substring(aRemoteType, strlen(ISOLATED_REMOTE_TYPE));
+    CopyUTF16toUTF8(so, aSiteOrigin);
+    return true;
+  }
+  return false;
+}
+
+/* static */ nsContentUtils::ProcessTargetAction
+nsContentUtils::ShouldLoadChangeProcess(nsIChannel* aChannel,
+                                        const nsAString& aCurrentRemoteType,
+                                        nsAString& aRemoteType)
+{
+  // Determine the isolating site for the current process.
+  nsAutoCString currentSite;
+  bool currentlyIsolated =
+    GetRemoteTypeSiteOrigin(aCurrentRemoteType, currentSite);
+
+  // Get the principal for the channel result, so that we can get the permission
+  // key for the document which will be created from this response.
+  nsCOMPtr<nsIScriptSecurityManager> ssm = GetSecurityManager();
+  nsCOMPtr<nsIPrincipal> resultPrincipal;
+  ssm->GetChannelResultPrincipal(aChannel, getter_AddRefs(resultPrincipal));
+  MOZ_ASSERT(resultPrincipal, "Channel has no result principal!");
+
+  // Get the |siteOrigin| of the channel's result principal.
+  nsAutoCString resultSite;
+  resultPrincipal->GetSiteOrigin(resultSite);
+  bool resultSameSite = currentlyIsolated && currentSite == resultSite;
+
+  // Check for a header which forces isolation.
+  nsAutoCString _dummy;
+  nsCOMPtr<nsIHttpChannel> httpChannel = do_QueryInterface(aChannel);
+  bool forceIsolate = httpChannel &&
+    NS_SUCCEEDED(httpChannel->GetResponseHeader(
+      NS_LITERAL_CSTRING("X-Bikeshed-Force-Isolation"), _dummy));
+
+  nsCOMPtr<nsILoadInfo> loadInfo = aChannel->GetLoadInfo();
+
+  // If the load is neither currently isolated, nor requesting isolation, no
+  // process change is required.
+  if (!forceIsolate && !currentlyIsolated) {
+    return ProcessTargetAction::Current;
+  }
+
+  // The load is requesting to be loaded in an isolated process.
+  if (forceIsolate) {
+    // 1. If the load is already in a same-site isolated process, allow it to
+    //    continue as normal.
+    if (resultSameSite) {
+      return ProcessTargetAction::Current;
+    }
+
+    // 2. If the load is toplevel, perform a process swap into a correctly
+    //    isolated process.
+    if (loadInfo->GetIsTopLevelLoad()) {
+      aRemoteType.AssignLiteral(ISOLATED_REMOTE_TYPE);
+      AppendUTF8toUTF16(resultSite, aRemoteType);
+      return ProcessTargetAction::Switch;
+    }
+
+    // 3. Otherwise, abort the load as it cannot become isolated at this time.
+    //    TODO: Emit some form of warning here?
+    NS_WARNING("Unable to isolate |X-Bikeshed-Force-Isolation| document!");
+    return ProcessTargetAction::Abort;
+  }
+
+  // The load isn't requesting isolation, but is being loaded in an isolated
+  // process.
+  //
+  // 1. If the load is toplevel, switch to a non-isolated process.
+  if (loadInfo->GetIsTopLevelLoad()) {
+    aRemoteType.AssignLiteral(DEFAULT_REMOTE_TYPE);
+    return ProcessTargetAction::Switch;
+  }
+
+  // 2. If the load is for a same-site frame, allow the load to continue.
+  if (resultSameSite) {
+    return ProcessTargetAction::Current;
+  }
+
+  // 3. Otherwise, abort the load. TODO: Emit some form of warning here?
+  NS_WARNING("Unable to load non-same-site frame in isolated process");
+  return ProcessTargetAction::Abort;
 }

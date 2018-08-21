@@ -41,6 +41,11 @@ const PRIVILEGED_REMOTE_TYPE = "privileged";
 
 // This must start with the WEB_REMOTE_TYPE above.
 const LARGE_ALLOCATION_REMOTE_TYPE = "webLargeAllocation";
+
+// This must start with the WEB_REMOTE_TYPE above.
+// note: ISOLATED_REMOTE_TYPE is used as a prefix.
+const ISOLATED_REMOTE_TYPE = "webIsolated=";
+
 const DEFAULT_REMOTE_TYPE = WEB_REMOTE_TYPE;
 
 function validatedWebRemoteType(aPreferredRemoteType, aTargetUri, aCurrentUri) {
@@ -87,6 +92,7 @@ var E10SUtils = {
   EXTENSION_REMOTE_TYPE,
   PRIVILEGED_REMOTE_TYPE,
   LARGE_ALLOCATION_REMOTE_TYPE,
+  ISOLATED_REMOTE_TYPE,
 
   canLoadURIInProcess(aURL, aProcess) {
     let remoteType = aProcess == Ci.nsIXULRuntime.PROCESS_TYPE_CONTENT
