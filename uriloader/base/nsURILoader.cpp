@@ -301,7 +301,11 @@ NS_IMETHODIMP nsDocumentOpenInfo::OnStartRequest(nsIRequest *request, nsISupport
       }
 
       case nsContentUtils::ProcessTargetAction::Switch: {
-        // Perform a process-changing redirect load.
+        // Get into the parent process & call |RedirectLoad|
+        // https://searchfox.org/mozilla-central/rev/3fa761ade83ed0b8ab463acb057c2cf0b104689e/browser/base/content/browser.js#1111-1144
+        // to switch the browser into a new process. The |target| generated
+        // above needs to be sent along to decide the type of process to restore
+        // into.
         return NS_BINDING_ABORTED;
       }
 
