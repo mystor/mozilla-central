@@ -320,6 +320,15 @@ class TabParent final : public PBrowserParent,
   virtual mozilla::ipc::IPCResult RecvPWindowGlobalConstructor(
       PWindowGlobalParent* aActor, const WindowGlobalInit& aInit) override;
 
+  virtual PRemoteFrameParent* AllocPRemoteFrameParent(
+      const nsString& aPresentationURL, const nsString& aRemoteType) override;
+
+  virtual bool DeallocPRemoteFrameParent(PRemoteFrameParent* aActor) override;
+
+  virtual mozilla::ipc::IPCResult RecvPRemoteFrameConstructor(
+      PRemoteFrameParent* aActor, const nsString& aPresentationURL,
+      const nsString& aRemoteType) override;
+
   void LoadURL(nsIURI* aURI);
 
   void InitRendering();
@@ -557,6 +566,8 @@ class TabParent final : public PBrowserParent,
 
   void NavigateByKey(bool aForward, bool aForDocumentNavigation);
 
+  ShowInfo GetShowInfo();
+
  protected:
   bool ReceiveMessage(
       const nsString& aMessage, bool aSync, ipc::StructuredCloneData* aData,
@@ -618,15 +629,15 @@ class TabParent final : public PBrowserParent,
   LayoutDeviceIntPoint mClientOffset;
   LayoutDeviceIntPoint mChromeOffset;
 
+  already_AddRefed<nsFrameLoader> GetFrameLoader(
+      bool aUseCachedFrameLoaderAfterDestroy = false) const;
+
  private:
   void SuppressDisplayport(bool aEnabled);
 
   void DestroyInternal();
 
   void SetRenderLayersInternal(bool aEnabled, bool aForceRepaint);
-
-  already_AddRefed<nsFrameLoader> GetFrameLoader(
-      bool aUseCachedFrameLoaderAfterDestroy = false) const;
 
   RefPtr<nsIContentParent> mManager;
   void TryCacheDPIAndScale();
@@ -725,8 +736,6 @@ class TabParent final : public PBrowserParent,
 #ifdef DEBUG
   int32_t mActiveSupressDisplayportCount;
 #endif
-
-  ShowInfo GetShowInfo();
 
  private:
   // This is used when APZ needs to find the TabParent associated with a layer

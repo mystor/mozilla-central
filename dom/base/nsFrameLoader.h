@@ -58,6 +58,7 @@ class ProcessMessageManager;
 class Promise;
 class TabParent;
 class MutableTabContext;
+class RemoteFrameChild;
 
 namespace ipc {
 class StructuredCloneData;
@@ -271,6 +272,7 @@ class nsFrameLoader final : public nsStubMutationObserver,
   }
 
   PBrowserParent* GetRemoteBrowser() const;
+  mozilla::dom::RemoteFrameChild* GetRemoteFrameChild() const;
 
   /**
    * The "current" render frame is the one on which the most recent
@@ -349,6 +351,11 @@ class nsFrameLoader final : public nsStubMutationObserver,
   virtual JSObject* WrapObject(JSContext* cx,
                                JS::Handle<JSObject*> aGivenProto) override;
 
+  /**
+   * Return true if the frame is a remote frame. Return false otherwise
+   */
+  bool IsRemoteFrame();
+
  private:
   nsFrameLoader(mozilla::dom::Element* aOwner, nsPIDOMWindowOuter* aOpener,
                 bool aNetworkCreated, int32_t aJSPluginID);
@@ -357,11 +364,6 @@ class nsFrameLoader final : public nsStubMutationObserver,
   void SetOwnerContent(mozilla::dom::Element* aContent);
 
   bool ShouldUseRemoteProcess();
-
-  /**
-   * Return true if the frame is a remote frame. Return false otherwise
-   */
-  bool IsRemoteFrame();
 
   bool IsForJSPlugin() { return mJSPluginID != nsFakePluginTag::NOT_JSPLUGIN; }
 
@@ -455,6 +457,9 @@ class nsFrameLoader final : public nsStubMutationObserver,
 
   TabParent* mRemoteBrowser;
   uint64_t mChildID;
+
+  // This is used when this refers to a remote sub frame
+  RefPtr<mozilla::dom::RemoteFrameChild> mRemoteFrameChild;
 
   int32_t mJSPluginID;
 

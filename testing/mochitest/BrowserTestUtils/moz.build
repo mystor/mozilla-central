@@ -6,6 +6,7 @@
 
 TESTING_JS_MODULES += [
     'BrowserTestUtils.jsm',
+    'content/chrome-task.js',
     'content/content-task.js',
     'ContentTask.jsm',
     'ContentTaskUtils.jsm',
