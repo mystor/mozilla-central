@@ -3132,7 +3132,7 @@ HttpChannelChild::GetAltDataInputStream(const nsACString& aType,
 }
 
 mozilla::ipc::IPCResult HttpChannelChild::RecvOriginalCacheInputStreamAvailable(
-    const OptionalIPCStream& aStream) {
+    const Maybe<IPCStream>& aStream) {
   nsCOMPtr<nsIInputStream> stream = DeserializeIPCStream(aStream);
   nsCOMPtr<nsIInputStreamReceiver> receiver;
   receiver.swap(mOriginalInputStreamReceiver);
@@ -3144,7 +3144,7 @@ mozilla::ipc::IPCResult HttpChannelChild::RecvOriginalCacheInputStreamAvailable(
 }
 
 mozilla::ipc::IPCResult HttpChannelChild::RecvAltDataCacheInputStreamAvailable(
-    const OptionalIPCStream& aStream) {
+    const Maybe<IPCStream>& aStream) {
   nsCOMPtr<nsIInputStream> stream = DeserializeIPCStream(aStream);
   nsCOMPtr<nsIInputStreamReceiver> receiver;
   receiver.swap(mAltDataInputStreamReceiver);
