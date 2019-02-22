@@ -450,7 +450,7 @@ ContentParentsMemoryReporter::CollectReports(
         "queued-ipc-messages/content-parent"
         "(%s, pid=%d, %s, 0x%p, refcnt=%" PRIuPTR ")",
         NS_ConvertUTF16toUTF8(friendlyName).get(), cp->Pid(), channelStr,
-        static_cast<nsIContentParent*>(cp), refcnt);
+        static_cast<nsIObserver*>(cp), refcnt);
 
     NS_NAMED_LITERAL_CSTRING(
         desc,
@@ -2223,8 +2223,7 @@ ContentParent::ContentParent(ContentParent* aOpener,
                              RecordReplayState aRecordReplayState,
                              const nsAString& aRecordingFile,
                              int32_t aJSPluginID)
-    : nsIContentParent(),
-      mSelfRef(nullptr),
+    : mSelfRef(nullptr),
       mSubprocess(nullptr),
       mLaunchTS(TimeStamp::Now()),
       mLaunchYieldTS(mLaunchTS),
@@ -2911,7 +2910,6 @@ NS_IMPL_CYCLE_COLLECTING_ADDREF(ContentParent)
 NS_IMPL_CYCLE_COLLECTING_RELEASE(ContentParent)
 
 NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(ContentParent)
-  NS_INTERFACE_MAP_ENTRY(nsIContentParent)
   NS_INTERFACE_MAP_ENTRY(nsIObserver)
   NS_INTERFACE_MAP_ENTRY(nsIDOMGeoPositionCallback)
   NS_INTERFACE_MAP_ENTRY(nsIDOMGeoPositionErrorCallback)

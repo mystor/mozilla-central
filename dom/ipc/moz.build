@@ -42,8 +42,6 @@ EXPORTS.mozilla.dom += [
     'JSWindowActorParent.h',
     'JSWindowActorService.h',
     'MemoryReportRequest.h',
-    'nsIContentChild.h',
-    'nsIContentParent.h',
     'PermissionMessageUtils.h',
     'RemoteFrameChild.h',
     'RemoteFrameParent.h',

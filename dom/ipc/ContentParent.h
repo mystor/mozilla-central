@@ -8,11 +8,14 @@
 #define mozilla_dom_ContentParent_h
 
 #include "mozilla/dom/PContentParent.h"
-#include "mozilla/dom/nsIContentParent.h"
+#include "mozilla/dom/CPOWManagerGetter.h"
+#include "mozilla/dom/ipc/IdType.h"
 #include "mozilla/gfx/gfxVarReceiver.h"
 #include "mozilla/gfx/GPUProcessListener.h"
 #include "mozilla/ipc/BackgroundUtils.h"
 #include "mozilla/ipc/GeckoChildProcessHost.h"
+#include "mozilla/ipc/PParentToChildStreamParent.h"
+#include "mozilla/ipc/PChildToParentStreamParent.h"
 #include "mozilla/Attributes.h"
 #include "mozilla/FileUtils.h"
 #include "mozilla/HalTypes.h"
@@ -89,6 +92,7 @@ class ProtocolFuzzerHelper;
 
 namespace jsipc {
 class PJavaScriptParent;
+class CpowEntry;
 }  // namespace jsipc
 
 namespace layers {
@@ -107,7 +111,6 @@ class GetFilesHelper;
 class MemoryReportRequestHost;
 
 class ContentParent final : public PContentParent,
-                            public nsIContentParent,
                             public nsIObserver,
                             public nsIDOMGeoPositionCallback,
                             public nsIDOMGeoPositionErrorCallback,
@@ -115,7 +118,10 @@ class ContentParent final : public PContentParent,
                             public gfx::gfxVarReceiver,
                             public mozilla::LinkedListElement<ContentParent>,
                             public gfx::GPUProcessListener,
-                            public mozilla::MemoryReportingProcess {
+                            public mozilla::MemoryReportingProcess,
+                            public mozilla::dom::ipc::MessageManagerCallback,
+                            public CPOWManagerGetter,
+                            public mozilla::ipc::IShmemAllocator {
   typedef mozilla::ipc::GeckoChildProcessHost GeckoChildProcessHost;
   typedef mozilla::ipc::OptionalURIParams OptionalURIParams;
   typedef mozilla::ipc::PFileDescriptorSetParent PFileDescriptorSetParent;
