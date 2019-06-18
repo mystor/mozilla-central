@@ -5628,3 +5628,8 @@ pref("fission.preserve_browsing_contexts", false);
 //  * userContent.css
 //  * userChrome.css
 pref("toolkit.legacyUserProfileCustomizations.stylesheets", false);
+
+// - TESTING TESTING TESTING -
+pref("fission.autostart", true);
+pref("webrender.all", true);
+
