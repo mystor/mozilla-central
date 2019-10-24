@@ -10,14 +10,19 @@ interface RemoteTab;
 interface nsITransportSecurityInfo;
 
 [Exposed=Window, ChromeOnly]
-interface WindowGlobalParent {
+interface WindowContext {
+  readonly attribute unsigned long long innerWindowId;
+};
+
+[Exposed=Window, ChromeOnly]
+interface WindowGlobalParent : WindowContext {
   readonly attribute boolean isClosed;
   readonly attribute boolean isInProcess;
   readonly attribute CanonicalBrowsingContext browsingContext;
 
   readonly attribute boolean isCurrentGlobal;
 
-  readonly attribute unsigned long long innerWindowId;
+  // readonly attribute unsigned long long innerWindowId;
   readonly attribute unsigned long long outerWindowId;
   readonly attribute unsigned long long contentParentId;
 
@@ -91,6 +96,7 @@ interface WindowGlobalChild {
   readonly attribute boolean isClosed;
   readonly attribute boolean isInProcess;
   readonly attribute BrowsingContext browsingContext;
+  readonly attribute WindowContext windowContext;
 
   readonly attribute boolean isCurrentGlobal;
 

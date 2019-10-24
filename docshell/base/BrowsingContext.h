@@ -58,6 +58,7 @@ struct Nullable;
 template <typename T>
 class Sequence;
 class StructuredCloneHolder;
+class WindowContext;
 struct WindowPostMessageOptions;
 class WindowProxyHolder;
 
@@ -264,9 +265,18 @@ class BrowsingContext : public nsISupports, public nsWrapperCache {
 
   void GetChildren(Children& aChildren);
 
+  void GetWindowContexts(nsTArray<RefPtr<WindowContext>>& aWindows);
+
+  void RegisterWindowContext(WindowContext* aWindow);
+  void UnregisterWindowContext(WindowContext* aWindow);
+  WindowContext* GetCurrentWindowContext() const {
+    return mCurrentWindowContext;
+  }
+  void SetCurrentWindowContext(WindowContext* aWindow);
+
   BrowsingContextGroup* Group() { return mGroup; }
 
-  uint32_t SandboxFlags() { return mSandboxFlags; }
+  uint32_t SandboxFlags() { return GetSandboxFlags(); }
 
   // Using the rules for choosing a browsing context we try to find
   // the browsing context with the given name in the set of
@@ -341,6 +351,9 @@ class BrowsingContext : public nsISupports, public nsWrapperCache {
   NS_DECL_CYCLE_COLLECTION_SCRIPT_HOLDER_CLASS(BrowsingContext)
 
   const Children& GetChildren() { return mChildren; }
+  const nsTArray<RefPtr<WindowContext>>& GetWindowContexts() {
+    return mWindowContexts;
+  }
 
   // Perform a pre-order walk of this BrowsingContext subtree.
   void PreOrderWalk(const std::function<void(BrowsingContext*)>& aCallback) {
@@ -528,6 +541,9 @@ class BrowsingContext : public nsISupports, public nsWrapperCache {
   nsCOMPtr<nsIDocShell> mDocShell;
 
   RefPtr<Element> mEmbedderElement;
+
+  nsTArray<RefPtr<WindowContext>> mWindowContexts;
+  RefPtr<WindowContext> mCurrentWindowContext;
 
   // This is not a strong reference, but using a JS::Heap for that should be
   // fine. The JSObject stored in here should be a proxy with a

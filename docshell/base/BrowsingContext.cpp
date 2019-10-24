@@ -475,6 +475,37 @@ void BrowsingContext::GetChildren(Children& aChildren) {
   MOZ_ALWAYS_TRUE(aChildren.AppendElements(mChildren));
 }
 
+void BrowsingContext::GetWindowContexts(
+    nsTArray<RefPtr<WindowContext>>& aWindows) {
+  aWindows.AppendElements(mWindowContexts);
+}
+
+void BrowsingContext::RegisterWindowContext(WindowContext* aWindow) {
+  MOZ_ASSERT(!mWindowContexts.Contains(aWindow),
+             "WindowContext already registered!");
+  mWindowContexts.AppendElement(aWindow);
+}
+
+void BrowsingContext::UnregisterWindowContext(WindowContext* aWindow) {
+  MOZ_ASSERT(!mWindowContexts.Contains(aWindow),
+             "WindowContext already registered!");
+  mWindowContexts.RemoveElement(aWindow);
+
+  // Our current window global should be in our mWindowGlobals set. If it's not
+  // anymore, clear that reference.
+  // FIXME: There are probably situations where this is wrong. We should
+  // double-check.
+  if (aWindow == mCurrentWindowContext) {
+    mCurrentWindowContext = nullptr;
+  }
+}
+
+void BrowsingContext::SetCurrentWindowContext(WindowContext* aWindow) {
+  MOZ_ASSERT(mWindowContexts.Contains(aWindow),
+             "WindowContext not registered!");
+  mCurrentWindowContext = aWindow;
+}
+
 // FindWithName follows the rules for choosing a browsing context,
 // with the exception of sandboxing for iframes. The implementation
 // for arbitrarily choosing between two browsing contexts with the
@@ -799,18 +830,12 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(BrowsingContext)
 
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mDocShell, mChildren, mParent, mGroup,
                                   mEmbedderElement)
-  if (XRE_IsParentProcess()) {
-    CanonicalBrowsingContext::Cast(tmp)->Unlink();
-  }
   NS_IMPL_CYCLE_COLLECTION_UNLINK_PRESERVED_WRAPPER
 NS_IMPL_CYCLE_COLLECTION_UNLINK_END
 
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(BrowsingContext)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mDocShell, mChildren, mParent, mGroup,
                                     mEmbedderElement)
-  if (XRE_IsParentProcess()) {
-    CanonicalBrowsingContext::Cast(tmp)->Traverse(cb);
-  }
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
 
 class RemoteLocationProxy

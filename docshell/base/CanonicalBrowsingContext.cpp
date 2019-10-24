@@ -106,36 +106,14 @@ void CanonicalBrowsingContext::SetInFlightProcessId(uint64_t aProcessId) {
 
 void CanonicalBrowsingContext::GetWindowGlobals(
     nsTArray<RefPtr<WindowGlobalParent>>& aWindows) {
-  aWindows.SetCapacity(mWindowGlobals.Count());
-  for (auto iter = mWindowGlobals.Iter(); !iter.Done(); iter.Next()) {
-    aWindows.AppendElement(iter.Get()->GetKey());
+  aWindows.SetCapacity(GetWindowContexts().Length());
+  for (auto& window : GetWindowContexts()) {
+    aWindows.AppendElement(static_cast<WindowGlobalParent*>(window.get()));
   }
 }
 
-void CanonicalBrowsingContext::RegisterWindowGlobal(
-    WindowGlobalParent* aGlobal) {
-  MOZ_ASSERT(!mWindowGlobals.Contains(aGlobal), "Global already registered!");
-  mWindowGlobals.PutEntry(aGlobal);
-}
-
-void CanonicalBrowsingContext::UnregisterWindowGlobal(
-    WindowGlobalParent* aGlobal) {
-  MOZ_ASSERT(mWindowGlobals.Contains(aGlobal), "Global not registered!");
-  mWindowGlobals.RemoveEntry(aGlobal);
-
-  // Our current window global should be in our mWindowGlobals set. If it's not
-  // anymore, clear that reference.
-  if (aGlobal == mCurrentWindowGlobal) {
-    mCurrentWindowGlobal = nullptr;
-  }
-}
-
-void CanonicalBrowsingContext::SetCurrentWindowGlobal(
-    WindowGlobalParent* aGlobal) {
-  MOZ_ASSERT(mWindowGlobals.Contains(aGlobal), "Global not registered!");
-
-  // TODO: This should probably assert that the processes match.
-  mCurrentWindowGlobal = aGlobal;
+WindowGlobalParent* CanonicalBrowsingContext::GetCurrentWindowGlobal() const {
+  return static_cast<WindowGlobalParent*>(GetCurrentWindowContext());
 }
 
 already_AddRefed<WindowGlobalParent>
@@ -153,19 +131,8 @@ JSObject* CanonicalBrowsingContext::WrapObject(
   return CanonicalBrowsingContext_Binding::Wrap(aCx, this, aGivenProto);
 }
 
-void CanonicalBrowsingContext::Traverse(
-    nsCycleCollectionTraversalCallback& cb) {
-  CanonicalBrowsingContext* tmp = this;
-  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mWindowGlobals, mCurrentWindowGlobal);
-}
-
-void CanonicalBrowsingContext::Unlink() {
-  CanonicalBrowsingContext* tmp = this;
-  NS_IMPL_CYCLE_COLLECTION_UNLINK(mWindowGlobals, mCurrentWindowGlobal);
-}
-
 void CanonicalBrowsingContext::NotifyStartDelayedAutoplayMedia() {
-  if (!mCurrentWindowGlobal) {
+  if (!GetCurrentWindowGlobal()) {
     return;
   }
 
@@ -266,7 +233,7 @@ void CanonicalBrowsingContext::PendingRemotenessChange::Complete(
     return;
   }
 
-  RefPtr<WindowGlobalParent> oldWindow = target->mCurrentWindowGlobal;
+  RefPtr<WindowGlobalParent> oldWindow = target->GetCurrentWindowGlobal();
   RefPtr<BrowserParent> oldBrowser =
       oldWindow ? oldWindow->GetBrowserParent() : nullptr;
   bool wasRemote = oldWindow && oldWindow->IsProcessRoot();
@@ -411,10 +378,10 @@ CanonicalBrowsingContext::ChangeFrameRemoteness(const nsAString& aRemoteType,
 
   // Switching to local. No new process, so perform switch sync.
   if (aRemoteType.Equals(embedderBrowser->Manager()->GetRemoteType())) {
-    if (mCurrentWindowGlobal) {
-      MOZ_DIAGNOSTIC_ASSERT(mCurrentWindowGlobal->IsProcessRoot());
+    if (GetCurrentWindowGlobal()) {
+      MOZ_DIAGNOSTIC_ASSERT(GetCurrentWindowGlobal()->IsProcessRoot());
       RefPtr<BrowserParent> oldBrowser =
-          mCurrentWindowGlobal->GetBrowserParent();
+          GetCurrentWindowGlobal()->GetBrowserParent();
 
       RefPtr<CanonicalBrowsingContext> target(this);
       SetInFlightProcessId(OwnerProcessId());
@@ -465,6 +432,12 @@ already_AddRefed<Promise> CanonicalBrowsingContext::ChangeFrameRemoteness(
           [promise](nsresult aRv) { promise->MaybeReject(aRv); });
   return promise.forget();
 }
+
+NS_IMPL_ADDREF_INHERITED(CanonicalBrowsingContext, BrowsingContext)
+NS_IMPL_RELEASE_INHERITED(CanonicalBrowsingContext, BrowsingContext)
+
+NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(CanonicalBrowsingContext)
+NS_INTERFACE_MAP_END_INHERITING(BrowsingContext)
 
 }  // namespace dom
 }  // namespace mozilla
