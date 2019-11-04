@@ -219,11 +219,6 @@ IPCResult WindowGlobalParent::RecvSetHasBeforeUnload(bool aHasBeforeUnload) {
   return IPC_OK();
 }
 
-IPCResult WindowGlobalParent::RecvBecomeCurrentWindowGlobal() {
-  mBrowsingContext->SetCurrentWindowContext(this);
-  return IPC_OK();
-}
-
 IPCResult WindowGlobalParent::RecvDestroy() {
   if (CanSend()) {
     RefPtr<BrowserParent> browserParent = GetBrowserParent();

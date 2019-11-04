@@ -96,8 +96,10 @@ void WindowContext::Init() {
 
   // Register ourself to the browsing context.
   mBrowsingContext->RegisterWindowContext(this);
-  if (!mBrowsingContext->GetCurrentWindowContext()) {
-    mBrowsingContext->SetCurrentWindowContext(this);
+
+  uint64_t windowId = mBrowsingContext->GetCurrentInnerWindowId();
+  if (windowId == mInnerWindowId) {
+    mBrowsingContext->mCurrentWindowContext = this;
   }
 }
 

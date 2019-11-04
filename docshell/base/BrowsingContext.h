@@ -75,6 +75,7 @@ class WindowProxyHolder;
   FIELD(OnePermittedSandboxedNavigatorId, uint64_t)             \
   /* WindowID of the inner window which embeds this BC */       \
   FIELD(EmbedderInnerWindowId, uint64_t)                        \
+  FIELD(CurrentInnerWindowId, uint64_t)                         \
   FIELD(HadOriginalOpener, bool)                                \
   FIELD(IsPopupSpam, bool)                                      \
   /* Controls whether the BrowsingContext is currently */       \
@@ -272,7 +273,6 @@ class BrowsingContext : public nsISupports, public nsWrapperCache {
   WindowContext* GetCurrentWindowContext() const {
     return mCurrentWindowContext;
   }
-  void SetCurrentWindowContext(WindowContext* aWindow);
 
   BrowsingContextGroup* Group() { return mGroup; }
 
@@ -451,6 +451,8 @@ class BrowsingContext : public nsISupports, public nsWrapperCache {
 
   friend class ::nsOuterWindowProxy;
   friend class ::nsGlobalWindowOuter;
+  friend class WindowContext;
+
   // Update the window proxy object that corresponds to this browsing context.
   // This should be called from the window proxy object's objectMoved hook, if
   // the object mWindowProxy points to was moved by the JS GC.
@@ -515,6 +517,11 @@ class BrowsingContext : public nsISupports, public nsWrapperCache {
 
   bool CanSet(FieldIndex<IDX_EmbedderInnerWindowId>, const uint64_t& aValue,
               ContentParent* aSource);
+
+  bool CanSet(FieldIndex<IDX_CurrentInnerWindowId>, const uint64_t& aValue,
+              ContentParent* aSource);
+
+  void DidSet(FieldIndex<IDX_CurrentInnerWindowId>);
 
   bool CanSet(FieldIndex<IDX_IsPopupSpam>, const bool& aValue,
               ContentParent* aSource);

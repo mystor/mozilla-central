@@ -145,7 +145,6 @@ class WindowGlobalParent final : public WindowContext,
     return IPC_OK();
   }
   mozilla::ipc::IPCResult RecvSetHasBeforeUnload(bool aHasBeforeUnload);
-  mozilla::ipc::IPCResult RecvBecomeCurrentWindowGlobal();
   mozilla::ipc::IPCResult RecvDestroy();
   mozilla::ipc::IPCResult RecvRawMessage(const JSWindowActorMessageMeta& aMeta,
                                          const ClonedMessageData& aData);
